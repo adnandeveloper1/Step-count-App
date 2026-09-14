@@ -9,6 +9,7 @@ import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
 import 'core/services/local_storage_service.dart';
 import 'core/services/native_health_service.dart';
+import 'core/services/notification_service.dart';
 import 'core/services/widget_service.dart';
 
 @pragma('vm:entry-point')
@@ -134,6 +135,8 @@ void callbackDispatcher() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  await NotificationService().init();
 
   await g_sign_in.GoogleSignIn.instance.initialize(
     serverClientId: '348703955298-5nrsu7etb9jbvl8cqi7m4g1o222hc61p.apps.googleusercontent.com',

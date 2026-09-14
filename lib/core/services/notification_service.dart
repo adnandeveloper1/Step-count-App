@@ -1,17 +1,59 @@
 import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
 class NotificationService {
+
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
   FlutterLocalNotificationsPlugin();
+  
+  bool _isInitialized = false;
 
   Future<void> init() async {
-    tz.initializeTimeZones();
-    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    if (_isInitialized) return;
+
+    tz_data.initializeTimeZones();
+    
+    String timeZoneName = 'America/New_York';
+    try {
+      final dynamic timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+      final String rawString = timeZoneInfo.toString();
+      
+
+      if (rawString.contains('TimezoneInfo(')) {
+        final int startIndex = rawString.indexOf('TimezoneInfo(') + 'TimezoneInfo('.length;
+        final int endIndex = rawString.indexOf(',', startIndex);
+        if (endIndex != -1) {
+          timeZoneName = rawString.substring(startIndex, endIndex).trim();
+        } else {
+          final int closeParen = rawString.indexOf(')', startIndex);
+          if (closeParen != -1) {
+            timeZoneName = rawString.substring(startIndex, closeParen).trim();
+          }
+        }
+      } else {
+        timeZoneName = rawString;
+      }
+    } catch (_) {
+      timeZoneName = 'America/New_York';
+    }
+    
+    try {
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+    } catch (_) {
+
+      if (timeZoneName.contains('Karachi') || timeZoneName.contains('Asia/Karachi')) {
+        tz.setLocalLocation(tz.getLocation('Asia/Karachi'));
+      } else {
+        tz.setLocalLocation(tz.getLocation('America/New_York'));
+      }
+    }
 
     if (Platform.isAndroid) {
       await _notificationsPlugin
@@ -37,6 +79,8 @@ class NotificationService {
     await _notificationsPlugin.initialize(
       settings: initSettings,
     );
+
+    _isInitialized = true;
   }
 
   Future<void> scheduleDailyWalkReminder(int hour, int minute) async {
@@ -47,7 +91,7 @@ class NotificationService {
       importance: Importance.high,
       priority: Priority.high,
     );
-
+ 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails();
 
     const NotificationDetails details = NotificationDetails(
@@ -56,14 +100,12 @@ class NotificationService {
     );
 
     await _notificationsPlugin.zonedSchedule(
-      0,
-      'Time to Walk!',
-      'Your scheduled daily walk is coming up. Let us get moving!',
-      _nextInstanceOfTime(hour, minute),
-      details,
+      id: 0,
+      title: 'Time to Walk!',
+      body: 'Your scheduled daily walk is coming up. Let us get moving!',
+      scheduledDate: _nextInstanceOfTime(hour, minute),
+      notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-      UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
@@ -122,6 +164,50 @@ class NotificationService {
       id: 2,
       title: 'Goal Reached! 🏆',
       body: 'Incredible work. You hit $steps steps today.',
+      notificationDetails: details,
+    );
+  }
+
+  Future<void> showChallengeCompleted(String title) async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'challenge_channel',
+      'Challenges',
+      channelDescription: 'Notifications for completed challenges',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+      iOS: const DarwinNotificationDetails(),
+    );
+
+    await _notificationsPlugin.show(
+      id: DateTime.now().millisecond,
+      title: 'Challenge Completed! 🌟',
+      body: 'Great job! You finished the "$title" challenge.',
+      notificationDetails: details,
+    );
+  }
+
+  Future<void> showChallengeFailed(String title) async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'challenge_channel',
+      'Challenges',
+      channelDescription: 'Notifications for failed or expired challenges',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+      iOS:  DarwinNotificationDetails(),
+    );
+
+    await _notificationsPlugin.show(
+      id: DateTime.now().millisecond,
+      title: 'Challenge Expired ⏳',
+      body: 'Time ran out for the "$title" challenge. Don\'t worry, you can try again!',
       notificationDetails: details,
     );
   }

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/notification_provider/notification_provider.dart';
 import '../../../../core/services/local_storage_service.dart';
 
 class ChallengeItem {
@@ -216,6 +217,8 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
             isActive = false;
             isFailed = true;
             anyFailure = true;
+            ref.read(notificationServiceProvider).showChallengeFailed(item.title);
+
           }
         }
 
@@ -277,6 +280,8 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
         final deadline = item.startTime!.add(Duration(hours: item.durationInHours));
         if (now.isAfter(deadline)) {
           changed = true;
+          ref.read(notificationServiceProvider).showChallengeFailed(item.title);
+
           return item.copyWith(isActive: false, isFailed: true);
         }
       }
@@ -301,6 +306,7 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
 
       if (newSteps >= item.targetSteps) {
         earnedCoins += item.rewardCoins;
+        ref.read(notificationServiceProvider).showChallengeCompleted(item.title);
         return item.copyWith(
           currentSteps: item.targetSteps,
           isActive: false,
