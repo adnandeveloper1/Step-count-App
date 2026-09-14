@@ -206,7 +206,8 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                 ),
-                FutureBuilder<PackageInfo>(                  future: PackageInfo.fromPlatform(),
+                FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) return const SizedBox.shrink();
                     return Center(

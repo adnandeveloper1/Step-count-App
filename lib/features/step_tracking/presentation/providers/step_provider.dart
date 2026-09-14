@@ -444,7 +444,12 @@ class StepNotifier extends Notifier<StepState> {
       weeklySteps: weekly,
     );
     storage.saveSteps(todaySteps);
-    ref.read(widgetServiceProvider).updateWidgetData(todaySteps, state.goalSteps);
+    ref.read(widgetServiceProvider).updateWidgetData(
+      steps: todaySteps,
+      goal: state.goalSteps,
+      distance: calculatedDistanceKm,
+      calories: calculatedCalories,
+    );
   }
 
   //  check if  user broke  personal record of month right here.
@@ -498,7 +503,12 @@ class StepNotifier extends Notifier<StepState> {
   void updateGoal(int newGoal) {
     ref.read(storageProvider).saveStepGoal(newGoal);
     state = state.copyWith(goalSteps: newGoal);
-    ref.read(widgetServiceProvider).updateWidgetData(state.currentSteps, newGoal);
+    ref.read(widgetServiceProvider).updateWidgetData(
+      steps: state.currentSteps,
+      goal: newGoal,
+      distance: state.distanceKm,
+      calories: state.calories,
+    );
     
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {

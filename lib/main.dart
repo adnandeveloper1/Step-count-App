@@ -93,10 +93,19 @@ void callbackDispatcher() {
       weekly[now.weekday - 1] = todaySteps;
       storage.saveWeeklySteps(weekly.join(','));
     }
+    final double height = storage.getHeight();
+    final double weight = storage.getWeight();
+    final double strideLengthMeters = (height * 0.413) / 100;
+    final double distanceKm = (todaySteps * strideLengthMeters) / 1000;
+    final double calories = distanceKm * weight * 1.036;
 
     final widgetService = WidgetService();
-    await widgetService.init();
-    widgetService.updateWidgetData(todaySteps, storage.getStepGoal());
+    await widgetService.updateWidgetData(
+      steps: todaySteps,
+      goal: storage.getStepGoal(),
+      distance: distanceKm,
+      calories: calories,
+    );
 
     // 5. Silent Firebase Sync
     final user = FirebaseAuth.instance.currentUser;
@@ -107,8 +116,8 @@ void callbackDispatcher() {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'currentCoins': currentCoins,
         'todaySteps': todaySteps,
-        'todayCalories': todaySteps * 0.04,
-        'todayDistanceKm': todaySteps * 0.00075,
+        'todayCalories': calories,      
+        'todayDistanceKm': distanceKm,
         'weeklySteps': weekly,
         'weeklyCalories': totalWeeklySteps * 0.04,
         'lastUpdated': FieldValue.serverTimestamp(),
@@ -133,14 +142,22 @@ void main() async {
   final storage = LocalStorageService();
   await storage.init();
 
-  final widgetService = WidgetService();
-  await widgetService.init();
+  final int steps = storage.getSteps();
+  final int goal = storage.getStepGoal();
+  final double h = storage.getHeight();
+  final double w = storage.getWeight();
+  final double d = (steps * (h * 0.413) / 100) / 1000;
+  final double c = d * w * 1.036;
 
-  Workmanager().initialize(
-    callbackDispatcher,
-    isInDebugMode: true,
+  final widgetService = WidgetService();
+  await widgetService.updateWidgetData(
+    steps: steps,
+    goal: goal,
+    distance: d,
+    calories: c,
   );
 
+  Workmanager().initialize(callbackDispatcher, isInDebugMode: true);
   Workmanager().registerPeriodicTask(
     "step_tracker_task_id",
     "process_background_steps",
