@@ -1,4 +1,4 @@
-package com.example.build_up
+package com.nexappra.buildup
 
 import android.appwidget.AppWidgetManager
 import android.content.Context

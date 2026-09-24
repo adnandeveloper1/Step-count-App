@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/notification_provider/notification_provider.dart';
 import '../../../../core/services/local_storage_service.dart';
@@ -119,7 +118,7 @@ final storageProvider = Provider<LocalStorageService>((ref) => LocalStorageServi
 final widgetServiceProvider = Provider<WidgetService>((ref) => WidgetService());
 final stepNotifierProvider = NotifierProvider<StepNotifier, StepState>(StepNotifier.new);
 
-final Health _health = Health();
+
 
 // brain of the whole step tracker It handles all the logic for counting and saving.
 
@@ -230,74 +229,50 @@ class StepNotifier extends Notifier<StepState> {
     final now = DateTime.now();
     final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
+    // 1. Handle hardware reboots / system step counter resets first
+    if (hardwareSteps != null && hardwareSteps > 0) {
+      int currentBaseline = storage.getHardwareBaseline();
+      if (hardwareSteps < currentBaseline) {
+        storage.saveHardwareBaseline(0);
+      }
+    }
     if (storage.getLastDate() != dateStr) {
       storage.saveLastDate(dateStr);
       storage.saveSteps(0);
       storage.saveLastCoinStep(0);
       storage.saveGoalNotified(false);
 
-      storage.saveHardwareBaseline(0);
-
       String weeklyData = storage.getWeeklySteps();
       List<int> weekly = weeklyData.split(',').map((e) => int.tryParse(e) ?? 0).toList();
       if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
       weekly[now.weekday - 1] = 0;
       storage.saveWeeklySteps(weekly.join(','));
+
+      if (hardwareSteps != null && hardwareSteps > 0) {
+        storage.saveHardwareBaseline(hardwareSteps);
+      } else {
+        storage.saveHardwareBaseline(0);
+      }
     }
-    // This is for older phones that poll slowly
+
     if (hardwareSteps != null && hardwareSteps > 0) {
-      if (storage.getHardwareBaseline() == 0 || storage.getSteps() == 0) {
+
+      if (storage.getHardwareBaseline() == 0) {
         storage.saveHardwareBaseline(hardwareSteps);
       }
     }
   }
 
-  //sets up connection to sensors to ask permission first.
-
   Future initializeTracking() async {
-
-    final storage = ref.read(storageProvider);
-
-    // 1. If we already know Health isn't supported, go straight to hardware
-    if (!storage.getHealthSupported()) {
-      await _setupFallbackTracking();
-      return;
-    }
-    final types = [HealthDataType.STEPS];
     final activityStatus = await Permission.activityRecognition.request();
 
     if (!activityStatus.isGranted) {
       state = state.copyWith(pedestrianStatus: 'Permission Denied');
       return;
     }
-  bool hasPermissions = false;
-  try {
-    _health.configure();
-    hasPermissions = await _health.hasPermissions(types) ?? false;
-    if (!hasPermissions) {
-        hasPermissions = await _health.requestAuthorization(types);
-    }
-  } catch (e) {
-    debugPrint('Health Connect not supported, falling back: $e');
-    storage.saveHealthSupported(false);
-    hasPermissions = false;
-  }
-    if (hasPermissions) {
-      await _fetchHealthData();
-      _pollingTimer?.cancel();
-      _pollingTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
-        if (!state.isRestMode) _fetchHealthData();
-      });
-    }  else {
-      // 3. If permissions failed or service is missing, switch to hardware
-      storage.saveHealthSupported(false);
-      await _setupFallbackTracking();
-    }
-    if (await Permission.ignoreBatteryOptimizations.isDenied) {
-      await Permission.ignoreBatteryOptimizations.request();
-    }
-  }
 
+    await _setupFallbackTracking();
+  }
   Future<void> _setupFallbackTracking() async {
     await _fetchFallbackData();
     _pollingTimer?.cancel();
@@ -305,20 +280,6 @@ class StepNotifier extends Notifier<StepState> {
       if (!state.isRestMode) _fetchFallbackData();
     });
   }
-
-  // step count from OS Health or Apple Health
-
-  Future<void> _fetchHealthData() async {
-    try {
-      _handleDailyResetIfNeeded();
-      final now = DateTime.now();
-      final midnight = DateTime(now.year, now.month, now.day);
-      int? steps = await _health.getTotalStepsInInterval(midnight, now);
-      _processSteps(steps ?? 0, 'tracking');
-    } catch (e) { await _fetchFallbackData(); }
-  }
-
-  // If the health sensors fail, we use this backup way to count steps directly from the phone.
 
   Future<void> _fetchFallbackData() async {
     final nativeHealth = ref.read(nativeHealthProvider);

@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
 
 class GpsTrackingState {
   final Position? currentPosition;
@@ -116,6 +115,7 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
   Future<void> stopTracking() async {
     state = state.copyWith(isTracking: false);
     await _saveRouteToHistory();
+    disposeSubscription();
   }
 
   Future<void> _saveRouteToHistory() async {

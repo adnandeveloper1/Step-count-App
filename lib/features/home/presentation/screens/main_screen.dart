@@ -3,14 +3,9 @@ import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/gps_tracking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../../../../core/services/permission_service.dart';
-import '../../../../core/services/local_storage_service.dart';
 import '../../../settings/presentation/setting_screen.dart';
-import '../../../shop/presentation/screens/store_screen.dart';
 import '../../../social/presentation/screens/social_screen.dart';
-import '../../../step_tracking/presentation/providers/step_provider.dart';
 import '../../../step_tracking/presentation/screens/dashboard_screen.dart';
 
 
@@ -35,73 +30,9 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAndroidVersionAndPrompt();
-    });
   }
 
-  Future<void> _checkAndroidVersionAndPrompt() async {
-    if (!Platform.isAndroid) return;
 
-    final storage = ref.read(storageProvider);
-    if (storage.getBatteryPromptShown()) return;
-
-    final deviceInfo = DeviceInfoPlugin();
-    final androidInfo = await deviceInfo.androidInfo;
-
-    if (androidInfo.version.sdkInt <= 33) {
-      if (mounted) {
-        _showBatteryDialog(storage);
-      }
-    }
-  }
-
-  void _showBatteryDialog(LocalStorageService storage) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundDark,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        title: const Text(
-          'Enable Background Tracking',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: const Text(
-          'You must disable battery optimization for Build Up to count your steps accurately in the background.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              storage.saveBatteryPromptShown(true);
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await ref.read(permissionServiceProvider).requestBatteryExemption();
-              storage.saveBatteryPromptShown(true);
-              if (context.mounted) Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryEmerald,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-            child: const Text('Enable', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {

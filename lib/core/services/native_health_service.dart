@@ -17,13 +17,4 @@ class NativeHealthService {
     }
   }
 
-  Future<int> getAndroidApiLevel() async {
-    try {
-      final int apiLevel = await platform.invokeMethod('getAndroidApiLevel');
-      return apiLevel;
-    } on PlatformException {
-      return 99;
-    }
-  }
-
 }

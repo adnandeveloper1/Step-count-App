@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart' as g_sign_in;
-import 'package:health/health.dart';
 import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
 import 'core/services/local_storage_service.dart';
@@ -22,16 +21,8 @@ void callbackDispatcher() {
     await storage.init();
     final now = DateTime.now();
 
-    int hardwareSteps = 0;
-    final health = Health();
-    int? healthSteps = await health.getTotalStepsInInterval(DateTime(now.year, now.month, now.day), now);
-
-    if (healthSteps != null && healthSteps > 0) {
-      hardwareSteps = healthSteps;
-    } else {
-      final nativeHealth = NativeHealthService();
-      hardwareSteps = await nativeHealth.getHardwareSteps();
-    }
+    final nativeHealth = NativeHealthService();
+    int hardwareSteps = await nativeHealth.getHardwareSteps();
 
     if (hardwareSteps == 0) return Future.value(true);
 

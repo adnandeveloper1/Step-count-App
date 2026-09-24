@@ -105,7 +105,7 @@ class NotificationService {
       body: 'Your scheduled daily walk is coming up. Let us get moving!',
       scheduledDate: _nextInstanceOfTime(hour, minute),
       notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }

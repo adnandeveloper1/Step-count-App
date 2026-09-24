@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../step_tracking/presentation/providers/step_provider.dart';
 import '../../../core/utils/export_service.dart';
-
 import '../../auth/presentation/providers/auth_provider.dart';
-import '../../../core/services/native_health_service.dart';
 import '../../step_tracking/presentation/widgets/glass_step_card.dart';
 import 'scheduler_screen.dart';
 import 'edit_profile_screen.dart';
@@ -35,6 +34,16 @@ class SettingsScreen extends ConsumerWidget {
     final screenWidth = size.width;
     final screenHeight = size.height;
     final padding = screenWidth * 0.05;
+
+    const String privacyPolicyUrl =
+        'https://sites.google.com/view/buildup-app-buildup-app-/home';
+
+    Future<void> _openPrivacyPolicy() async {
+      final Uri url = Uri.parse(privacyPolicyUrl);
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw Exception('Could not launch $privacyPolicyUrl');
+      }
+    }
 
     return SafeArea(
       child: Scaffold(
@@ -107,8 +116,6 @@ class SettingsScreen extends ConsumerWidget {
                 ),
       
                 SizedBox(height: screenHeight * 0.03),
-                const ConditionalHealthNotice(),
-                SizedBox(height: screenHeight * 0.01),
                 Text(
                   'SETTINGS',
                   style: TextStyle(
@@ -181,8 +188,19 @@ class SettingsScreen extends ConsumerWidget {
                             stepState.calories,
                             stepState.distanceKm,
                           );
+
                         },
                       ),
+                      const Divider(color: Colors.white24),
+                      ListTile(
+                        leading: Icon(Icons.privacy_tip_rounded, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
+                        title: Text('Privacy & Policy', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
+                        onTap: () {
+                          _openPrivacyPolicy();
+
+                        },
+                      ),
+
                     ],
                   ),
                 ),
@@ -229,25 +247,6 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class ConditionalHealthNotice extends ConsumerWidget {
-  const ConditionalHealthNotice({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final nativeHealth = ref.read(nativeHealthProvider);
-
-    return FutureBuilder<int>(
-      future: nativeHealth.getAndroidApiLevel(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data! < 34) {
-          return const HealthConnectNotice();
-        }
-        return const SizedBox.shrink();
-      },
     );
   }
 }
