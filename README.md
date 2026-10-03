@@ -1,0 +1,36 @@
+# Build Up
+
+## Description
+Build Up is a gamified fitness and productivity application designed to help users track their health goals through interactive social features and automated data insights.
+
+## Tech Stack
+- **Frontend:** Flutter
+- **Backend:** Firestore/Firebase
+- **Backend Services:** Firebase (Auth, Firestore, Cloud Messaging)
+- **State Management:** Riverpod
+
+## Features
+- **Step Tracking:** Real-time activity monitoring using health data integration.
+- **Social Interaction:** Compete with friends and engage in live Step Race Weekly.
+- **Automated Data Analytics:** Visualize progress with detailed insights and glassmorphic charts.
+- **Gamified Shop:** Earn rewards and collect unique badges as you reach milestones.
+- **Smart Notifications:** Stay motivated with timely updates and alerts.
+
+## Run Instructions
+Follow these commands to get the project running locally:
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/your-username/build_up.git
+   cd build_up
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Run the application:**
+   ```bash
+   flutter run
+   ```

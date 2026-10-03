@@ -1,0 +1,18 @@
+name: native_health
+description: A local plugin for step tracking background access.
+version: 0.0.1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.nexappra.buildup.native_health
+        pluginClass: NativeHealthPlugin
