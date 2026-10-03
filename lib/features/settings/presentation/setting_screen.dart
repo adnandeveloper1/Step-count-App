@@ -53,7 +53,7 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: screenHeight * 0.04),
+                SizedBox(height: screenHeight * 0.02),
                 Center(
                   child: Column(
                     children: [
@@ -63,7 +63,7 @@ class SettingsScreen extends ConsumerWidget {
                         tierName: '${stepState.tierName}',
                       ),
                       
-                      SizedBox(height: screenHeight * 0.001),
+                      SizedBox(height: screenHeight * 0.01),
                       Text(
                         displayName,
                         style: GoogleFonts.sora(

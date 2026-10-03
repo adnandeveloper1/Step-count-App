@@ -14,6 +14,7 @@ class InsightsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final stepState = ref.watch(stepNotifierProvider);
     final size = MediaQuery.of(context).size;
+    final screenWidth = size.width;
     final currentDayIndex = DateTime.now().weekday - 1;
 
     final List<int> rawWeeklySteps = List<int>.from(stepState.weeklySteps);
@@ -64,83 +65,105 @@ class InsightsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(
-          'WEEKLY INSIGHTS',
-          style: GoogleFonts.sora(
-            fontSize: size.width * 0.06,
-            fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
-            letterSpacing: .1,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-      ),
+
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(size.width * 0.05),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildGraphCard(orderedSteps, orderedLabels, size),
-              SizedBox(height: size.height * 0.03),
-              IntrinsicHeight(
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: screenWidth * 0.05,
+                vertical: 10,
+              ),
+              child: SizedBox(
+                height: 50, // Force consistent height across all screens
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Expanded(
-                      child: _buildInsightCard(
-                        label: 'Daily Average',
-                        value: '$avgSteps',
-                        unit: 'steps',
-                        icon: Icons.directions_walk,
-                        trendText: trendText,
-                        isPositive: isTrendPositive,
+                    // Left Spacer (Matches Dashboard Avatar space)
+                    const Expanded(child: SizedBox.shrink()),
+
+                    Text(
+                      'WEEKLY INSIGHTS',
+                      style: GoogleFonts.sora(
+                        fontSize: screenWidth * 0.06,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                        letterSpacing: .1,
                       ),
                     ),
-                    SizedBox(width: size.width * 0.03),
-                    Expanded(
-                      child: _buildInsightCard(
-                        label: 'Total Burn',
-                        value: '${totalCalories.toInt()}',
-                        unit: 'kcal',
-                        icon: Icons.local_fire_department,
-                      ),
-                    ),
+
+                    // Right Spacer (Matches Dashboard Coin space)
+                    const Expanded(child: SizedBox.shrink()),
                   ],
                 ),
               ),
-              SizedBox(height: size.height * 0.03),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(size.width * 0.05),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: _buildInsightCard(
-                        label: 'Active Time',
-                        value: '$hours:${minutes.toString().padLeft(2, '0')}',
-                        unit: 'hrs',
-                        icon: Icons.timer,
+                    _buildGraphCard(orderedSteps, orderedLabels, size),
+                    SizedBox(height: size.height * 0.03),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _buildInsightCard(
+                              label: 'Daily Average',
+                              value: '$avgSteps',
+                              unit: 'steps',
+                              icon: Icons.directions_walk,
+                              trendText: trendText,
+                              isPositive: isTrendPositive,
+                            ),
+                          ),
+                          SizedBox(width: size.width * 0.03),
+                          Expanded(
+                            child: _buildInsightCard(
+                              label: 'Total Burn',
+                              value: '${totalCalories.toInt()}',
+                              unit: 'kcal',
+                              icon: Icons.local_fire_department,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: size.width * 0.03),
-                    Expanded(
-                      child: _buildInsightCard(
-                        label: 'Best Day',
-                        value: maxSteps > 0 ? '$maxSteps' : '0',
-                        unit: 'steps',
-                        subtitle: bestDayName,
-                        icon: Icons.star,
+                    SizedBox(height: size.height * 0.03),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _buildInsightCard(
+                              label: 'Active Time',
+                              value: '$hours:${minutes.toString().padLeft(2, '0')}',
+                              unit: 'hrs',
+                              icon: Icons.timer,
+                            ),
+                          ),
+                          SizedBox(width: size.width * 0.03),
+                          Expanded(
+                            child: _buildInsightCard(
+                              label: 'Best Day',
+                              value: maxSteps > 0 ? '$maxSteps' : '0',
+                              unit: 'steps',
+                              subtitle: bestDayName,
+                              icon: Icons.star,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
