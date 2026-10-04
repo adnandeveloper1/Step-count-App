@@ -66,7 +66,6 @@ class AuthController {
           'name': 'Guest User',
           'displayName': 'Guest User',
           'totalSteps': 0,
-          'photoUrl': '',
           'avatarUrl': '👤',
           'isGuest': true,
           'createdAt': FieldValue.serverTimestamp(),
@@ -100,7 +99,6 @@ class AuthController {
             'name': user.displayName ?? 'Google User',
             'displayName': user.displayName ?? 'Google User',
             'totalSteps': 0,
-            'photoUrl': user.photoURL ?? '',
             'avatarUrl': '🌟',
             'createdAt': FieldValue.serverTimestamp(),
           });
@@ -111,6 +109,7 @@ class AuthController {
       rethrow;
     }
   }
+
   Future<void> signUp(String email, String password, String name) async {
     final userCredential = await _auth.createUserWithEmailAndPassword(
       email: email,
@@ -123,7 +122,6 @@ class AuthController {
         'name': name,
         'displayName': name,
         'totalSteps': 0,
-        'photoUrl': '',
         'avatarUrl': '🙂',
         'createdAt': FieldValue.serverTimestamp(),
       });
