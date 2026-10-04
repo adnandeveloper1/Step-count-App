@@ -10,12 +10,15 @@ import 'core/services/local_storage_service.dart';
 import 'core/services/native_health_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/widget_service.dart';
+import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     WidgetsFlutterBinding.ensureInitialized();
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
     final storage = LocalStorageService();
     await storage.init();
@@ -125,12 +128,14 @@ void callbackDispatcher() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   await NotificationService().init();
 
   await g_sign_in.GoogleSignIn.instance.initialize(
-    serverClientId: '348703955298-5nrsu7etb9jbvl8cqi7m4g1o222hc61p.apps.googleusercontent.com',
+    serverClientId: '477084231873-0ehsragfu755ik8ijnh68pak6v36h2s3.apps.googleusercontent.com',
   );
 
   final storage = LocalStorageService();
