@@ -1,27 +1,27 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../app/theme/app_theme_model.dart';
 import '../../../step_tracking/presentation/providers/step_provider.dart';
 
 class ThemeState {
   final String activeThemeId;
-  final List<String> purchasedThemes;
-  final Color primaryColor;
+  final List<String> purchasedThemeIds;
 
   ThemeState({
-    required this.activeThemeId,
-    required this.purchasedThemes,
-    required this.primaryColor,
-  });
+    required String? activeThemeId,
+    required this.purchasedThemeIds,
+  }) : activeThemeId = (activeThemeId == null || activeThemeId.isEmpty) ? 'default_dark' : activeThemeId;
+
+  // ⚡ Computed getter: Always fetches the latest AppThemeModel from catalog
+  // Safe null check prevents Hot Reload state mismatch errors!
+  AppThemeModel get activeTheme => AppThemeCatalog.getById(activeThemeId);
 
   ThemeState copyWith({
     String? activeThemeId,
-    List<String>? purchasedThemes,
-    Color? primaryColor,
+    List<String>? purchasedThemeIds,
   }) {
     return ThemeState(
       activeThemeId: activeThemeId ?? this.activeThemeId,
-      purchasedThemes: purchasedThemes ?? this.purchasedThemes,
-      primaryColor: primaryColor ?? this.primaryColor,
+      purchasedThemeIds: purchasedThemeIds ?? this.purchasedThemeIds,
     );
   }
 }
@@ -29,56 +29,62 @@ class ThemeState {
 final themeProvider = NotifierProvider<ThemeNotifier, ThemeState>(ThemeNotifier.new);
 
 class ThemeNotifier extends Notifier<ThemeState> {
-  final Map<String, Color> themeColors = {
-    'default': const Color(0xFF10B981),
-    'neon': const Color(0xFF1de9b6),
-    'ocean': const Color(0xFF0EA5E9),
-    'sunset': const Color(0xFFF97316),
-    'amethyst': const Color(0xFF8B5CF6),
-    'avatar_pro': const Color(0xFFFFD700),
-    'icon_dark': const Color(0xFF1F2937),
-    'analytics': const Color(0xFF3B82F6),
-  };
   @override
   ThemeState build() {
     final storage = ref.watch(storageProvider);
-    final active = storage.getActiveTheme();
-    final purchased = storage.getPurchasedThemes();
+    final activeId = storage.getActiveTheme();
+
+    final defaultPurchased = ['default_dark', 'default_light'];
+    final savedPurchased = storage.getPurchasedThemes();
+    final purchased = {...defaultPurchased, ...savedPurchased}.toList();
 
     return ThemeState(
-      activeThemeId: active,
-      purchasedThemes: purchased,
-      primaryColor: themeColors[active] ?? themeColors['default']!,
+      activeThemeId: activeId,
+      purchasedThemeIds: purchased,
     );
   }
 
-  bool purchaseTheme(String themeId, int cost) {
-    if (state.purchasedThemes.contains(themeId)) return false;
+  bool isOwned(String themeId) => state.purchasedThemeIds.contains(themeId);
+  bool isActive(String themeId) => state.activeThemeId == themeId;
 
-    final stepNotifier = ref.read(stepNotifierProvider.notifier);
-    final success = stepNotifier.deductCoins(cost);
+  bool purchaseTheme(AppThemeModel theme) {
+    if (isOwned(theme.id)) return false;
 
-    if (success) {
+    if (theme.costCoins == 0) {
       final storage = ref.read(storageProvider);
-      final updatedPurchased = List<String>.from(state.purchasedThemes)..add(themeId);
-
+      final updatedPurchased = [...state.purchasedThemeIds, theme.id];
       storage.savePurchasedThemes(updatedPurchased);
-      state = state.copyWith(purchasedThemes: updatedPurchased);
+      state = state.copyWith(
+        purchasedThemeIds: updatedPurchased,
+        activeThemeId: theme.id,
+      );
+      storage.saveActiveTheme(theme.id);
       return true;
     }
 
+    final stepNotifier = ref.read(stepNotifierProvider.notifier);
+    final success = stepNotifier.deductCoins(theme.costCoins);
+
+    if (success) {
+      final storage = ref.read(storageProvider);
+      final updatedPurchased = [...state.purchasedThemeIds, theme.id];
+
+      storage.savePurchasedThemes(updatedPurchased);
+      state = state.copyWith(
+        purchasedThemeIds: updatedPurchased,
+        activeThemeId: theme.id,
+      );
+      storage.saveActiveTheme(theme.id);
+      return true;
+    }
     return false;
   }
 
-  void setActiveTheme(String themeId) {
-    if (!state.purchasedThemes.contains(themeId)) return;
+  void setActiveTheme(AppThemeModel theme) {
+    if (!isOwned(theme.id)) return;
 
     final storage = ref.read(storageProvider);
-    storage.saveActiveTheme(themeId);
-
-    state = state.copyWith(
-      activeThemeId: themeId,
-      primaryColor: themeColors[themeId] ?? themeColors['default']!,
-    );
+    storage.saveActiveTheme(theme.id);
+    state = state.copyWith(activeThemeId: theme.id);
   }
 }

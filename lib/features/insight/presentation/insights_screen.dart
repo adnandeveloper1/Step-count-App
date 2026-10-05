@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../step_tracking/presentation/providers/step_provider.dart';
 import '../../step_tracking/presentation/widgets/glass_step_card.dart';
-
 
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
@@ -65,7 +64,6 @@ class InsightsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-
       body: SafeArea(
         child: Column(
           children: [
@@ -75,24 +73,20 @@ class InsightsScreen extends ConsumerWidget {
                 vertical: 10,
               ),
               child: SizedBox(
-                height: 50, // Force consistent height across all screens
+                height: 50,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Left Spacer (Matches Dashboard Avatar space)
                     const Expanded(child: SizedBox.shrink()),
-
                     Text(
                       'WEEKLY INSIGHTS',
                       style: GoogleFonts.sora(
                         fontSize: screenWidth * 0.06,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
+                        color: context.textPrimary,
                         letterSpacing: .1,
                       ),
                     ),
-
-                    // Right Spacer (Matches Dashboard Coin space)
                     const Expanded(child: SizedBox.shrink()),
                   ],
                 ),
@@ -104,7 +98,7 @@ class InsightsScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildGraphCard(orderedSteps, orderedLabels, size),
+                    _buildGraphCard(context, orderedSteps, orderedLabels, size),
                     SizedBox(height: size.height * 0.03),
                     IntrinsicHeight(
                       child: Row(
@@ -112,6 +106,7 @@ class InsightsScreen extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: _buildInsightCard(
+                              context: context,
                               label: 'Daily Average',
                               value: '$avgSteps',
                               unit: 'steps',
@@ -123,6 +118,7 @@ class InsightsScreen extends ConsumerWidget {
                           SizedBox(width: size.width * 0.03),
                           Expanded(
                             child: _buildInsightCard(
+                              context: context,
                               label: 'Total Burn',
                               value: '${totalCalories.toInt()}',
                               unit: 'kcal',
@@ -139,6 +135,7 @@ class InsightsScreen extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: _buildInsightCard(
+                              context: context,
                               label: 'Active Time',
                               value: '$hours:${minutes.toString().padLeft(2, '0')}',
                               unit: 'hrs',
@@ -148,6 +145,7 @@ class InsightsScreen extends ConsumerWidget {
                           SizedBox(width: size.width * 0.03),
                           Expanded(
                             child: _buildInsightCard(
+                              context: context,
                               label: 'Best Day',
                               value: maxSteps > 0 ? '$maxSteps' : '0',
                               unit: 'steps',
@@ -170,6 +168,7 @@ class InsightsScreen extends ConsumerWidget {
   }
 
   Widget _buildInsightCard({
+    required BuildContext context,
     required String label,
     required String value,
     required String unit,
@@ -187,21 +186,21 @@ class InsightsScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, color: AppColors.primaryEmerald, size: 28),
+              Icon(icon, color: context.primaryColor, size: 28),
               if (trendText != null && isPositive != null)
                 Row(
                   children: [
                     Text(
                       trendText,
                       style: GoogleFonts.jetBrainsMono(
-                        color: isPositive ? AppColors.primaryEmerald : Colors.redAccent,
+                        color: isPositive ? context.primaryColor : Colors.redAccent,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
                     ),
                     Icon(
                       isPositive ? Icons.arrow_upward : Icons.arrow_downward,
-                      color: isPositive ? AppColors.primaryEmerald : Colors.redAccent,
+                      color: isPositive ? context.primaryColor : Colors.redAccent,
                       size: 14,
                     ),
                   ],
@@ -220,7 +219,7 @@ class InsightsScreen extends ConsumerWidget {
                     style: GoogleFonts.sora(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: context.textPrimary,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -231,7 +230,7 @@ class InsightsScreen extends ConsumerWidget {
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        color: context.textSecondary,
                       ),
                     ),
                   ),
@@ -244,7 +243,7 @@ class InsightsScreen extends ConsumerWidget {
                   style: GoogleFonts.sora(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primaryEmerald,
+                    color: context.primaryColor,
                   ),
                 ),
               ],
@@ -253,7 +252,7 @@ class InsightsScreen extends ConsumerWidget {
                 label,
                 style: GoogleFonts.sora(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: context.textSecondary,
                 ),
               ),
             ],
@@ -263,86 +262,118 @@ class InsightsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildGraphCard(List<int> steps, List<String> labels, Size size) {
+  Widget _buildGraphCard(BuildContext context, List<int> steps, List<String> labels, Size size) {
     final double maxStep = steps.isEmpty ? 0 : steps.reduce((a, b) => a > b ? a : b).toDouble();
+    final bool hasData = steps.any((s) => s > 0);
     final double calculatedMaxY = maxStep > 10000 ? maxStep * 1.2 : 10000.0;
 
     return GlassCard(
       padding: EdgeInsets.all(size.width * 0.05),
       child: SizedBox(
         height: size.height * 0.265,
-        child: BarChart(
-          BarChartData(
-            alignment: BarChartAlignment.center,
-            groupsSpace: size.width * 0.030,
-            maxY: calculatedMaxY,
-            barTouchData: BarTouchData(
-              enabled: true,
-              touchTooltipData: BarTouchTooltipData(
-                getTooltipColor: (group) =>AppColors.backgroundDark,
-                tooltipBorderRadius: BorderRadius.circular(20),
-                tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                tooltipMargin: 8,
-                getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                  return BarTooltipItem(
-                    '${rod.toY.toInt()}',
-                    GoogleFonts.jetBrainsMono(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: size.width * 0.035,
-                    ),
-                  );
-                },
-              ),
-            ),
-            titlesData: FlTitlesData(
-              show: true,
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: size.height * 0.030,
-                  getTitlesWidget: (value, meta) {
-                    final index = value.toInt();
-                    if (index < 0 || index >= labels.length) return const SizedBox.shrink();
-                    final isToday = index == 6;
-                    return Padding(
-                      padding: EdgeInsets.only(top: size.height * 0.008),
-                      child: Text(
-                        labels[index],
-                        style: GoogleFonts.jetBrainsMono(
-                          color: isToday ? AppColors.primaryEmerald : AppColors.textSecondary,
-                          fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                          fontSize: size.width * 0.032,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            gridData: const FlGridData(show: false),
-            borderData: FlBorderData(show: false),
-            barGroups: List.generate(
-              7,
-                  (index) => BarChartGroupData(
-                x: index,
-                barRods: [
-                  BarChartRodData(
-                    toY: index < steps.length ? steps[index].toDouble() : 0,
-                    color: AppColors.primaryEmerald,
-                    width: size.width * 0.095,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
+        child: hasData
+            ? BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.center,
+                  groupsSpace: size.width * 0.030,
+                  maxY: calculatedMaxY,
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (group) => context.backgroundColor,
+                      tooltipBorderRadius: BorderRadius.circular(20),
+                      tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      tooltipMargin: 8,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        return BarTooltipItem(
+                          '${rod.toY.toInt()}',
+                          GoogleFonts.jetBrainsMono(
+                            color: context.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: size.width * 0.035,
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ],
+                  titlesData: FlTitlesData(
+                    show: true,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: size.height * 0.030,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index < 0 || index >= labels.length) return const SizedBox.shrink();
+                          final isToday = index == 6;
+                          return Padding(
+                            padding: EdgeInsets.only(top: size.height * 0.008),
+                            child: Text(
+                              labels[index],
+                              style: GoogleFonts.jetBrainsMono(
+                                color: isToday ? context.primaryColor : context.textSecondary,
+                                fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                                fontSize: size.width * 0.032,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  barGroups: List.generate(
+                    7,
+                    (index) => BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        BarChartRodData(
+                          toY: index < steps.length ? steps[index].toDouble() : 0,
+                          color: context.primaryColor,
+                          width: size.width * 0.095,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.bar_chart_rounded,
+                      color: context.primaryColor.withValues(alpha: 0.6),
+                      size: 42,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No data available',
+                      style: GoogleFonts.sora(
+                        color: context.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Start walking to view your weekly chart',
+                      style: GoogleFonts.inter(
+                        color: context.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-        ),
       ),
     );
   }

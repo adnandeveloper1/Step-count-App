@@ -3,10 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../providers/auth_provider.dart';
-
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -30,13 +29,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           message.toUpperCase(),
           textAlign: TextAlign.center,
           style: GoogleFonts.sora(
-            color: isError ? Colors.white : AppColors.backgroundDark,
+            color: isError ? Colors.white : Colors.black,
             fontWeight: FontWeight.w500,
             fontSize: 14,
             letterSpacing: 1.2,
           ),
         ),
-        backgroundColor: isError ? Colors.redAccent : AppColors.primaryEmerald,
+        backgroundColor: isError ? Colors.redAccent : context.primaryColor,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         shape: RoundedRectangleBorder(
@@ -107,12 +106,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       _showCustomSnackBar(errorMessage, isError: true);
     } catch (e) {
       _showCustomSnackBar('Sign-in cancelled.', isError: true);
-    }finally {
+    } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
+
   Future<void> _submitGuestLogin() async {
     setState(() => _isLoading = true);
     try {
@@ -146,21 +146,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         style: GoogleFonts.jetBrainsMono(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: AppColors.textSecondary,
+          color: context.textSecondary,
           letterSpacing: 1.0,
         ),
       ),
     );
   }
 
-  void _showForgotPasswordDialog()
-  {
-
+  void _showForgotPasswordDialog() {
     final resetEmailController = TextEditingController(text: _emailController.text);
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.all(24),
@@ -175,7 +173,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   style: GoogleFonts.sora(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: dialogContext.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -183,20 +181,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   'Enter your email address. We will send you a link to reset your password.',
                   style: GoogleFonts.sora(
                     fontSize: 14,
-                    color: AppColors.textSecondary,
+                    color: dialogContext.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 24),
                 _buildLabel('Email Address'),
                 TextField(
                   controller: resetEmailController,
-                  style: const TextStyle(color: Colors.white60),
+                  style: TextStyle(color: dialogContext.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'runner@gmail.com',
-                    hintStyle: const TextStyle(color: Colors.white60),
+                    hintStyle: TextStyle(color: dialogContext.textSecondary),
                     filled: true,
-                    fillColor: AppColors.glassCardBackground,
-                    prefixIcon: const Icon(Icons.mail_outline, color: Colors.white60),
+                    fillColor: dialogContext.cardColor,
+                    prefixIcon: Icon(Icons.mail_outline, color: dialogContext.textSecondary),
                     border: OutlineInputBorder(
                       borderSide: BorderSide.none,
                       borderRadius: BorderRadius.circular(8),
@@ -218,18 +216,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
                       try {
                         await ref.read(authControllerProvider).resetPassword(email);
-                        if (context.mounted) {
-                          Navigator.pop(context);
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
                           _showCustomSnackBar('Reset link sent to your email');
                         }
                       } catch (e) {
-                        if (context.mounted) {
+                        if (dialogContext.mounted) {
                           _showCustomSnackBar(e.toString(), isError: true);
                         }
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryEmerald,
+                      backgroundColor: dialogContext.primaryColor,
                       foregroundColor: Colors.black,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(25),
@@ -247,11 +245,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 const SizedBox(height: 12),
                 Center(
                   child: TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(dialogContext),
                     child: Text(
                       'Cancel',
                       style: GoogleFonts.sora(
-                        color: AppColors.textSecondary,
+                        color: dialogContext.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -264,10 +262,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -275,18 +274,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-
                 Text(
                   'BUILD UP',
                   style: GoogleFonts.sora(
                     fontSize: 48,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.primaryEmerald,
+                    color: context.primaryColor,
                     letterSpacing: -1.0,
                     height: 1.2,
                   ),
                 ),
-
                 const SizedBox(height: 40),
                 GlassCard(
                   padding: const EdgeInsets.all(24),
@@ -297,20 +294,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       _buildLabel('Email Address'),
                       TextField(
                         controller: _emailController,
-                        style: const TextStyle(color: Colors.white60),
+                        style: TextStyle(color: context.textPrimary),
                         decoration: InputDecoration(
                           hintText: 'runner@gmail.com',
-                          hintStyle: const TextStyle(color: Colors.white60),
+                          hintStyle: TextStyle(color: context.textSecondary),
                           filled: true,
-                          fillColor:AppColors.glassCardBackground,
-                          prefixIcon: const Icon(Icons.mail_outline,
-                              color: Colors.white60),
+                          fillColor: context.cardColor,
+                          prefixIcon: Icon(Icons.mail_outline, color: context.textSecondary),
                           border: OutlineInputBorder(
                             borderSide: BorderSide.none,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          contentPadding:
-                          const EdgeInsets.symmetric(vertical: 16),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -329,7 +324,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                   style: GoogleFonts.jetBrainsMono(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.primaryEmerald,
+                                    color: context.primaryColor,
                                   ),
                                 ),
                               ),
@@ -340,20 +335,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       TextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        style: const TextStyle(color: Colors.white60),
+                        style: TextStyle(color: context.textPrimary),
                         decoration: InputDecoration(
                           hintText: '••••••••',
-                          hintStyle: const TextStyle(color: Colors.white60),
+                          hintStyle: TextStyle(color: context.textSecondary),
                           filled: true,
-                          fillColor: AppColors.glassCardBackground,
-                          prefixIcon: const Icon(Icons.lock_outline,
-                              color: Colors.white60),
+                          fillColor: context.cardColor,
+                          prefixIcon: Icon(Icons.lock_outline, color: context.textSecondary),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword
                                   ? Icons.visibility_off
                                   : Icons.visibility,
-                              color: Colors.white60,
+                              color: context.textSecondary,
                             ),
                             onPressed: () {
                               setState(() {
@@ -365,15 +359,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             borderSide: BorderSide.none,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          contentPadding:
-                          const EdgeInsets.symmetric(vertical: 16),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                       ),
                       const SizedBox(height: 32),
                       if (_isLoading)
-                        const Center(
-                            child: CircularProgressIndicator(
-                                color: AppColors.primaryEmerald))
+                        Center(
+                          child: CircularProgressIndicator(color: context.primaryColor),
+                        )
                       else ...[
                         SizedBox(
                           width: double.infinity,
@@ -381,7 +374,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           child: ElevatedButton(
                             onPressed: _submitLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryEmerald,
+                              backgroundColor: context.primaryColor,
                               foregroundColor: Colors.black,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(28),
@@ -404,7 +397,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           child: OutlinedButton(
                             onPressed: _submitGoogleSignIn,
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Colors.white24),
+                              side: BorderSide(color: context.textSecondary.withValues(alpha: 0.3)),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(28),
                               ),
@@ -412,14 +405,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.g_mobiledata, color: Colors.white, size: 32),
+                                Icon(Icons.g_mobiledata, color: context.textPrimary, size: 32),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Sign in with Google',
                                   style: GoogleFonts.sora(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.white,
+                                    color: context.textPrimary,
                                   ),
                                 ),
                               ],
@@ -434,7 +427,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               'CONTINUE AS GUEST',
                               style: GoogleFonts.jetBrainsMono(
                                 fontSize: 12,
-                                color: AppColors.primaryEmerald,
+                                color: context.primaryColor,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 1.0,
                               ),
@@ -456,14 +449,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               text: "DON'T HAVE AN ACCOUNT? ",
                               style: GoogleFonts.sora(
                                 fontSize: 14,
-                                color: AppColors.textSecondary,
+                                color: context.textSecondary,
                                 fontWeight: FontWeight.w700,
                               ),
                               children: [
                                 TextSpan(
                                   text: "SIGN UP",
                                   style: TextStyle(
-                                    color: AppColors.primaryEmerald,
+                                    color: context.primaryColor,
                                   ),
                                 ),
                               ],

@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../providers/gps_tracking_provider.dart';
 import '../widgets/glass_step_card.dart';
 
@@ -20,12 +20,11 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
   final MapController _mapController = MapController();
   bool _isMapReady = false;
 
-  // Dark mode color matrix filter
   final darkMapFilter = const ColorFilter.matrix([
-    -1, 0, 0, 0, 255, // Red
-    0, -1, 0, 0, 255, // Green
-    0, 0, -1, 0, 255, // Blue
-    0, 0, 0, 1, 0, // Alpha
+    -1, 0, 0, 0, 255,
+    0, -1, 0, 0, 255,
+    0, 0, -1, 0, 255,
+    0, 0, 0, 1, 0,
   ]);
 
   @override
@@ -91,12 +90,12 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
             height: 25,
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.cardColor,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: context.textSecondary.withValues(alpha: 0.3)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                   ),
                 ],
@@ -104,8 +103,8 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
               child: Center(
                 child: Text(
                   '${(nextMilestone / 1000).toInt()} km',
-                  style: const TextStyle(
-                    color: Colors.black,
+                  style: TextStyle(
+                    color: context.textPrimary,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -134,15 +133,15 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundDark,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: dialogContext.cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+          side: BorderSide(color: dialogContext.textSecondary.withValues(alpha: 0.2)),
         ),
-        title: const Text(
+        title: Text(
           'Workout Complete',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: dialogContext.textPrimary, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         content: SizedBox(
@@ -155,43 +154,43 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                 children: [
                   Column(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.straighten,
-                        color: AppColors.primaryEmerald,
+                        color: dialogContext.primaryColor,
                         size: 30,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         distanceText,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: dialogContext.textPrimary,
                           fontSize: 18,
                         ),
                       ),
-                      const Text(
+                      Text(
                         'Distance',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                        style: TextStyle(color: dialogContext.textSecondary, fontSize: 12),
                       ),
                     ],
                   ),
                   Column(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.timer,
-                        color: AppColors.primaryEmerald,
+                        color: dialogContext.primaryColor,
                         size: 30,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         timeText,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: dialogContext.textPrimary,
                           fontSize: 18,
                         ),
                       ),
-                      const Text(
+                      Text(
                         'Duration',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                        style: TextStyle(color: dialogContext.textSecondary, fontSize: 12),
                       ),
                     ],
                   ),
@@ -205,15 +204,15 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryEmerald,
+                backgroundColor: dialogContext.primaryColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
-              child: const Text('Close', style: TextStyle(color: Colors.white)),
+              child: const Text('Close', style: TextStyle(color: Colors.black)),
             ),
           ),
         ],
@@ -271,8 +270,7 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
     final screenWidth = size.width;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           children: [
@@ -286,18 +284,16 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Spacer(),
+                    const Spacer(),
                     Text(
                       'READY TO RUN',
                       style: GoogleFonts.sora(
                         fontSize: screenWidth * 0.06,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
+                        color: context.textPrimary,
                         letterSpacing: .1,
                       ),
                     ),
-        
-
                     Expanded(
                       child: Align(
                         alignment: Alignment.centerRight,
@@ -312,7 +308,7 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                           },
                           icon: const Icon(Icons.history),
                           iconSize: 25,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                         ),
                       ),
                     ),
@@ -320,7 +316,6 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                 ),
               ),
             ),
-
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -331,13 +326,13 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                     ? Center(
                         child: Text(
                           trackingState.errorMessage!,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: context.textPrimary),
                         ),
                       )
                     : trackingState.currentPosition == null
-                    ? const Center(
+                    ? Center(
                         child: CircularProgressIndicator(
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                         ),
                       )
                     : ClipRRect(
@@ -357,12 +352,13 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                               urlTemplate:
                                   'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                               userAgentPackageName: 'com.example.build_up',
-
                               tileBuilder: (context, tileWidget, tile) {
-                                return ColorFiltered(
-                                  colorFilter: darkMapFilter,
-                                  child: tileWidget,
-                                );
+                                return context.isDarkMode
+                                    ? ColorFiltered(
+                                        colorFilter: darkMapFilter,
+                                        child: tileWidget,
+                                      )
+                                    : tileWidget;
                               },
                             ),
                             if (trackingState.recordedPositions.length > 1)
@@ -380,9 +376,9 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                                   ),
                                   width: 40,
                                   height: 40,
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.location_on,
-                                    color: AppColors.primaryEmerald,
+                                    color: context.primaryColor,
                                     size: 40,
                                   ),
                                 ),
@@ -396,7 +392,6 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                       ),
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.only(
                 left: 24.0,
@@ -416,8 +411,8 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: trackingState.isTracking
-                            ? AppColors.primaryEmerald
-                            : AppColors.textPrimary,
+                            ? context.primaryColor
+                            : context.textPrimary,
                         letterSpacing: 1.2,
                       ),
                     ),
@@ -425,16 +420,16 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _toggleTracking,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: trackingState.isTracking
                               ? Colors.redAccent
-                              : AppColors.primaryEmerald,
+                              : context.primaryColor,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
+                        onPressed: _toggleTracking,
                         child: Text(
                           trackingState.isTracking ? 'Stop Route' : 'Start Route',
                           style: const TextStyle(

@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../providers/auth_provider.dart';
 
@@ -30,13 +30,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           message.toUpperCase(),
           textAlign: TextAlign.center,
           style: GoogleFonts.sora(
-            color: isError ? Colors.white : AppColors.backgroundDark,
+            color: isError ? Colors.white : Colors.black,
             fontWeight: FontWeight.w900,
             fontSize: 14,
             letterSpacing: 1.2,
           ),
         ),
-        backgroundColor: isError ? Colors.redAccent : AppColors.primaryEmerald,
+        backgroundColor: isError ? Colors.redAccent : context.primaryColor,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         shape: RoundedRectangleBorder(
@@ -103,7 +103,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         style: GoogleFonts.jetBrainsMono(
           fontSize: 10,
           fontWeight: FontWeight.w700,
-          color: AppColors.textSecondary,
+          color: context.textSecondary,
           letterSpacing: 1.0,
         ),
       ),
@@ -116,28 +116,29 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     required IconData icon,
     bool obscureText = false,
     Widget? suffixIcon,
-  }) {
+  })
+  {
     return TextField(
       controller: controller,
       obscureText: obscureText,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: context.textPrimary),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: const TextStyle(color: Colors.white38),
+        hintStyle: TextStyle(color: context.textSecondary),
         filled: true,
-        fillColor: Colors.black.withOpacity(0.4),
-        prefixIcon: Icon(icon, color: Colors.white38),
+        fillColor: context.cardColor,
+        prefixIcon: Icon(icon, color: context.textSecondary),
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: context.textSecondary.withValues(alpha: 0.1)),
           borderRadius: BorderRadius.circular(8),
         ),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: context.textSecondary.withValues(alpha: 0.1)),
           borderRadius: BorderRadius.circular(8),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: AppColors.primaryEmerald),
+          borderSide: BorderSide(color: context.primaryColor),
           borderRadius: BorderRadius.circular(8),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
@@ -148,7 +149,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -165,7 +166,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       style: GoogleFonts.sora(
                         fontSize: 40,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.primaryEmerald,
+                        color: context.primaryColor,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -186,7 +187,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                               style: GoogleFonts.sora(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: context.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -194,7 +195,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                               'Enter your credentials to begin.',
                               style: GoogleFonts.sora(
                                 fontSize: 14,
-                                color: AppColors.textSecondary,
+                                color: context.textSecondary,
                               ),
                             ),
                           ],
@@ -226,7 +227,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             _obscurePassword
                                 ? Icons.visibility_off
                                 : Icons.visibility,
-                            color: Colors.white38,
+                            color: context.textSecondary,
                           ),
                           onPressed: () {
                             setState(() {
@@ -240,11 +241,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         children: [
                           Theme(
                             data: Theme.of(context).copyWith(
-                              unselectedWidgetColor: Colors.white38,
+                              unselectedWidgetColor: context.textSecondary,
                             ),
                             child: Checkbox(
                               value: _agreeToTerms,
-                              activeColor: AppColors.primaryEmerald,
+                              activeColor: context.primaryColor,
                               checkColor: Colors.black,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(4),
@@ -260,7 +261,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             child: RichText(
                               text: TextSpan(
                                 style: GoogleFonts.sora(
-                                  color: Colors.white70,
+                                  color: context.textSecondary,
                                   fontSize: 12,
                                   height: 1.5,
                                 ),
@@ -269,7 +270,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                   TextSpan(
                                     text: 'terms',
                                     style: GoogleFonts.sora(
-                                      color: AppColors.primaryEmerald,
+                                      color: context.primaryColor,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -277,7 +278,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                   TextSpan(
                                     text: 'conditions.',
                                     style: GoogleFonts.sora(
-                                      color: AppColors.primaryEmerald,
+                                      color: context.primaryColor,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -289,9 +290,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       ),
                       const SizedBox(height: 32),
                       if (_isLoading)
-                        const Center(
-                            child: CircularProgressIndicator(
-                                color: AppColors.primaryEmerald))
+                        Center(
+                          child: CircularProgressIndicator(
+                            color: context.primaryColor,
+                          ),
+                        )
                       else
                         SizedBox(
                           width: double.infinity,
@@ -299,7 +302,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           child: ElevatedButton(
                             onPressed: _submitSignUp,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryEmerald,
+                              backgroundColor: context.primaryColor,
                               foregroundColor: Colors.black,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(28),
@@ -333,7 +336,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             text: TextSpan(
                               style: GoogleFonts.sora(
                                 fontSize: 12,
-                                color: AppColors.textSecondary,
+                                color: context.textSecondary,
                               ),
                               children: [
                                 const TextSpan(
@@ -341,7 +344,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                                 TextSpan(
                                   text: 'Login',
                                   style: GoogleFonts.sora(
-                                    color: AppColors.primaryEmerald,
+                                    color: context.primaryColor,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),

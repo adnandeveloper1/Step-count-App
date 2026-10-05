@@ -16,5 +16,4 @@ class NativeHealthService {
       return 0;
     }
   }
-
 }

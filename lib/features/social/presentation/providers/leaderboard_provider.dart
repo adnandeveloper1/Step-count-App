@@ -8,6 +8,7 @@ class LeaderboardUser {
   final int monthlyHighScore;
   final String avatarUrl;
   final String? currentLeague; // New field
+  final List<String> unlockedItems;
 
   LeaderboardUser({
     required this.id,
@@ -16,10 +17,12 @@ class LeaderboardUser {
     required this.monthlyHighScore,
     required this.avatarUrl,
     this.currentLeague,
+    this.unlockedItems = const [],
   });
 
   factory LeaderboardUser.fromDocument(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final items = data['unlockedItems'] as List<dynamic>?;
     return LeaderboardUser(
       id: doc.id,
       name: data['name'] ?? 'Anonymous Walker',
@@ -27,6 +30,7 @@ class LeaderboardUser {
       monthlyHighScore: data['monthlyHighScore'] ?? 0,
       avatarUrl: data['avatarUrl'] ?? data['photoUrl'] ?? '',
       currentLeague: data['currentLeague'], // Read from Firestore
+      unlockedItems: items?.map((e) => e.toString()).toList() ?? [],
     );
   }
 }

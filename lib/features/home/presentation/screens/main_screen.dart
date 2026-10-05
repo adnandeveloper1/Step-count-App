@@ -1,13 +1,11 @@
-import 'dart:io';
 import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/gps_tracking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../../settings/presentation/setting_screen.dart';
 import '../../../social/presentation/screens/social_screen.dart';
 import '../../../step_tracking/presentation/screens/dashboard_screen.dart';
-
 
 class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
@@ -21,23 +19,16 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   final List<Widget> _screens = [
     const DashboardView(),
-    InsightsScreen (),
-     ChallengeScreen(),
-    GpsTrackingScreen(),
-    SettingsScreen(),
+    const InsightsScreen(),
+    const ChallengeScreen(),
+    const GpsTrackingScreen(),
+    const SettingsScreen(),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: context.backgroundColor,
       extendBody: false,
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
@@ -45,15 +36,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF141618),
+            color: context.cardColor,
             borderRadius: BorderRadius.circular(40),
             border: Border.all(
-              color: Colors.white.withOpacity(0.08),
+              color: context.textSecondary.withValues(alpha: 0.2),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -82,15 +73,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
-        width: 50,
-        height: 50,
+        width: 45,
+        height: 45,
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryEmerald : Colors.transparent,
+          color: isSelected ? context.primaryColor : Colors.transparent,
           shape: BoxShape.circle,
         ),
         child: Icon(
           icon,
-          color: isSelected ? Colors.black : AppColors.textSecondary,
+          color: isSelected ? Colors.black : context.textSecondary,
           size: 24,
         ),
       ),
