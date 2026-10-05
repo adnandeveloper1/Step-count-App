@@ -71,6 +71,7 @@ class AuthController {
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
+      await _ref.read(stepNotifierProvider.notifier).restoreDataFromFirebase();
     }
   }
 
