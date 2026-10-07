@@ -30,6 +30,20 @@ class BuildUpApp extends ConsumerWidget {
         surface: activeTheme.cardColor,
         onSurface: activeTheme.textPrimary,
       ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: activeTheme.primaryColor,
+        contentTextStyle: GoogleFonts.sora(
+          color: Colors.black,
+          fontWeight: FontWeight.w900,
+          fontSize: 13,
+          letterSpacing: 1.2,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 8,
+      ),
       textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme).apply(
         bodyColor: activeTheme.textPrimary,
         displayColor: activeTheme.textPrimary,

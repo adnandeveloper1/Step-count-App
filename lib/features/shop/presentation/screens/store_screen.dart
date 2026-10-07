@@ -128,11 +128,17 @@ class StoreScreen extends ConsumerWidget {
                               if (isActive) return;
                               if (isOwned) {
                                 themeNotifier.setActiveTheme(theme);
-                                context.showAppSnackBar('Equipped ${theme.name}!');
+                                context.showAppSnackBar(
+                                  'Equipped ${theme.name}!',
+                                  backgroundColor: theme.primaryColor,
+                                );
                               } else {
                                 final success = themeNotifier.purchaseTheme(theme);
                                 if (success) {
-                                  context.showAppSnackBar('Purchased and equipped ${theme.name}!');
+                                  context.showAppSnackBar(
+                                    'Purchased and equipped ${theme.name}!',
+                                    backgroundColor: theme.primaryColor,
+                                  );
                                 } else {
                                   context.showAppSnackBar(
                                     'Not enough coins! Need ${theme.costCoins} coins.',
