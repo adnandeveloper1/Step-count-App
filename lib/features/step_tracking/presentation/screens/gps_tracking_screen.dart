@@ -31,13 +31,12 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(gpsTrackingProvider.notifier).checkPermissionAndStart();
+      ref.read(gpsTrackingProvider.notifier).checkPermissionAndGetLocation();
     });
   }
 
   @override
   void dispose() {
-    ref.read(gpsTrackingProvider.notifier).stopListeningIfNotTracking();
     super.dispose();
   }
 

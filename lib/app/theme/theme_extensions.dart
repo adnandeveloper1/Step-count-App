@@ -11,7 +11,7 @@ extension ThemeContextExtension on BuildContext {
   Color get textPrimary => theme.colorScheme.onSurface;
   Color get textSecondary => isDarkMode ? const Color(0xFF9CA3AF) : const Color(0xFF64748B);
 
-  void showAppSnackBar(String message, {bool isError = false}) {
+  void showAppSnackBar(String message, {bool isError = false, Color? backgroundColor}) {
     ScaffoldMessenger.of(this).clearSnackBars();
     ScaffoldMessenger.of(this).showSnackBar(
       SnackBar(
@@ -25,7 +25,7 @@ extension ThemeContextExtension on BuildContext {
             letterSpacing: 1.2,
           ),
         ),
-        backgroundColor: isError ? Colors.redAccent : primaryColor,
+        backgroundColor: isError ? Colors.redAccent : (backgroundColor ?? primaryColor),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         shape: RoundedRectangleBorder(
