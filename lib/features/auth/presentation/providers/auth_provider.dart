@@ -66,6 +66,7 @@ class AuthController {
           'name': 'Guest User',
           'displayName': 'Guest User',
           'totalSteps': 0,
+          'monthlyHighScore': 0,
           'avatarUrl': '👤',
           'isGuest': true,
           'createdAt': FieldValue.serverTimestamp(),
@@ -100,6 +101,7 @@ class AuthController {
             'name': user.displayName ?? 'Google User',
             'displayName': user.displayName ?? 'Google User',
             'totalSteps': 0,
+            'monthlyHighScore': 0,
             'avatarUrl': '🌟',
             'createdAt': FieldValue.serverTimestamp(),
           });
@@ -123,6 +125,7 @@ class AuthController {
         'name': name,
         'displayName': name,
         'totalSteps': 0,
+        'monthlyHighScore': 0,
         'avatarUrl': '🙂',
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -133,10 +136,14 @@ class AuthController {
 
   Future<void> signOut() async {
     await _auth.signOut();
-    await _googleSignIn.signOut();
-    final storage = LocalStorageService();
-    await storage.init();
-    await storage.clearAllUserData();
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+    try {
+      final storage = LocalStorageService();
+      await storage.init();
+      await storage.clearAllUserData();
+    } catch (_) {}
   }
 
   Future<void> resetPassword(String email) async {

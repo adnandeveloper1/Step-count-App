@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/theme_extensions.dart';
+import '../../../home/presentation/screens/main_screen.dart';
 import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../providers/auth_provider.dart';
 
@@ -67,6 +68,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     try {
       await ref.read(authControllerProvider).signUp(email, password, name);
       _showCustomSnackBar('Account created successfully');
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+              (route) => false,
+        );
+      }
     } on FirebaseAuthException catch (e) {
       String errorMessage;
       switch (e.code) {

@@ -148,6 +148,12 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
     _positionSubscription?.cancel();
     _positionSubscription = null;
   }
+
+  void stopListeningIfNotTracking() {
+    if (!state.isTracking) {
+      disposeSubscription();
+    }
+  }
 }
 
 final gpsTrackingProvider = StateNotifierProvider<GpsTrackingNotifier, GpsTrackingState>((ref) {

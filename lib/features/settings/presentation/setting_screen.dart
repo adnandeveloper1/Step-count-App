@@ -221,8 +221,94 @@ class SettingsScreen extends ConsumerWidget {
                   child: ListTile(
                     leading: Icon(Icons.logout, color: Colors.orangeAccent, size: screenWidth * 0.06),
                     title: Text('Sign Out', style: TextStyle(color: context.textPrimary, fontSize: screenWidth * 0.04)),
-                    onTap: () async {
-                      await authController.signOut();
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (dialogContext) {
+                          return Dialog(
+                            backgroundColor: dialogContext.backgroundColor,
+                            insetPadding: const EdgeInsets.all(24),
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Sign Out',
+                                    style: GoogleFonts.sora(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: dialogContext.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Are you sure you want to sign out?',
+                                    style: GoogleFonts.sora(
+                                      fontSize: 14,
+                                      color: dialogContext.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 32),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 50,
+                                          child: OutlinedButton(
+                                            onPressed: () => Navigator.pop(dialogContext),
+                                            style: OutlinedButton.styleFrom(
+                                              side: BorderSide(color: dialogContext.textSecondary.withValues(alpha: 0.3)),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(25),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'Cancel',
+                                              style: GoogleFonts.sora(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: dialogContext.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 50,
+                                          child: ElevatedButton(
+                                            onPressed: () async {
+                                              Navigator.pop(dialogContext);
+                                              await authController.signOut();
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.redAccent,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(25),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'Sign Out',
+                                              style: GoogleFonts.sora(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
                     },
                   ),
                 ),

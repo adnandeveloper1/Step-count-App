@@ -35,6 +35,12 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    ref.read(gpsTrackingProvider.notifier).stopListeningIfNotTracking();
+    super.dispose();
+  }
+
   List<Polyline> _buildSpeedPolylines(List<Position> positions) {
     List<Polyline> lines = [];
     if (positions.length < 2) return lines;
@@ -134,7 +140,7 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: dialogContext.cardColor,
+        backgroundColor: dialogContext.backgroundColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(color: dialogContext.textSecondary.withValues(alpha: 0.2)),

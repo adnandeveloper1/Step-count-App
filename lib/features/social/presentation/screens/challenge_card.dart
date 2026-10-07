@@ -79,7 +79,7 @@ class ChallengeCard extends ConsumerWidget {
         border: Border.all(
           color: isFailed
               ? Colors.redAccent.withValues(alpha: 0.3)
-              : context.primaryColor.withValues(alpha: 0.3),
+              : context.primaryColor.withValues(alpha: 0.00),
         ),
       ),
       padding: EdgeInsets.all(cardPadding),

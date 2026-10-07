@@ -2,6 +2,7 @@ import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/gps_tracking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_update/in_app_update.dart';
 import '../../../../app/theme/theme_extensions.dart';
 import '../../../settings/presentation/setting_screen.dart';
 import '../../../social/presentation/screens/social_screen.dart';
@@ -16,6 +17,28 @@ class MainNavigationScreen extends ConsumerStatefulWidget {
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForUpdates();
+  }
+  Future<void> _checkForUpdates() async {
+    try {
+      AppUpdateInfo updateInfo = await InAppUpdate.checkForUpdate();
+
+      if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+
+        await InAppUpdate.performImmediateUpdate();
+
+        // FLEXIBLE UPDATE (Downloads in background, prompts user to restart when ready)
+        // await InAppUpdate.startFlexibleUpdate();
+        // await InAppUpdate.completeFlexibleUpdate();
+      }
+    } catch (e) {
+      debugPrint('In-App Update error: $e');
+    }
+  }
 
   final List<Widget> _screens = [
     const DashboardView(),
