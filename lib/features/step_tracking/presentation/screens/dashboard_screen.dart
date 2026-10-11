@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:build_up/app/theme/theme_extensions.dart';
 import 'package:build_up/features/settings/presentation/setting_screen.dart';
 import 'package:build_up/features/shop/presentation/screens/store_screen.dart';
@@ -12,6 +11,7 @@ import '../providers/step_provider.dart';
 import '../providers/active_duration_provider.dart';
 import '../widgets/glass_step_card.dart';
 import '../widgets/metric_glass_card.dart';
+import '../widgets/step_gauge.dart';
 
 class DashboardView extends ConsumerStatefulWidget {
   const DashboardView({super.key});
@@ -167,71 +167,10 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                       children: [
                         SizedBox(height: screenHeight * 0.02),
                         Center(
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              SizedBox(
-                                height: screenWidth * 0.6,
-                                width: screenWidth * 0.6,
-                                child: CircularProgressIndicator(
-                                  value: stepState.goalSteps > 0
-                                      ? (stepState.currentSteps /
-                                                stepState.goalSteps)
-                                            .clamp(0.0, 1.0)
-                                      : 0.0,
-                                  strokeWidth: screenWidth * 0.05,
-                                  backgroundColor: context.primaryColor
-                                      .withValues(alpha: 0.1),
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    context.primaryColor,
-                                  ),
-                                  strokeCap: StrokeCap.round,
-                                ),
-                              ),
-                              ClipOval(
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(
-                                    sigmaX: 10,
-                                    sigmaY: 10,
-                                  ),
-                                  child: Container(
-                                    height: screenWidth * 0.525,
-                                    width: screenWidth * 0.525,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: context.cardColor,
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          key: const Key(
-                                            'dashboard_step_count',
-                                          ),
-                                          '${stepState.currentSteps}',
-                                          style: GoogleFonts.sora(
-                                            fontSize: screenWidth * 0.105,
-                                            fontWeight: FontWeight.w900,
-                                            color: context.textPrimary,
-                                            height: 1.2,
-                                          ),
-                                        ),
-                                        Text(
-                                          '/ ${stepState.goalSteps} STEPS',
-                                          style: GoogleFonts.jetBrainsMono(
-                                            fontSize: screenWidth * 0.03,
-                                            fontWeight: FontWeight.w600,
-                                            color: context.textSecondary,
-                                            letterSpacing: 1.2,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                          child: StepGauge(
+                            steps: stepState.currentSteps,
+                            goal: stepState.goalSteps,
+                            size: screenWidth * 0.6,
                           ),
                         ),
                         SizedBox(height: screenHeight * 0.042),
