@@ -45,6 +45,9 @@ class StepState {
   final int coins;
   final List<int> weeklySteps;
 
+  /// Today's steps removed because they were counted in a vehicle.
+  final int drivingSteps;
+
   const StepState({
     required this.currentSteps,
     this.height = 170.0,
@@ -56,6 +59,7 @@ class StepState {
     this.pedestrianStatus = 'stopped',
     this.coins = 0,
     this.weeklySteps = const [0, 0, 0, 0, 0, 0, 0],
+    this.drivingSteps = 0,
   });
 
   // Converting steps into active Distance
@@ -80,6 +84,7 @@ class StepState {
     String? pedestrianStatus,
     int? coins,
     List<int>? weeklySteps,
+    int? drivingSteps,
   }) {
     return StepState(
       currentSteps: currentSteps ?? this.currentSteps,
@@ -92,6 +97,7 @@ class StepState {
       pedestrianStatus: pedestrianStatus ?? this.pedestrianStatus,
       coins: coins ?? this.coins,
       weeklySteps: weeklySteps ?? this.weeklySteps,
+      drivingSteps: drivingSteps ?? this.drivingSteps,
     );
   }
 
@@ -162,9 +168,8 @@ class StepNotifier extends Notifier<StepState> {
     _lastProcessedDate =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
-    final displaySteps = storage.getLastDate() == _lastProcessedDate
-        ? storage.getSteps()
-        : 0;
+    final isToday = storage.getLastDate() == _lastProcessedDate;
+    final displaySteps = isToday ? storage.getSteps() : 0;
     final savedCoins = storage.getCoins();
     final savedGoal = storage.getStepGoal();
     final savedHeight = storage.getHeight();
@@ -193,6 +198,7 @@ class StepNotifier extends Notifier<StepState> {
       isRestMode: false,
       coins: savedCoins,
       weeklySteps: loadedWeeklySteps,
+      drivingSteps: isToday ? storage.getDrivingStepsToday() : 0,
     );
   }
 
@@ -249,6 +255,7 @@ class StepNotifier extends Notifier<StepState> {
     storage.saveSteps(0);
     storage.saveLastCoinStep(0);
     storage.saveGoalNotified(false);
+    storage.saveDrivingStepsToday(0);
 
     String weeklyData = storage.getWeeklySteps();
     List<int> weekly = weeklyData
@@ -332,7 +339,7 @@ class StepNotifier extends Notifier<StepState> {
 
     if (isNewDay) _resetDay(dateStr, now);
     storage.saveHardwareBaseline(result.baseline);
-    storage.markDrivesApplied(result.appliedDriveIds);
+    storage.markDrivesApplied(result);
 
     _processSteps(
       result.todaySteps,
@@ -434,6 +441,7 @@ class StepNotifier extends Notifier<StepState> {
       coins: currentCoins,
       pedestrianStatus: trackingStatus,
       weeklySteps: weekly,
+      drivingSteps: storage.getDrivingStepsToday(),
     );
     storage.saveSteps(todaySteps);
     ref

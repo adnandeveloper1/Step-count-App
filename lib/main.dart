@@ -138,6 +138,7 @@ Future<_BackgroundSyncResult?> _saveStepsInBackground(
       storage.saveSteps(0);
       storage.saveLastCoinStep(0);
       storage.saveGoalNotified(false);
+      storage.saveDrivingStepsToday(0);
 
       String weeklyData = storage.getWeeklySteps();
       List<int> weekly = weeklyData
@@ -150,7 +151,7 @@ Future<_BackgroundSyncResult?> _saveStepsInBackground(
     }
 
     storage.saveHardwareBaseline(result.baseline);
-    storage.markDrivesApplied(result.appliedDriveIds);
+    storage.markDrivesApplied(result);
     final int todaySteps = result.todaySteps;
 
     // 3. Process Coins

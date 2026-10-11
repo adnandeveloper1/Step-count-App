@@ -6,6 +6,7 @@ Stable widget keys for driving the app in integration tests and Flutter Driver.
 | --- | --- | --- |
 | `dashboard_step_count` | Dashboard ring | Today's step count |
 | `dashboard_coins` | Dashboard header | Current coin balance |
+| `step_details_driving_steps` | Step details, today only | Steps removed while driving today (hidden when 0) |
 
 ## Background step sync on a device
 

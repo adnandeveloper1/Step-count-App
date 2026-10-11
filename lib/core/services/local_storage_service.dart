@@ -188,15 +188,22 @@ class LocalStorageService {
   List<int> getAppliedDriveIds() =>
       List<int>.from(_box.get('appliedDriveIds', defaultValue: const <int>[]));
 
-  /// Records drives just folded into the saved baseline. Save the baseline
-  /// first, then delete the drives natively.
-  void markDrivesApplied(List<int> ids) {
-    if (ids.isEmpty) return;
+  /// Records the drives [result] folded into the saved baseline and adds
+  /// their steps to today's driving steps. Call after any new-day reset and
+  /// after saving the baseline; delete the drives natively afterwards.
+  void markDrivesApplied(StepCounterResult result) {
+    if (result.appliedDriveIds.isEmpty) return;
     _box.put(
       'appliedDriveIds',
-      rememberAppliedDrives(getAppliedDriveIds(), ids),
+      rememberAppliedDrives(getAppliedDriveIds(), result.appliedDriveIds),
     );
+    saveDrivingStepsToday(getDrivingStepsToday() + result.drivingSteps);
   }
+
+  /// Steps removed today because they were counted in a vehicle.
+  int getDrivingStepsToday() => _box.get('drivingStepsToday', defaultValue: 0);
+
+  void saveDrivingStepsToday(int steps) => _box.put('drivingStepsToday', steps);
 
   Future<void> clearAllUserData() async {
     await _box.clear();

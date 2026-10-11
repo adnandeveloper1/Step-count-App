@@ -67,6 +67,11 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                 screenWidth,
                 screenHeight,
               ),
+              // Driving steps are only kept for today.
+              if (_selectedDateIndex == 6 && stepState.drivingSteps > 0) ...[
+                SizedBox(height: screenHeight * 0.02),
+                _buildDrivingNote(stepState.drivingSteps, screenWidth),
+              ],
               SizedBox(height: screenHeight * 0.03),
               _buildSummaryStats(displayDistance, displayCalories, screenWidth),
               SizedBox(height: screenHeight * 0.05),
@@ -74,6 +79,30 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDrivingNote(int drivingSteps, double screenWidth) {
+    return Row(
+      key: const Key('step_details_driving_steps'),
+      children: [
+        Icon(
+          Icons.directions_car_rounded,
+          color: context.textSecondary,
+          size: screenWidth * 0.045,
+        ),
+        SizedBox(width: screenWidth * 0.02),
+        Expanded(
+          child: Text(
+            'About $drivingSteps steps removed while driving. Approximate: '
+            'spotting a vehicle takes 1-3 minutes.',
+            style: GoogleFonts.inter(
+              color: context.textSecondary,
+              fontSize: screenWidth * 0.032,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
