@@ -229,13 +229,6 @@ class StepNotifier extends Notifier<StepState> {
     final now = DateTime.now();
     final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
-    // 1. Handle hardware reboots / system step counter resets first
-    if (hardwareSteps != null && hardwareSteps > 0) {
-      int currentBaseline = storage.getHardwareBaseline();
-      if (hardwareSteps < currentBaseline) {
-        storage.saveHardwareBaseline(0);
-      }
-    }
     if (storage.getLastDate() != dateStr) {
       storage.saveLastDate(dateStr);
       storage.saveSteps(0);
@@ -254,13 +247,6 @@ class StepNotifier extends Notifier<StepState> {
         storage.saveHardwareBaseline(0);
       }
     }
-
-    if (hardwareSteps != null && hardwareSteps > 0) {
-
-      if (storage.getHardwareBaseline() == 0) {
-        storage.saveHardwareBaseline(hardwareSteps);
-      }
-    }
   }
 
   Future initializeTracking() async {
@@ -273,6 +259,7 @@ class StepNotifier extends Notifier<StepState> {
 
     await _setupFallbackTracking();
   }
+
   Future<void> _setupFallbackTracking() async {
     await _fetchFallbackData();
     _pollingTimer?.cancel();
@@ -285,10 +272,15 @@ class StepNotifier extends Notifier<StepState> {
     final nativeHealth = ref.read(nativeHealthProvider);
     final hardwareSteps = await nativeHealth.getHardwareSteps();
 
+    // DIAGNOSTIC PRINT 1
+    debugPrint('RAW HARDWARE SENSOR READ: $hardwareSteps');
+
     if (hardwareSteps == -1) {
       state = state.copyWith(pedestrianStatus: 'No Sensor Detected');
       return;
     }
+
+    if (hardwareSteps <= 0) return;
 
     _handleDailyResetIfNeeded(hardwareSteps: hardwareSteps);
 
@@ -296,22 +288,33 @@ class StepNotifier extends Notifier<StepState> {
       state = state.copyWith(pedestrianStatus: 'fallback');
     }
 
-    if (hardwareSteps == 0) return;
-
     final storage = ref.read(storageProvider);
     int baseline = storage.getHardwareBaseline();
+
+    // Handle mid-day reboot / system step counter resets
     if (baseline > 0 && hardwareSteps < baseline) {
       int savedStepsToday = storage.getSteps();
       int newBaseline = hardwareSteps - savedStepsToday;
+      if (newBaseline < 0) newBaseline = 0;
       storage.saveHardwareBaseline(newBaseline);
       baseline = newBaseline;
     }
+
+    // Set baseline if initial launch or reset
     if (baseline == 0) {
       storage.saveHardwareBaseline(hardwareSteps);
       baseline = hardwareSteps;
     }
+
+    // DIAGNOSTIC PRINT 2
+    debugPrint('CURRENT BASELINE: $baseline');
+
     int todaySteps = hardwareSteps - baseline;
     if (todaySteps < 0) todaySteps = 0;
+
+    // DIAGNOSTIC PRINT 3
+    debugPrint('CALCULATED TODAY STEPS: $todaySteps');
+
     _processSteps(todaySteps, 'fallback');
   }
 
