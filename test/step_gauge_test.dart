@@ -34,14 +34,6 @@ void main() {
     });
   });
 
-  group('StepGauge.overflowColor', () {
-    test('differs from the primary colour in both brightnesses', () {
-      const primary = Color(0xFF22C55E);
-      expect(StepGauge.overflowColor(primary, isDark: true), isNot(primary));
-      expect(StepGauge.overflowColor(primary, isDark: false), isNot(primary));
-    });
-  });
-
   group('StepGauge widget', () {
     setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 

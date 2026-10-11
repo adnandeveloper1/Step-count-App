@@ -2,6 +2,7 @@ import 'package:build_up/app/theme/theme_extensions.dart';
 import 'package:build_up/features/settings/presentation/setting_screen.dart';
 import 'package:build_up/features/shop/presentation/screens/store_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/step_details_screen.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,6 +22,18 @@ class DashboardView extends ConsumerStatefulWidget {
 }
 
 class _DashboardViewState extends ConsumerState<DashboardView> {
+  /// Debug builds only: long-press the ring to preview it at these fractions
+  /// of the goal (overflow laps included) without touching saved data.
+  static const _debugGaugePreviews = [0.5, 1.0, 1.35, 2.0, 2.5];
+  int? _debugGaugePreview;
+
+  void _cycleDebugGaugePreview() {
+    setState(() {
+      final next = (_debugGaugePreview ?? -1) + 1;
+      _debugGaugePreview = next < _debugGaugePreviews.length ? next : null;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -167,10 +180,19 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                       children: [
                         SizedBox(height: screenHeight * 0.02),
                         Center(
-                          child: StepGauge(
-                            steps: stepState.currentSteps,
-                            goal: stepState.goalSteps,
-                            size: screenWidth * 0.6,
+                          child: GestureDetector(
+                            onLongPress: kDebugMode
+                                ? _cycleDebugGaugePreview
+                                : null,
+                            child: StepGauge(
+                              steps: _debugGaugePreview == null
+                                  ? stepState.currentSteps
+                                  : (stepState.goalSteps *
+                                            _debugGaugePreviews[_debugGaugePreview!])
+                                        .round(),
+                              goal: stepState.goalSteps,
+                              size: screenWidth * 0.6,
+                            ),
                           ),
                         ),
                         SizedBox(height: screenHeight * 0.042),

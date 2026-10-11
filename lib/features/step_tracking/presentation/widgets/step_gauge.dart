@@ -8,7 +8,8 @@ import '../../../../app/theme/theme_extensions.dart';
 ///
 /// The ring and the count animate from the previous value to the new one.
 /// Past the goal the ring keeps going: each extra lap is drawn on top of the
-/// full first lap in [overflowColor].
+/// full first lap in the same colour, with a shadow under its leading end
+/// so the overlap stands out.
 class StepGauge extends StatelessWidget {
   final int steps;
   final int goal;
@@ -20,16 +21,8 @@ class StepGauge extends StatelessWidget {
     required this.steps,
     required this.goal,
     required this.size,
-    this.duration = const Duration(milliseconds: 900),
+    this.duration = const Duration(milliseconds: 1500),
   });
-
-  /// Colour for laps past the goal: the primary colour shifted in lightness so
-  /// it stays readable against the first lap in both light and dark themes.
-  static Color overflowColor(Color primary, {required bool isDark}) {
-    final hsl = HSLColor.fromColor(primary);
-    final shift = isDark ? 0.18 : -0.18;
-    return hsl.withLightness((hsl.lightness + shift).clamp(0.0, 1.0)).toColor();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,10 +46,6 @@ class StepGauge extends StatelessWidget {
                   strokeWidth: strokeWidth,
                   color: context.primaryColor,
                   trackColor: context.primaryColor.withValues(alpha: 0.1),
-                  overflowColor: overflowColor(
-                    context.primaryColor,
-                    isDark: context.isDarkMode,
-                  ),
                 ),
               ),
             ),
@@ -111,14 +100,12 @@ class StepGaugePainter extends CustomPainter {
   final double strokeWidth;
   final Color color;
   final Color trackColor;
-  final Color overflowColor;
 
   const StepGaugePainter({
     required this.progress,
     required this.strokeWidth,
     required this.color,
     required this.trackColor,
-    required this.overflowColor,
   });
 
   /// Fraction of a full turn to draw for the base lap and the overflow lap.
@@ -157,18 +144,23 @@ class StepGaugePainter extends CustomPainter {
     }
     if (s.overflow > 0) {
       final sweep = 2 * math.pi * s.overflow;
-      // Soft shadow under the leading cap so the new lap reads as on top.
+      // Same colour as the first lap, so a shadow under the leading cap is
+      // what shows the new lap sitting on top. It is nudged a little ahead
+      // of the cap (along the direction of travel) so it falls on the lap
+      // below instead of being hidden under the new lap itself.
       final end = start + sweep;
+      final radius = rect.width / 2;
       final capCenter =
-          rect.center + Offset(math.cos(end), math.sin(end)) * (rect.width / 2);
+          rect.center + Offset(math.cos(end), math.sin(end)) * radius;
+      final ahead = Offset(-math.sin(end), math.cos(end)) * strokeWidth * 0.2;
       canvas.drawCircle(
-        capCenter,
+        capCenter + ahead,
         strokeWidth / 2,
         Paint()
-          ..color = Colors.black.withValues(alpha: 0.25)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, strokeWidth * 0.3),
+          ..color = Colors.black.withValues(alpha: 0.6)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, strokeWidth * 0.25),
       );
-      canvas.drawArc(rect, start, sweep, false, stroke(overflowColor));
+      canvas.drawArc(rect, start, sweep, false, stroke(color));
     }
   }
 
@@ -177,6 +169,5 @@ class StepGaugePainter extends CustomPainter {
       old.progress != progress ||
       old.strokeWidth != strokeWidth ||
       old.color != color ||
-      old.trackColor != trackColor ||
-      old.overflowColor != overflowColor;
+      old.trackColor != trackColor;
 }
