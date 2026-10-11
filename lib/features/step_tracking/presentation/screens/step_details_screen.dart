@@ -1,9 +1,9 @@
-import 'package:build_up/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:ui';
+import '../../../../app/theme/theme_extensions.dart';
 import '../providers/step_provider.dart';
 
 class StepDetailsScreen extends ConsumerStatefulWidget {
@@ -23,7 +23,6 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
     final screenWidth = size.width;
     final screenHeight = size.height;
 
-    // Logic to calculate dates for the selector (last 7 days ending today)
     final now = DateTime.now();
     final List<DateTime> weekDays = List.generate(
       7,
@@ -32,8 +31,6 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
 
     final selectedDate = weekDays[_selectedDateIndex];
 
-    // Fetch steps: if today (index 6), use current live steps; otherwise pull from weekly history array.
-    // Index in weeklySteps is weekday - 1 (0=Mon, 6=Sun)
     int displaySteps = (_selectedDateIndex == 6)
         ? stepState.currentSteps
         : stepState.weeklySteps[selectedDate.weekday - 1];
@@ -42,15 +39,15 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
     double displayCalories = displaySteps * 0.04;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: context.textPrimary),
         title: Text(
           'ACTIVITY DETAILS',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: context.textPrimary,
             fontSize: screenWidth * 0.045,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.5,
@@ -105,14 +102,12 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
               width: screenWidth * 0.16,
               margin: EdgeInsets.only(right: screenWidth * 0.03),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primaryEmerald
-                    : Colors.white.withValues(alpha: 0.05),
+                color: isSelected ? context.primaryColor : context.cardColor,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected
                       ? Colors.transparent
-                      : Colors.white.withValues(alpha: 0.1),
+                      : context.textSecondary.withValues(alpha: 0.2),
                 ),
               ),
               child: Column(
@@ -121,7 +116,7 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                   Text(
                     dayName,
                     style: GoogleFonts.inter(
-                      color: isSelected ? Colors.black : Colors.white54,
+                      color: isSelected ? Colors.black : context.textSecondary,
                       fontSize: screenWidth * 0.03,
                       fontWeight: FontWeight.bold,
                     ),
@@ -130,7 +125,7 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                   Text(
                     date.day.toString(),
                     style: GoogleFonts.inter(
-                      color: isSelected ? Colors.black : Colors.white,
+                      color: isSelected ? Colors.black : context.textPrimary,
                       fontSize: screenWidth * 0.045,
                       fontWeight: FontWeight.bold,
                     ),
@@ -152,7 +147,6 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
     int currentHour = DateTime.now().hour;
     int activeIndex = -1;
 
-    // For Today (index 6), highlight the bar for the current time slot
     if (_selectedDateIndex == 6) {
       if (currentHour >= 22) {
         activeIndex = 4;
@@ -175,9 +169,11 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
           height: screenHeight * 0.35,
           padding: EdgeInsets.all(screenWidth * 0.05),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: context.cardColor,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            border: Border.all(
+              color: context.textSecondary.withValues(alpha: 0.2),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +181,7 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
               Text(
                 _selectedDateIndex == 6 ? 'Steps Today' : 'Daily Progress',
                 style: GoogleFonts.inter(
-                  color: Colors.white54,
+                  color: context.textSecondary,
                   fontSize: screenWidth * 0.035,
                   fontWeight: FontWeight.bold,
                 ),
@@ -203,8 +199,8 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                         sideTitles: SideTitles(
                           showTitles: true,
                           getTitlesWidget: (value, meta) {
-                            const style = TextStyle(
-                              color: Colors.white54,
+                            final style = TextStyle(
+                              color: context.textSecondary,
                               fontSize: 10,
                             );
                             String text = '';
@@ -227,7 +223,6 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                                   break;
                               }
                             } else {
-                              // For history, we just show one main indicator or labels for a single bar
                               if (value == 2) text = 'TOTAL';
                             }
                             return SideTitleWidget(
@@ -245,8 +240,8 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                             meta: meta,
                             child: Text(
                               value.toInt().toString(),
-                              style: const TextStyle(
-                                color: Colors.white54,
+                              style: TextStyle(
+                                color: context.textSecondary,
                                 fontSize: 9,
                               ),
                             ),
@@ -264,13 +259,11 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                       show: true,
                       horizontalInterval: 2500,
                       getDrawingHorizontalLine: (value) => FlLine(
-                        color: Colors.white.withValues(alpha: 0.05),
+                        color: context.textSecondary.withValues(alpha: 0.1),
                         strokeWidth: 1,
                       ),
                     ),
                     barGroups: [
-                      // If it's a history day, we show one large bar in the middle.
-                      // If it's today, we show progress in the current time slot.
                       _buildBar(
                         0,
                         (_selectedDateIndex == 6 && activeIndex == 0)
@@ -323,13 +316,13 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
       barRods: [
         BarChartRodData(
           toY: y,
-          color: AppColors.primaryEmerald,
+          color: context.primaryColor,
           width: screenWidth * 0.045,
           borderRadius: BorderRadius.circular(4),
           backDrawRodData: BackgroundBarChartRodData(
             show: true,
             toY: 10000,
-            color: Colors.white.withValues(alpha: 0.05),
+            color: context.textSecondary.withValues(alpha: 0.1),
           ),
         ),
       ],
@@ -377,23 +370,25 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
         child: Container(
           padding: EdgeInsets.all(screenWidth * 0.05),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: context.cardColor,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            border: Border.all(
+              color: context.textSecondary.withValues(alpha: 0.2),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
                 icon,
-                color: AppColors.primaryEmerald,
+                color: context.primaryColor,
                 size: screenWidth * 0.075,
               ),
               const SizedBox(height: 12),
               Text(
                 value,
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: context.textPrimary,
                   fontSize: screenWidth * 0.055,
                   fontWeight: FontWeight.bold,
                 ),
@@ -402,7 +397,7 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
               Text(
                 title,
                 style: GoogleFonts.inter(
-                  color: Colors.white54,
+                  color: context.textSecondary,
                   fontSize: screenWidth * 0.025,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.2,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../providers/challenge_provider.dart';
 import 'challenge_card.dart';
 
@@ -12,7 +12,6 @@ class AllChallengesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final challenges = ref.watch(challengeProvider);
 
-    // Filter challenges into three distinct groups
     final activeNow = challenges
         .where((c) => c.isActive && !c.isCompleted)
         .toList();
@@ -22,15 +21,15 @@ class AllChallengesScreen extends ConsumerWidget {
         .toList();
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: context.textPrimary),
         title: Text(
           'ALL CHALLENGES',
           style: GoogleFonts.inter(
-            color: AppColors.textPrimary,
+            color: context.textPrimary,
             fontWeight: FontWeight.w900,
             letterSpacing: 1.2,
           ),
@@ -43,9 +42,8 @@ class AllChallengesScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. ACTIVE NOW SECTION
               if (activeNow.isNotEmpty) ...[
-                _buildSectionHeader('ACTIVE NOW', Colors.grey),
+                _buildSectionHeader('ACTIVE NOW', context.textSecondary),
                 const SizedBox(height: 12),
                 ...activeNow.map(
                   (c) => Padding(
@@ -55,10 +53,8 @@ class AllChallengesScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
               ],
-
-              // 2. COMPLETED SECTION
               if (completed.isNotEmpty) ...[
-                _buildSectionHeader('COMPLETED', Colors.grey),
+                _buildSectionHeader('COMPLETED', context.textSecondary),
                 const SizedBox(height: 12),
                 ...completed.map(
                   (c) => Padding(
@@ -68,10 +64,8 @@ class AllChallengesScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
               ],
-
-              // 3. AVAILABLE SECTION
               if (available.isNotEmpty) ...[
-                _buildSectionHeader('AVAILABLE', AppColors.textSecondary),
+                _buildSectionHeader('AVAILABLE', context.textSecondary),
                 const SizedBox(height: 12),
                 ...available.map(
                   (c) => Padding(
@@ -80,7 +74,6 @@ class AllChallengesScreen extends ConsumerWidget {
                   ),
                 ),
               ],
-
               const SizedBox(height: 20),
             ],
           ),

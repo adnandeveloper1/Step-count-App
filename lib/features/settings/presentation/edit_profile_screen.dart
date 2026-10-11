@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../../app/theme/app_colors.dart';
-
+import '../../../app/theme/theme_extensions.dart';
 import '../../step_tracking/presentation/providers/step_provider.dart';
 import '../../step_tracking/presentation/widgets/glass_step_card.dart';
+import '../../../core/widgets/pro_avatar.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -24,6 +24,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   String selectedAvatar = '🤖';
   bool _isSaving = false;
+  bool isProAvatarUnlocked = false; // Add this variable
 
   final List<String> avatars = [
     '🤖',
@@ -93,6 +94,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           if (data?['bodyFat'] != null) {
             bodyFatController.text = data!['bodyFat'].toString();
           }
+          if (data?['unlockedItems'] != null) {
+            List<dynamic> items = data!['unlockedItems'];
+            if (items.contains('avatar_pro')) {
+              setState(() {
+                isProAvatarUnlocked = true;
+              });
+            }
+          }
         }
       } catch (e) {
         debugPrint('Error loading profile: $e');
@@ -147,28 +156,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ref.read(stepNotifierProvider.notifier).updateGoal(newGoal);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'PROFILE UPDATED',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.sora(
-                color: AppColors.backgroundDark,
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-                letterSpacing: 1.2,
-              ),
-            ),
-            backgroundColor: AppColors.primaryEmerald,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            elevation: 8,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        context.showAppSnackBar('PROFILE UPDATED');
 
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
@@ -176,9 +164,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update profile')),
-        );
+        context.showAppSnackBar('Failed to update profile', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -190,10 +176,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       padding: const EdgeInsets.only(bottom: 12.0, top: 24.0),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.bold,
-          color: AppColors.textSecondary,
+          color: context.textSecondary,
         ),
       ),
     );
@@ -213,14 +199,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.text,
         style: GoogleFonts.sora(
-          color: AppColors.textPrimary,
+          color: context.textPrimary,
           fontWeight: FontWeight.w600,
         ),
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: hint,
-          hintStyle: const TextStyle(color: AppColors.textSecondary),
-          icon: Icon(icon, color: AppColors.primaryEmerald),
+          hintStyle: TextStyle(color: context.textSecondary),
+          icon: Icon(icon, color: context.primaryColor),
         ),
       ),
     );
@@ -229,20 +215,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         title: Text(
           'EDIT PROFILE',
           style: GoogleFonts.sora(
             fontSize: 20,
             fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
+            color: context.textPrimary,
             letterSpacing: .1,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: context.textPrimary),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -250,17 +236,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'SELECT AVATAR',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
+                color: context.textSecondary,
               ),
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 90,
+              height: 120, // Increased height to accommodate ProAvatar
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: avatars.length,
@@ -276,28 +262,32 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected
-                              ? AppColors.primaryEmerald
+                              ? context.primaryColor
                               : Colors.transparent,
                           width: 2,
                         ),
                       ),
-                      child: CircleAvatar(
-                        radius: 35,
-                        backgroundColor: const Color(0xFF1E293B),
-                        child: Text(
-                          avatar,
-                          style: const TextStyle(fontSize: 35),
-                        ),
-                      ),
+                      child: isProAvatarUnlocked
+                          ? ProAvatar(
+                              emojiAvatar: avatar,
+                              radius: 35,
+                              isPro: true,
+                            )
+                          : CircleAvatar(
+                              radius: 35,
+                              backgroundColor: context.cardColor,
+                              child: Text(
+                                avatar,
+                                style: const TextStyle(fontSize: 35),
+                              ),
+                            ),
                     ),
                   );
                 },
               ),
             ),
-
             _buildLabel('DISPLAY NAME'),
             _buildInputField(nameController, 'Enter your name', Icons.badge),
-
             _buildLabel('DAILY STEP GOAL'),
             _buildInputField(
               goalController,
@@ -305,7 +295,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               Icons.directions_walk,
               isNumber: true,
             ),
-
             _buildLabel('WEIGHT (KG)'),
             _buildInputField(
               weightController,
@@ -313,7 +302,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               Icons.monitor_weight,
               isNumber: true,
             ),
-
             _buildLabel('HEIGHT (CM)'),
             _buildInputField(
               heightController,
@@ -321,7 +309,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               Icons.height,
               isNumber: true,
             ),
-
             _buildLabel('BODY FAT (%)'),
             _buildInputField(
               bodyFatController,
@@ -329,14 +316,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               Icons.percent,
               isNumber: true,
             ),
-
             const SizedBox(height: 48),
             SizedBox(
               width: double.infinity,
               height: 60,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryEmerald,
+                  backgroundColor: context.primaryColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -348,7 +334,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         height: 24,
                         width: 24,
                         child: CircularProgressIndicator(
-                          color: AppColors.backgroundDark,
+                          color: Colors.black,
                           strokeWidth: 2,
                         ),
                       )
@@ -357,7 +343,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         style: GoogleFonts.sora(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.backgroundDark,
+                          color: Colors.black,
                           letterSpacing: 1.2,
                         ),
                       ),

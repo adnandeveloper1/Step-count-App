@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../providers/challenge_provider.dart';
 
 class ChallengeCard extends ConsumerWidget {
@@ -32,7 +32,7 @@ class ChallengeCard extends ConsumerWidget {
     }
 
     String badgeText = '${challenge.durationInHours}H LIMIT';
-    Color badgeColor = AppColors.primaryEmerald;
+    Color badgeColor = context.primaryColor;
     IconData badgeIcon = Icons.timer_outlined;
     String coins = challenge.rewardCoins.toString();
 
@@ -64,20 +64,26 @@ class ChallengeCard extends ConsumerWidget {
                 end: Alignment.bottomRight,
                 colors: [
                   Colors.redAccent.withValues(alpha: 0.1),
-                  Colors.redAccent.withValues(alpha: 0.3),
+                  Colors.redAccent.withValues(alpha: 0.25),
                 ],
               )
             : LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppColors.glassCardBackground.withValues(alpha: 0.15),
-                  AppColors.primaryEmerald.withValues(alpha: 0.4),
+                  context.cardColor,
+                  context.primaryColor.withValues(
+                    alpha: context.isDarkMode ? 0.25 : 0.12,
+                  ),
                 ],
               ),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isFailed
+              ? Colors.redAccent.withValues(alpha: 0.3)
+              : context.primaryColor.withValues(alpha: 0.00),
+        ),
       ),
-
       padding: EdgeInsets.all(cardPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,7 +106,7 @@ class ChallengeCard extends ConsumerWidget {
                               Text(
                                 challenge.title,
                                 style: GoogleFonts.sora(
-                                  color: AppColors.textPrimary,
+                                  color: context.textPrimary,
                                   fontSize: titleFontSize / 1.2,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -109,7 +115,7 @@ class ChallengeCard extends ConsumerWidget {
                               Text(
                                 challenge.subtitle,
                                 style: GoogleFonts.sora(
-                                  color: AppColors.textSecondary,
+                                  color: context.textSecondary,
                                   fontSize: titleFontSize / 2.5,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -117,9 +123,7 @@ class ChallengeCard extends ConsumerWidget {
                             ],
                           ),
                         ),
-
-                        SizedBox(width: 12),
-
+                        const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -140,7 +144,7 @@ class ChallengeCard extends ConsumerWidget {
                                   Text(
                                     badgeText,
                                     style: GoogleFonts.inter(
-                                      color: Colors.white,
+                                      color: context.textPrimary,
                                       fontSize: labelFontSize * 1.3,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.5,
@@ -149,7 +153,6 @@ class ChallengeCard extends ConsumerWidget {
                                 ],
                               ),
                             ),
-
                             Container(
                               padding: EdgeInsets.symmetric(
                                 horizontal: size.width * 0.01,
@@ -160,14 +163,14 @@ class ChallengeCard extends ConsumerWidget {
                                 children: [
                                   Icon(
                                     Icons.paid,
-                                    color: AppColors.primaryEmerald,
+                                    color: context.primaryColor,
                                     size: size.width * 0.04,
                                   ),
                                   SizedBox(width: size.width * 0.01),
                                   Text(
                                     "+$coins Coins",
                                     style: GoogleFonts.inter(
-                                      color: Colors.white,
+                                      color: context.textPrimary,
                                       fontSize: titleFontSize / 2.6,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.5,
@@ -181,7 +184,6 @@ class ChallengeCard extends ConsumerWidget {
                       ],
                     ),
                     SizedBox(height: size.height * 0.002),
-                    //steps progress
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
@@ -190,7 +192,7 @@ class ChallengeCard extends ConsumerWidget {
                         Text(
                           formatNumber(challenge.currentSteps),
                           style: GoogleFonts.inter(
-                            color: AppColors.primaryEmerald,
+                            color: context.primaryColor,
                             fontSize: numberFontSize * 1.5,
                             fontWeight: FontWeight.w900,
                           ),
@@ -198,12 +200,12 @@ class ChallengeCard extends ConsumerWidget {
                         Text(
                           ' /${formatNumber(challenge.targetSteps)}',
                           style: GoogleFonts.inter(
-                            color: AppColors.textSecondary,
+                            color: context.textSecondary,
                             fontSize: size.width * 0.04,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        Spacer(),
+                        const Spacer(),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -219,8 +221,8 @@ class ChallengeCard extends ConsumerWidget {
                                     color: isCompleted
                                         ? Colors.amber
                                         : (challenge.isActive
-                                              ? AppColors.primaryEmerald
-                                              : AppColors.textSecondary),
+                                              ? context.primaryColor
+                                              : context.textSecondary),
                                     fontSize: isCompleted
                                         ? size.width * 0.042
                                         : size.width * 0.032,
@@ -233,8 +235,7 @@ class ChallengeCard extends ConsumerWidget {
                                     scale: 0.8,
                                     child: CupertinoSwitch(
                                       value: challenge.isActive,
-                                      activeTrackColor:
-                                          AppColors.primaryEmerald,
+                                      activeTrackColor: context.primaryColor,
                                       onChanged: (bool value) {
                                         if (value) {
                                           ref

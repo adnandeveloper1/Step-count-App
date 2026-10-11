@@ -5,13 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/theme_extensions.dart';
 import '../../step_tracking/presentation/providers/step_provider.dart';
 import '../../../core/utils/export_service.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
 import '../../step_tracking/presentation/widgets/glass_step_card.dart';
 import 'scheduler_screen.dart';
 import 'edit_profile_screen.dart';
+import '../../../core/widgets/pro_avatar.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -28,6 +29,8 @@ class SettingsScreen extends ConsumerWidget {
     final displayName =
         profile?['name'] ?? profile?['displayName'] ?? 'Build Up User';
     final avatar = profile?['avatarUrl'] ?? '👦';
+    final isProAvatarUnlocked =
+        (profile?['unlockedItems'] as List?)?.contains('avatar_pro') ?? false;
 
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
@@ -46,6 +49,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return SafeArea(
       child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: Padding(
           padding: EdgeInsets.all(padding),
           child: SingleChildScrollView(
@@ -56,11 +60,17 @@ class SettingsScreen extends ConsumerWidget {
                 Center(
                   child: Column(
                     children: [
-                      ProfileAvatarWithTier(
-                        avatarEmoji: avatar,
-                        tier: stepState.currentLeague,
-                        tierName: stepState.tierName,
-                      ),
+                      isProAvatarUnlocked
+                          ? ProAvatar(
+                              emojiAvatar: avatar,
+                              radius: 45,
+                              isPro: true,
+                            )
+                          : ProfileAvatarWithTier(
+                              avatarEmoji: avatar,
+                              tier: stepState.currentLeague,
+                              tierName: stepState.tierName,
+                            ),
 
                       SizedBox(height: screenHeight * 0.01),
                       Text(
@@ -68,7 +78,7 @@ class SettingsScreen extends ConsumerWidget {
                         style: GoogleFonts.sora(
                           fontSize: screenWidth * 0.055,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: context.textPrimary,
                         ),
                       ),
                       SizedBox(height: screenHeight * 0.00),
@@ -82,12 +92,12 @@ class SettingsScreen extends ConsumerWidget {
                     leading: Container(
                       padding: EdgeInsets.all(screenWidth * 0.025),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryEmerald.withValues(alpha: 0.2),
+                        color: context.primaryColor.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.edit,
-                        color: AppColors.primaryEmerald,
+                        color: context.primaryColor,
                         size: screenWidth * 0.06,
                       ),
                     ),
@@ -96,19 +106,19 @@ class SettingsScreen extends ConsumerWidget {
                       style: GoogleFonts.sora(
                         fontSize: screenWidth * 0.04,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: context.textPrimary,
                       ),
                     ),
                     subtitle: Text(
                       'Avatar, Name, Step Goal',
                       style: GoogleFonts.sora(
                         fontSize: screenWidth * 0.03,
-                        color: AppColors.textSecondary,
+                        color: context.textSecondary,
                       ),
                     ),
                     trailing: Icon(
                       Icons.chevron_right,
-                      color: AppColors.textSecondary,
+                      color: context.textSecondary,
                       size: screenWidth * 0.05,
                     ),
                     onTap: () {
@@ -128,7 +138,7 @@ class SettingsScreen extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: screenWidth * 0.035,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textSecondary,
+                    color: context.textSecondary,
                   ),
                 ),
                 SizedBox(height: screenHeight * 0.015),
@@ -139,39 +149,39 @@ class SettingsScreen extends ConsumerWidget {
                       ListTile(
                         leading: Icon(
                           Icons.notifications,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           size: screenWidth * 0.06,
                         ),
                         title: Text(
                           'Stand Alerts',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                             fontSize: screenWidth * 0.04,
                           ),
                         ),
                         trailing: Switch(
                           value: true,
                           onChanged: (bool value) {},
-                          activeThumbColor: AppColors.primaryEmerald,
+                          activeTrackColor: context.primaryColor,
                         ),
                       ),
                       const Divider(color: Colors.white24),
                       ListTile(
                         leading: Icon(
                           Icons.storefront,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           size: screenWidth * 0.06,
                         ),
                         title: Text(
                           'Store',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                             fontSize: screenWidth * 0.04,
                           ),
                         ),
                         trailing: Icon(
                           Icons.chevron_right,
-                          color: AppColors.textSecondary,
+                          color: context.textSecondary,
                           size: screenWidth * 0.05,
                         ),
                         onTap: () {
@@ -187,19 +197,19 @@ class SettingsScreen extends ConsumerWidget {
                       ListTile(
                         leading: Icon(
                           Icons.timer,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           size: screenWidth * 0.06,
                         ),
                         title: Text(
                           'Daily Walk Scheduler',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                             fontSize: screenWidth * 0.04,
                           ),
                         ),
                         trailing: Icon(
                           Icons.chevron_right,
-                          color: AppColors.textSecondary,
+                          color: context.textSecondary,
                           size: screenWidth * 0.05,
                         ),
                         onTap: () {
@@ -215,13 +225,13 @@ class SettingsScreen extends ConsumerWidget {
                       ListTile(
                         leading: Icon(
                           Icons.picture_as_pdf,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           size: screenWidth * 0.06,
                         ),
                         title: Text(
                           'Export PDF Report',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                             fontSize: screenWidth * 0.04,
                           ),
                         ),
@@ -237,13 +247,13 @@ class SettingsScreen extends ConsumerWidget {
                       ListTile(
                         leading: Icon(
                           Icons.table_chart,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           size: screenWidth * 0.06,
                         ),
                         title: Text(
                           'Export CSV Data',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                             fontSize: screenWidth * 0.04,
                           ),
                         ),
@@ -259,13 +269,13 @@ class SettingsScreen extends ConsumerWidget {
                       ListTile(
                         leading: Icon(
                           Icons.privacy_tip_rounded,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           size: screenWidth * 0.06,
                         ),
                         title: Text(
                           'Privacy & Policy',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                             fontSize: screenWidth * 0.04,
                           ),
                         ),
@@ -282,7 +292,7 @@ class SettingsScreen extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: screenWidth * 0.035,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textSecondary,
+                    color: context.textSecondary,
                   ),
                 ),
                 SizedBox(height: screenHeight * 0.015),
@@ -297,12 +307,106 @@ class SettingsScreen extends ConsumerWidget {
                     title: Text(
                       'Sign Out',
                       style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: context.textPrimary,
                         fontSize: screenWidth * 0.04,
                       ),
                     ),
-                    onTap: () async {
-                      await authController.signOut();
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (dialogContext) {
+                          return Dialog(
+                            backgroundColor: dialogContext.backgroundColor,
+                            insetPadding: const EdgeInsets.all(24),
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Sign Out',
+                                    style: GoogleFonts.sora(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: dialogContext.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Are you sure you want to sign out?',
+                                    style: GoogleFonts.sora(
+                                      fontSize: 14,
+                                      color: dialogContext.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 32),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 50,
+                                          child: OutlinedButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dialogContext),
+                                            style: OutlinedButton.styleFrom(
+                                              side: BorderSide(
+                                                color: dialogContext
+                                                    .textSecondary
+                                                    .withValues(alpha: 0.3),
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(25),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'Cancel',
+                                              style: GoogleFonts.sora(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color:
+                                                    dialogContext.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 50,
+                                          child: ElevatedButton(
+                                            onPressed: () async {
+                                              Navigator.pop(dialogContext);
+                                              await authController.signOut();
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.redAccent,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(25),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'Sign Out',
+                                              style: GoogleFonts.sora(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
                     },
                   ),
                 ),
@@ -317,7 +421,7 @@ class SettingsScreen extends ConsumerWidget {
                           'Build Up Version ${snapshot.data!.version}',
                           style: GoogleFonts.sora(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: context.textSecondary,
                           ),
                         ),
                       ),
@@ -345,16 +449,14 @@ class HealthConnectNotice extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.primaryEmerald.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             Icons.info_outline,
-            color: AppColors.primaryEmerald,
+            color: context.primaryColor,
             size: screenWidth * 0.06,
           ),
           SizedBox(width: screenWidth * 0.03),
@@ -365,7 +467,7 @@ class HealthConnectNotice extends StatelessWidget {
                 Text(
                   'Improve Step Accuracy',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: context.textPrimary,
                     fontSize: screenWidth * 0.04,
                     fontWeight: FontWeight.w600,
                   ),
@@ -374,7 +476,7 @@ class HealthConnectNotice extends StatelessWidget {
                 Text(
                   'For the most precise step tracking experience, download the Google Health Connect application from the Play Store.',
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: context.textSecondary,
                     fontSize: screenWidth * 0.035,
                     height: 1.4,
                   ),
@@ -407,7 +509,7 @@ class ProfileAvatarWithTier extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final avatarSize = screenWidth * 0.25;
 
-    Color tierColor = AppColors.primaryEmerald;
+    Color tierColor = context.primaryColor;
     IconData tierIcon = Icons.star;
 
     switch (tier) {
@@ -448,7 +550,7 @@ class ProfileAvatarWithTier extends StatelessWidget {
               height: avatarSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.textSecondary.withValues(alpha: 0.1),
+                color: context.textSecondary.withValues(alpha: 0.1),
                 border: Border.all(
                   color: tierColor,
                   width: screenWidth * 0.008,

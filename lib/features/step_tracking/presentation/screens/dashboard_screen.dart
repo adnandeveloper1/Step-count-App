@@ -1,11 +1,12 @@
 import 'dart:ui';
+import 'package:build_up/app/theme/theme_extensions.dart';
 import 'package:build_up/features/settings/presentation/setting_screen.dart';
 import 'package:build_up/features/shop/presentation/screens/store_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/step_details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../core/widgets/pro_avatar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/step_provider.dart';
 import '../providers/active_duration_provider.dart';
@@ -35,6 +36,8 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     final profileAsync = ref.watch(userProfileProvider);
     final profile = profileAsync.value;
     final avatar = profile?['avatarUrl'] ?? '👦';
+    final isProAvatarUnlocked =
+        (profile?['unlockedItems'] as List?)?.contains('avatar_pro') ?? false;
 
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
@@ -63,27 +66,33 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => SettingsScreen(),
+                              builder: (context) => const SettingsScreen(),
                             ),
                           ),
-                          child: Container(
-                            height: 44, // Fixed size for consistency
-                            width: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF1E293B),
-                              border: Border.all(
-                                color: currentTierColor,
-                                width: 2,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                avatar,
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          ),
+                          child: isProAvatarUnlocked
+                              ? ProAvatar(
+                                  emojiAvatar: avatar,
+                                  radius: 22,
+                                  isPro: true,
+                                )
+                              : Container(
+                                  height: 44,
+                                  width: 44,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: context.cardColor,
+                                    border: Border.all(
+                                      color: currentTierColor,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      avatar,
+                                      style: const TextStyle(fontSize: 22),
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -92,7 +101,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                       style: GoogleFonts.sora(
                         fontSize: screenWidth * 0.065,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
+                        color: context.textPrimary,
                         letterSpacing: .1,
                       ),
                     ),
@@ -116,9 +125,9 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.monetization_on_outlined,
-                                  color: AppColors.primaryEmerald,
+                                  color: context.primaryColor,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 6),
@@ -126,7 +135,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                   key: const Key('dashboard_coins'),
                                   '${stepState.coins} ',
                                   style: GoogleFonts.inter(
-                                    color: AppColors.textPrimary,
+                                    color: context.textPrimary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 14,
                                   ),
@@ -143,8 +152,8 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
             ),
             Expanded(
               child: RefreshIndicator(
-                color: AppColors.primaryEmerald,
-                backgroundColor: AppColors.glassCardBackground,
+                color: context.primaryColor,
+                backgroundColor: context.cardColor,
                 onRefresh: () async => await ref
                     .read(stepNotifierProvider.notifier)
                     .forceRefresh(),
@@ -157,8 +166,6 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                     child: Column(
                       children: [
                         SizedBox(height: screenHeight * 0.02),
-
-                        // Step Gauge
                         Center(
                           child: Stack(
                             alignment: Alignment.center,
@@ -173,12 +180,11 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                             .clamp(0.0, 1.0)
                                       : 0.0,
                                   strokeWidth: screenWidth * 0.05,
-                                  backgroundColor: AppColors.primaryEmerald
+                                  backgroundColor: context.primaryColor
                                       .withValues(alpha: 0.1),
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
-                                        AppColors.primaryEmerald,
-                                      ),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    context.primaryColor,
+                                  ),
                                   strokeCap: StrokeCap.round,
                                 ),
                               ),
@@ -191,9 +197,9 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                   child: Container(
                                     height: screenWidth * 0.525,
                                     width: screenWidth * 0.525,
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: AppColors.glassCardBackground,
+                                      color: context.cardColor,
                                     ),
                                     child: Column(
                                       mainAxisAlignment:
@@ -207,7 +213,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                           style: GoogleFonts.sora(
                                             fontSize: screenWidth * 0.105,
                                             fontWeight: FontWeight.w900,
-                                            color: AppColors.textPrimary,
+                                            color: context.textPrimary,
                                             height: 1.2,
                                           ),
                                         ),
@@ -216,7 +222,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                           style: GoogleFonts.jetBrainsMono(
                                             fontSize: screenWidth * 0.03,
                                             fontWeight: FontWeight.w600,
-                                            color: AppColors.textSecondary,
+                                            color: context.textSecondary,
                                             letterSpacing: 1.2,
                                           ),
                                         ),
@@ -229,8 +235,6 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                           ),
                         ),
                         SizedBox(height: screenHeight * 0.042),
-
-                        // KCAL Card
                         GlassCard(
                           padding: EdgeInsets.all(screenWidth * 0.06),
                           child: Row(
@@ -244,7 +248,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                     style: GoogleFonts.sora(
                                       fontSize: screenWidth * 0.09,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
+                                      color: context.textPrimary,
                                     ),
                                   ),
                                   SizedBox(height: screenHeight * 0.005),
@@ -253,7 +257,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                     style: GoogleFonts.jetBrainsMono(
                                       fontSize: screenWidth * 0.03,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.textSecondary,
+                                      color: context.textSecondary,
                                       letterSpacing: 1.2,
                                     ),
                                   ),
@@ -263,13 +267,13 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                 padding: EdgeInsets.all(screenWidth * 0.035),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: AppColors.primaryEmerald.withValues(
+                                  color: context.primaryColor.withValues(
                                     alpha: 0.15,
                                   ),
                                 ),
                                 child: Icon(
                                   Icons.local_fire_department,
-                                  color: AppColors.primaryEmerald,
+                                  color: context.primaryColor,
                                   size: screenWidth * 0.07,
                                 ),
                               ),
@@ -277,8 +281,6 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                           ),
                         ),
                         SizedBox(height: screenHeight * 0.02),
-
-                        // Metrics Row
                         Row(
                           children: [
                             Expanded(
@@ -301,14 +303,12 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                           ],
                         ),
                         SizedBox(height: screenHeight * 0.02),
-
-                        // History Card
                         GestureDetector(
                           onTap: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => StepDetailsScreen(),
+                                builder: (context) => const StepDetailsScreen(),
                               ),
                             );
                           },
@@ -319,7 +319,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                 Container(
                                   padding: EdgeInsets.all(screenWidth * 0.03),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primaryEmerald.withValues(
+                                    color: context.primaryColor.withValues(
                                       alpha: 0.2,
                                     ),
                                     borderRadius: BorderRadius.circular(
@@ -328,7 +328,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                   ),
                                   child: Icon(
                                     Icons.history,
-                                    color: AppColors.primaryEmerald,
+                                    color: context.primaryColor,
                                     size: screenWidth * 0.07,
                                   ),
                                 ),
@@ -343,7 +343,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                         style: GoogleFonts.sora(
                                           fontSize: screenWidth * 0.045,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary,
+                                          color: context.textPrimary,
                                           letterSpacing: .8,
                                         ),
                                       ),
@@ -353,16 +353,16 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                         style: GoogleFonts.sora(
                                           fontSize: screenWidth * 0.03,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.textSecondary,
+                                          color: context.textSecondary,
                                           letterSpacing: .8,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const Icon(
+                                Icon(
                                   Icons.chevron_right,
-                                  color: Colors.white54,
+                                  color: context.textSecondary,
                                 ),
                               ],
                             ),

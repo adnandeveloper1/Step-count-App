@@ -67,11 +67,13 @@ class AuthController {
           'name': 'Guest User',
           'displayName': 'Guest User',
           'totalSteps': 0,
+          'monthlyHighScore': 0,
           'avatarUrl': '👤',
           'isGuest': true,
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
+      await _ref.read(stepNotifierProvider.notifier).restoreDataFromFirebase();
     }
   }
 
@@ -98,6 +100,7 @@ class AuthController {
             'name': user.displayName ?? 'Google User',
             'displayName': user.displayName ?? 'Google User',
             'totalSteps': 0,
+            'monthlyHighScore': 0,
             'avatarUrl': '🌟',
             'createdAt': FieldValue.serverTimestamp(),
           });
@@ -123,6 +126,7 @@ class AuthController {
         'name': name,
         'displayName': name,
         'totalSteps': 0,
+        'monthlyHighScore': 0,
         'avatarUrl': '🙂',
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -133,14 +137,18 @@ class AuthController {
 
   Future<void> signOut() async {
     await _auth.signOut();
-    await _googleSignIn.signOut();
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
     // Drop the signed-out account's in-memory steps, coins and challenges and
     // stop the step poll first, so nothing writes them back after the clear.
     AccountSession.end();
     _resetUserState();
-    final storage = LocalStorageService();
-    await storage.init();
-    await storage.clearAllUserData();
+    try {
+      final storage = LocalStorageService();
+      await storage.init();
+      await storage.clearAllUserData();
+    } catch (_) {}
     // Anything rebuilt while clearing re-reads the now empty storage.
     _resetUserState();
   }

@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../widgets/glass_step_card.dart';
 
 class RouteHistoryScreen extends StatelessWidget {
@@ -63,16 +63,18 @@ class RouteHistoryScreen extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundDark,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: dialogContext.cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          side: BorderSide(
+            color: dialogContext.textSecondary.withValues(alpha: 0.2),
+          ),
         ),
         title: Text(
           dateStr,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: dialogContext.textPrimary,
             fontWeight: FontWeight.bold,
           ),
           textAlign: TextAlign.center,
@@ -88,7 +90,7 @@ class RouteHistoryScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppColors.primaryEmerald.withValues(alpha: 0.3),
+                    color: dialogContext.primaryColor.withValues(alpha: 0.3),
                   ),
                 ),
                 child: ClipRRect(
@@ -141,9 +143,9 @@ class RouteHistoryScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.straighten,
-                    color: AppColors.primaryEmerald,
+                    color: dialogContext.primaryColor,
                     size: 30,
                   ),
                   const SizedBox(width: 12),
@@ -152,15 +154,18 @@ class RouteHistoryScreen extends StatelessWidget {
                     children: [
                       Text(
                         distanceText,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: dialogContext.textPrimary,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Text(
+                      Text(
                         'Total Distance',
-                        style: TextStyle(color: Colors.white54, fontSize: 14),
+                        style: TextStyle(
+                          color: dialogContext.textSecondary,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -174,13 +179,13 @@ class RouteHistoryScreen extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryEmerald,
+                backgroundColor: dialogContext.primaryColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close', style: TextStyle(color: Colors.white)),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close', style: TextStyle(color: Colors.black)),
             ),
           ),
         ],
@@ -193,21 +198,21 @@ class RouteHistoryScreen extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Workout History',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: context.textPrimary),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: context.textPrimary),
       ),
       body: user == null
-          ? const Center(
+          ? Center(
               child: Text(
                 'User not found',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: context.textPrimary),
               ),
             )
           : StreamBuilder<QuerySnapshot>(
@@ -219,17 +224,17 @@ class RouteHistoryScreen extends StatelessWidget {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
+                  return Center(
                     child: CircularProgressIndicator(
-                      color: AppColors.primaryEmerald,
+                      color: context.primaryColor,
                     ),
                   );
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'No routes recorded.',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: context.textPrimary),
                     ),
                   );
                 }
@@ -289,8 +294,8 @@ class RouteHistoryScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                     dateStr,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: context.textPrimary,
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -298,16 +303,16 @@ class RouteHistoryScreen extends StatelessWidget {
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      const Icon(
+                                      Icon(
                                         Icons.straighten,
-                                        color: AppColors.primaryEmerald,
+                                        color: context.primaryColor,
                                         size: 20,
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
                                         distanceText,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: context.textPrimary,
                                           fontSize: 18,
                                         ),
                                       ),

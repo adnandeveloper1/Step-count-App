@@ -78,7 +78,10 @@ class LocalStorageService {
   }
 
   List<String> getPurchasedThemes() {
-    final data = _box.get('purchasedThemes', defaultValue: ['default']);
+    final data = _box.get(
+      'purchasedThemes',
+      defaultValue: ['default_dark', 'default_light'],
+    );
     return List<String>.from(data);
   }
 
@@ -87,7 +90,9 @@ class LocalStorageService {
   }
 
   String getActiveTheme() {
-    return _box.get('activeTheme', defaultValue: 'default');
+    final val = _box.get('activeTheme', defaultValue: 'default_dark');
+    if (val == 'default') return 'default_dark';
+    return val;
   }
 
   void saveActiveTheme(String themeId) {
