@@ -99,3 +99,17 @@ class DriveTransitionReceiver : BroadcastReceiver() {
         DriveDetector.record(context.applicationContext, transitions) { pending.finish() }
     }
 }
+
+// Transition updates are dropped when the phone restarts or the app is
+// updated, so register again then. The app and the background task also
+// register on every start.
+class DriveRestartReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                val pending = goAsync()
+                DriveDetector.start(context.applicationContext) { pending.finish() }
+            }
+        }
+    }
+}

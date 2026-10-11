@@ -30,6 +30,10 @@ void callbackDispatcher() {
       return Future.value(true);
     }
 
+    // Keeps vehicle detection registered even if the restart receiver
+    // missed (e.g. the app was force-stopped before a reboot).
+    await NativeHealthService().startDriveDetection();
+
     // Read the sensor before taking storage: it can take up to 30 s.
     final int hardwareSteps = await NativeHealthService().getHardwareSteps();
     // No sensor or no reading in time: keep what is stored and try next run.

@@ -412,6 +412,142 @@ void main() {
     });
   });
 
+  group('drives across restarts and days (#3)', () {
+    final now = DateTime(2026, 10, 12, 18);
+
+    StepCounterResult resolve({
+      required int hardwareSteps,
+      int baseline = 27000,
+      int savedToday = 1000,
+      bool isNewDay = false,
+      required List<Drive> drives,
+    }) => resolveTodaySteps(
+      hardwareSteps: hardwareSteps,
+      baseline: baseline,
+      savedToday: savedToday,
+      isNewDay: isNewDay,
+      drives: drives,
+      now: now,
+    )!;
+
+    test("a drive across midnight only removes today's part", () {
+      // 23:50 enter at 26000; first read today at 27000 (baseline) while
+      // still driving; exit at 27800.
+      final during = resolve(
+        hardwareSteps: 27000,
+        baseline: 26500,
+        isNewDay: true,
+        drives: [const Drive(id: 1, enterSteps: 26000)],
+      );
+      expect((during.todaySteps, during.baseline), (0, 27000));
+
+      final after = resolve(
+        hardwareSteps: 28300,
+        baseline: during.baseline,
+        savedToday: during.todaySteps,
+        drives: [const Drive(id: 1, enterSteps: 26000, exitSteps: 27800)],
+      );
+      // 1300 since the day started, 800 of them in the vehicle.
+      expect((after.todaySteps, after.drivingSteps), (500, 800));
+    });
+
+    test('a drive across midnight never makes today negative', () {
+      final r = resolve(
+        hardwareSteps: 27100,
+        baseline: 27000,
+        savedToday: 100,
+        drives: [const Drive(id: 1, enterSteps: 20000, exitSteps: 27100)],
+      );
+      expect(r.todaySteps, 0);
+    });
+
+    test('a reboot during a drive removes the steps since the reboot', () {
+      // 8051 saved before the reboot; entered the vehicle before it, the
+      // counter restarted, and the exit came at 300 after the reboot.
+      final r = resolve(
+        hardwareSteps: 700,
+        baseline: 27205,
+        savedToday: 8051,
+        drives: [
+          const Drive(
+            id: 1,
+            enterSteps: 35000,
+            exitSteps: 300,
+            enteredBeforeBoot: true,
+          ),
+        ],
+      );
+      // Only the 400 steps walked after getting out are new.
+      expect((r.todaySteps, r.drivingSteps), (8451, 300));
+    });
+
+    test('a reboot during an open drive keeps the count frozen', () {
+      final r = resolve(
+        hardwareSteps: 300,
+        baseline: 27205,
+        savedToday: 8051,
+        drives: [const Drive(id: 1, enterSteps: 1200, enteredBeforeBoot: true)],
+      );
+      expect(r.todaySteps, 8051);
+    });
+
+    test('a drive before the reboot removes nothing after it', () {
+      // Enter 200 and exit 900 were before the reboot, and the counter has
+      // passed both since; those steps are not in today's count anymore.
+      final r = resolve(
+        hardwareSteps: 1500,
+        baseline: -8051,
+        savedToday: 9551,
+        drives: [
+          const Drive(
+            id: 1,
+            enterSteps: 200,
+            exitSteps: 900,
+            enteredBeforeBoot: true,
+            exitedBeforeBoot: true,
+          ),
+        ],
+      );
+      expect((r.todaySteps, r.drivingSteps), (9551, 0));
+      expect(r.appliedDriveIds, [1]);
+    });
+
+    test('an open drive whose exit never arrives stops hiding steps', () {
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [
+          Drive(
+            id: 1,
+            enterSteps: 28000,
+            enteredAt: now.subtract(
+              openDriveTimeout + const Duration(minutes: 1),
+            ),
+          ),
+        ],
+      );
+      expect((r.todaySteps, r.drivingSteps), (3000, 0));
+      // Applied, so it is deleted natively and a new enter can start.
+      expect(r.appliedDriveIds, [1]);
+    });
+
+    test('an open drive within the timeout keeps hiding steps', () {
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [
+          Drive(
+            id: 1,
+            enterSteps: 28000,
+            enteredAt: now.subtract(
+              openDriveTimeout - const Duration(minutes: 1),
+            ),
+          ),
+        ],
+      );
+      expect(r.todaySteps, 1000);
+      expect(r.appliedDriveIds, isEmpty);
+    });
+  });
+
   group('rememberAppliedDrives', () {
     test('adds the new ids and keeps only the most recent ones', () {
       final ids = rememberAppliedDrives(
@@ -433,6 +569,19 @@ void main() {
     test('reads an open drive', () {
       final d = Drive.fromMap({'id': 3, 'enterSteps': 100, 'exitSteps': null});
       expect(d.isOpen, isTrue);
+    });
+
+    test('reads the enter time and readings from an earlier boot', () {
+      final d = Drive.fromMap({
+        'id': 3,
+        'enterSteps': 100,
+        'enterMs': 1791746148188,
+        'exitSteps': 250,
+        'enterBeforeBoot': true,
+        'exitBeforeBoot': false,
+      });
+      expect(d.enteredAt, DateTime.fromMillisecondsSinceEpoch(1791746148188));
+      expect((d.enteredBeforeBoot, d.exitedBeforeBoot), (true, false));
     });
   });
 }

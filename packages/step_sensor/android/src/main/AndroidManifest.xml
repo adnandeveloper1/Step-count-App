@@ -4,11 +4,21 @@
     <uses-permission
         android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION"
         android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application>
         <!-- Vehicle transitions from Play Services (see DriveDetector). -->
         <receiver
             android:name="com.nexappra.stepsensor.DriveTransitionReceiver"
             android:exported="false" />
+        <!-- Registers for transitions again after a restart or an app update. -->
+        <receiver
+            android:name="com.nexappra.stepsensor.DriveRestartReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
