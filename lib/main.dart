@@ -34,6 +34,8 @@ void callbackDispatcher() {
     final int hardwareSteps = await NativeHealthService().getHardwareSteps();
     // No sensor or no reading in time: keep what is stored and try next run.
     if (hardwareSteps <= 0) return Future.value(true);
+    // Drives to remove from today's steps; empty without Play Services.
+    final drives = await NativeHealthService().getDrives();
 
     // The account the saved data belongs to, read before saving so a switch
     // during the run can't send it to another account's document.
@@ -42,11 +44,14 @@ void callbackDispatcher() {
     // Checks again: the app may have started during the sensor read.
     _BackgroundSyncResult? synced;
     final outcome = await StepSyncCoordinator.runInBackground(() async {
-      synced = await _saveStepsInBackground(hardwareSteps);
+      synced = await _saveStepsInBackground(hardwareSteps, drives);
     });
     if (outcome != BackgroundSyncOutcome.ranHere) return Future.value(true);
     final result = synced;
     if (result == null) return Future.value(true);
+
+    // The baseline now includes these drives, and their ids are stored.
+    await NativeHealthService().removeDrives(result.appliedDriveIds);
 
     await WidgetService().updateWidgetData(
       steps: result.todaySteps,
@@ -87,12 +92,16 @@ typedef _BackgroundSyncResult = ({
   double distanceKm,
   double calories,
   List<int> weekly,
+  List<int> appliedDriveIds,
 });
 
-/// Saves [hardwareSteps] to storage. Call only while holding storage (see
-/// StepSyncCoordinator.runAsStorageOwner). Returns null when the reading is
-/// not usable.
-Future<_BackgroundSyncResult?> _saveStepsInBackground(int hardwareSteps) async {
+/// Saves [hardwareSteps], less the steps counted during [drives], to storage.
+/// Call only while holding storage (see StepSyncCoordinator.runInBackground).
+/// Returns null when the reading is not usable.
+Future<_BackgroundSyncResult?> _saveStepsInBackground(
+  int hardwareSteps,
+  List<Drive> drives,
+) async {
   final storage = LocalStorageService();
   await storage.init();
   try {
@@ -106,6 +115,8 @@ Future<_BackgroundSyncResult?> _saveStepsInBackground(int hardwareSteps) async {
       baseline: storage.getHardwareBaseline(),
       savedToday: storage.getSteps(),
       isNewDay: isNewDay,
+      drives: drives,
+      appliedDriveIds: storage.getAppliedDriveIds(),
     );
     if (result == null) return null;
 
@@ -139,6 +150,12 @@ Future<_BackgroundSyncResult?> _saveStepsInBackground(int hardwareSteps) async {
     }
 
     storage.saveHardwareBaseline(result.baseline);
+    storage.saveAppliedDriveIds(
+      rememberAppliedDrives(
+        storage.getAppliedDriveIds(),
+        result.appliedDriveIds,
+      ),
+    );
     final int todaySteps = result.todaySteps;
 
     // 3. Process Coins
@@ -176,6 +193,7 @@ Future<_BackgroundSyncResult?> _saveStepsInBackground(int hardwareSteps) async {
       distanceKm: distanceKm,
       calories: calories,
       weekly: weekly,
+      appliedDriveIds: result.appliedDriveIds,
     );
   } finally {
     // Flushes the writes above before another isolate may open the box.

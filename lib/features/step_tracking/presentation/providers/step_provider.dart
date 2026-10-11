@@ -269,6 +269,10 @@ class StepNotifier extends Notifier<StepState> {
       return;
     }
 
+    // Removes steps counted in a vehicle; does nothing without Play Services.
+    await ref.read(nativeHealthProvider).startDriveDetection();
+    if (!ref.mounted) return;
+
     await _setupFallbackTracking();
   }
 
@@ -285,6 +289,9 @@ class StepNotifier extends Notifier<StepState> {
     final nativeHealth = ref.read(nativeHealthProvider);
     final session = AccountSession.current;
     final hardwareSteps = await nativeHealth.getHardwareSteps();
+    final drives = hardwareSteps > 0
+        ? await nativeHealth.getDrives()
+        : const <Drive>[];
     // Signed out or reset while the sensor was read: this account's state
     // must not be written back.
     if (!ref.mounted || session != AccountSession.current) return;
@@ -305,6 +312,8 @@ class StepNotifier extends Notifier<StepState> {
       baseline: storage.getHardwareBaseline(),
       savedToday: storage.getSteps(),
       isNewDay: isNewDay,
+      drives: drives,
+      appliedDriveIds: storage.getAppliedDriveIds(),
     );
     if (result == null) return;
 
@@ -323,12 +332,20 @@ class StepNotifier extends Notifier<StepState> {
 
     if (isNewDay) _resetDay(dateStr, now);
     storage.saveHardwareBaseline(result.baseline);
+    storage.saveAppliedDriveIds(
+      rememberAppliedDrives(
+        storage.getAppliedDriveIds(),
+        result.appliedDriveIds,
+      ),
+    );
 
     _processSteps(
       result.todaySteps,
       'fallback',
       challengeSteps: credit.stepsToCredit,
     );
+    // The baseline now includes these drives, and their ids are stored.
+    await nativeHealth.removeDrives(result.appliedDriveIds);
   }
 
   /// Syncs on behalf of the background task while the app is running (see

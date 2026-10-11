@@ -181,6 +181,13 @@ class LocalStorageService {
   void saveChallengePendingSteps(int steps) =>
       _box.put('challengePendingSteps', steps);
 
+  // Drives already folded into the hardware baseline, so a drive the native
+  // side has not deleted yet is not removed twice (see resolveTodaySteps).
+  List<int> getAppliedDriveIds() =>
+      List<int>.from(_box.get('appliedDriveIds', defaultValue: const <int>[]));
+
+  void saveAppliedDriveIds(List<int> ids) => _box.put('appliedDriveIds', ids);
+
   Future<void> clearAllUserData() async {
     await _box.clear();
   }

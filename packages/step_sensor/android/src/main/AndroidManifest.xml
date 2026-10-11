@@ -1,2 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Vehicle transitions from Play Services (see DriveDetector). -->
+        <receiver
+            android:name="com.nexappra.stepsensor.DriveTransitionReceiver"
+            android:exported="false" />
+    </application>
 </manifest>

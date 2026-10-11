@@ -1,0 +1,106 @@
+package com.nexappra.stepsensor
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.SystemClock
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.ActivityTransition
+import com.google.android.gms.location.ActivityTransitionRequest
+import com.google.android.gms.location.ActivityTransitionResult
+import com.google.android.gms.location.DetectedActivity
+
+// Learns when the user gets into and out of a vehicle from Play Services'
+// Activity Recognition Transition API, which reports even while the app is
+// closed, and saves the step counter reading at each (see DriveStore).
+object DriveDetector {
+    // A receiver has about 10 s before the system may kill it.
+    private const val SENSOR_TIMEOUT_MS = 8000L
+
+    // Registers for vehicle enter / exit transitions. Calls [onResult] with
+    // false when Play Services or the Physical activity permission is missing.
+    @SuppressLint("MissingPermission") // Checked in hasPermission.
+    fun start(context: Context, onResult: (Boolean) -> Unit) {
+        val available = GoogleApiAvailability.getInstance()
+            .isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
+        if (!available || !hasPermission(context)) {
+            onResult(false)
+            return
+        }
+        val transitions = listOf(
+            ActivityTransition.ACTIVITY_TRANSITION_ENTER,
+            ActivityTransition.ACTIVITY_TRANSITION_EXIT,
+        ).map {
+            ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.IN_VEHICLE)
+                .setActivityTransition(it)
+                .build()
+        }
+        // Registering again replaces the earlier registration (same PendingIntent).
+        ActivityRecognition.getClient(context)
+            .requestActivityTransitionUpdates(ActivityTransitionRequest(transitions), pendingIntent(context))
+            .addOnSuccessListener { onResult(true) }
+            .addOnFailureListener { onResult(false) }
+    }
+
+    // Reads the step counter and saves an enter or exit at [atMs].
+    fun record(context: Context, isEnter: Boolean, atMs: Long, done: () -> Unit) {
+        StepCounterReader.read(context, SENSOR_TIMEOUT_MS) { steps ->
+            if (isEnter) DriveStore.enter(context, steps, atMs) else DriveStore.exit(context, steps, atMs)
+            done()
+        }
+    }
+
+    private fun hasPermission(context: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun pendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, DriveTransitionReceiver::class.java)
+        // Mutable: Play Services adds the transition result to the intent.
+        val mutable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+        return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or mutable)
+    }
+}
+
+// Receives vehicle transitions from Play Services, also while the app is closed.
+class DriveTransitionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (!ActivityTransitionResult.hasResult(intent)) return
+        val events = ActivityTransitionResult.extractResult(intent)?.transitionEvents ?: return
+        val event = events.lastOrNull { it.activityType == DetectedActivity.IN_VEHICLE } ?: return
+        // When the transition happened; it can arrive a little later.
+        val ageMs = (SystemClock.elapsedRealtimeNanos() - event.elapsedRealTimeNanos) / 1_000_000
+        val pending = goAsync()
+        DriveDetector.record(
+            context.applicationContext,
+            isEnter = event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER,
+            atMs = System.currentTimeMillis() - ageMs,
+        ) { pending.finish() }
+    }
+}
+
+// Debug builds only (registered in the app's debug manifest): fakes a vehicle
+// transition so drive removal can be checked without driving. See
+// docs/verification.md for the adb commands.
+class DebugDriveReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val isEnter = when (intent.getStringExtra("type")) {
+            "enter" -> true
+            "exit" -> false
+            else -> return
+        }
+        val pending = goAsync()
+        DriveDetector.record(context.applicationContext, isEnter, System.currentTimeMillis()) {
+            pending.finish()
+        }
+    }
+}

@@ -3,7 +3,42 @@ class StepCounterResult {
   final int todaySteps;
   final int baseline;
 
-  const StepCounterResult({required this.todaySteps, required this.baseline});
+  /// Steps removed by the finished drives in [appliedDriveIds].
+  final int drivingSteps;
+
+  /// Finished drives folded into [baseline]; delete them once it is saved.
+  final List<int> appliedDriveIds;
+
+  const StepCounterResult({
+    required this.todaySteps,
+    required this.baseline,
+    this.drivingSteps = 0,
+    this.appliedDriveIds = const [],
+  });
+}
+
+/// A vehicle ride recorded natively from Activity Recognition transitions,
+/// as hardware step counter readings at the enter and the exit.
+class Drive {
+  /// Marks a reading the sensor did not return in time.
+  static const unknown = -1;
+
+  final int id;
+  final int enterSteps;
+
+  /// Null while the user is still in the vehicle.
+  final int? exitSteps;
+
+  const Drive({required this.id, required this.enterSteps, this.exitSteps});
+
+  /// Reads a drive sent over the step sensor platform channel.
+  factory Drive.fromMap(Map<Object?, Object?> map) => Drive(
+    id: map['id'] as int,
+    enterSteps: map['enterSteps'] as int,
+    exitSteps: map['exitSteps'] as int?,
+  );
+
+  bool get isOpen => exitSteps == null;
 }
 
 /// Result of settling which steps still need to go to active challenges.
@@ -69,16 +104,27 @@ ChallengeCredit settleChallengeSteps({
 /// sensor, -2 for a sensor timeout); callers must then leave storage alone.
 /// The baseline can go negative after a reboot, because the counter restarts
 /// from zero while today's saved steps must be kept.
+///
+/// Steps counted during [drives] are removed: a finished drive's steps are
+/// added to the baseline, and an open drive's steps are left out of
+/// [StepCounterResult.todaySteps] until its exit arrives. Drives listed in
+/// [appliedDriveIds] are already in the baseline and are skipped.
 StepCounterResult? resolveTodaySteps({
   required int hardwareSteps,
   required int baseline,
   required int savedToday,
   required bool isNewDay,
+  List<Drive> drives = const [],
+  List<int> appliedDriveIds = const [],
 }) {
   if (hardwareSteps <= 0) return null;
+  drives = [
+    for (final drive in drives)
+      if (!appliedDriveIds.contains(drive.id)) drive,
+  ];
 
   if (isNewDay) {
-    return StepCounterResult(todaySteps: 0, baseline: hardwareSteps);
+    return _removeDrives(hardwareSteps, hardwareSteps, drives);
   }
 
   // Unset baseline: anchor so the steps already saved today are kept.
@@ -93,8 +139,61 @@ StepCounterResult? resolveTodaySteps({
       : hardwareSteps - baseline < savedToday;
   if (rebooted) baseline = -savedToday;
 
+  return _removeDrives(hardwareSteps, baseline, drives);
+}
+
+StepCounterResult _removeDrives(
+  int hardwareSteps,
+  int baseline,
+  List<Drive> drives,
+) {
+  // A positive baseline is the reading at today's zero, so a drive's steps
+  // before it belong to an earlier day. A negative one is not a reading.
+  final dayStart = baseline > 0 ? baseline : null;
+  var remaining = hardwareSteps - baseline;
+  var driving = 0;
+  final applied = <int>[];
+
+  // Steps between [from] and [to], or 0 when a reading is unknown or from
+  // before a reboot (above the current counter).
+  int stepsBetween(int from, int to) {
+    if (from == Drive.unknown || to == Drive.unknown) return 0;
+    if (from > hardwareSteps || to > hardwareSteps) return 0;
+    if (dayStart != null && from < dayStart) from = dayStart;
+    final steps = to - from;
+    if (steps <= 0) return 0;
+    return steps > remaining ? remaining : steps;
+  }
+
+  for (final drive in drives) {
+    if (drive.isOpen) {
+      // Left out of today until the exit arrives; the baseline stays put.
+      remaining -= stepsBetween(drive.enterSteps, hardwareSteps);
+    } else {
+      final steps = stepsBetween(drive.enterSteps, drive.exitSteps!);
+      driving += steps;
+      remaining -= steps;
+      applied.add(drive.id);
+    }
+  }
+
   return StepCounterResult(
-    todaySteps: hardwareSteps - baseline,
-    baseline: baseline,
+    todaySteps: remaining < 0 ? 0 : remaining,
+    baseline: baseline + driving,
+    drivingSteps: driving,
+    appliedDriveIds: applied,
   );
+}
+
+/// How many applied drive ids are remembered; far more than drives can pile
+/// up natively between two syncs.
+const appliedDrivesKept = 50;
+
+/// The ids to store after a sync: [stored] plus the drives just [applied],
+/// keeping the most recent [appliedDrivesKept].
+List<int> rememberAppliedDrives(List<int> stored, List<int> applied) {
+  final ids = [...stored, ...applied];
+  return ids.length > appliedDrivesKept
+      ? ids.sublist(ids.length - appliedDrivesKept)
+      : ids;
 }

@@ -4,4 +4,15 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <application>
+        <!-- Fake vehicle transitions over adb; see docs/verification.md. -->
+        <receiver
+            android:name="com.nexappra.stepsensor.DebugDriveReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.nexappra.buildup.DEBUG_DRIVE" />
+            </intent-filter>
+        </receiver>
+    </application>
 </manifest>

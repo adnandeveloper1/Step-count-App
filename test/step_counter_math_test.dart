@@ -232,4 +232,194 @@ void main() {
       expect(r.baseline, 28800);
     });
   });
+
+  group('resolveTodaySteps with drives', () {
+    StepCounterResult resolve({
+      required int hardwareSteps,
+      int baseline = 27000,
+      int savedToday = 1000,
+      bool isNewDay = false,
+      required List<Drive> drives,
+    }) => resolveTodaySteps(
+      hardwareSteps: hardwareSteps,
+      baseline: baseline,
+      savedToday: savedToday,
+      isNewDay: isNewDay,
+      drives: drives,
+    )!;
+
+    test('removes the steps counted during a finished drive', () {
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [const Drive(id: 1, enterSteps: 28000, exitSteps: 29500)],
+      );
+      expect(r.todaySteps, 1500);
+      expect(r.baseline, 28500);
+      expect(r.drivingSteps, 1500);
+      expect(r.appliedDriveIds, [1]);
+    });
+
+    test('a drive with zero steps changes nothing but is applied', () {
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [const Drive(id: 4, enterSteps: 28000, exitSteps: 28000)],
+      );
+      expect((r.todaySteps, r.baseline, r.drivingSteps), (3000, 27000, 0));
+      expect(r.appliedDriveIds, [4]);
+    });
+
+    test('an unfinished drive freezes the count at the enter reading', () {
+      final r = resolve(
+        hardwareSteps: 29200,
+        drives: [const Drive(id: 2, enterSteps: 28000)],
+      );
+      expect(r.todaySteps, 1000);
+      // Nothing is folded into the baseline until the exit arrives.
+      expect(r.baseline, 27000);
+      expect(r.drivingSteps, 0);
+      expect(r.appliedDriveIds, isEmpty);
+    });
+
+    test('the same drive, once finished, keeps the total it showed', () {
+      final during = resolve(
+        hardwareSteps: 29500,
+        drives: [const Drive(id: 2, enterSteps: 28000)],
+      );
+      final after = resolve(
+        hardwareSteps: 30000,
+        baseline: during.baseline,
+        savedToday: during.todaySteps,
+        drives: [const Drive(id: 2, enterSteps: 28000, exitSteps: 29500)],
+      );
+      expect(during.todaySteps, 1000);
+      expect(after.todaySteps, 1500);
+    });
+
+    test('applies several finished drives and an open one', () {
+      final r = resolve(
+        hardwareSteps: 33000,
+        drives: [
+          const Drive(id: 1, enterSteps: 28000, exitSteps: 29000),
+          const Drive(id: 2, enterSteps: 30000, exitSteps: 30500),
+          const Drive(id: 3, enterSteps: 32000),
+        ],
+      );
+      // 6000 raw, 1000 + 500 driven, 1000 hidden while driving.
+      expect(r.todaySteps, 3500);
+      expect(r.baseline, 28500);
+      expect(r.drivingSteps, 1500);
+      expect(r.appliedDriveIds, [1, 2]);
+    });
+
+    test('an unknown reading removes nothing', () {
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [
+          const Drive(id: 1, enterSteps: -1, exitSteps: 29000),
+          const Drive(id: 2, enterSteps: 29000, exitSteps: -1),
+          const Drive(id: 3, enterSteps: -1),
+        ],
+      );
+      expect((r.todaySteps, r.drivingSteps), (3000, 0));
+      expect(r.appliedDriveIds, [1, 2]);
+    });
+
+    test("a drive before today's start is applied without removing steps", () {
+      // Yesterday's drive, first read today.
+      final r = resolve(
+        hardwareSteps: 30000,
+        isNewDay: true,
+        drives: [const Drive(id: 1, enterSteps: 25000, exitSteps: 26000)],
+      );
+      expect((r.todaySteps, r.baseline, r.drivingSteps), (0, 30000, 0));
+      expect(r.appliedDriveIds, [1]);
+    });
+
+    test("a drive that started before today only removes today's part", () {
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [const Drive(id: 1, enterSteps: 26000, exitSteps: 28000)],
+      );
+      expect((r.todaySteps, r.drivingSteps), (2000, 1000));
+    });
+
+    test("today's total is never negative", () {
+      // Fewer steps saved today than the drive covers (e.g. after a restore).
+      final r = resolve(
+        hardwareSteps: 28500,
+        baseline: 28000,
+        savedToday: 500,
+        drives: [const Drive(id: 1, enterSteps: 27000, exitSteps: 28400)],
+      );
+      expect(r.todaySteps, greaterThanOrEqualTo(0));
+    });
+
+    test('a reading above the current counter (reboot) removes nothing', () {
+      final r = resolve(
+        hardwareSteps: 400,
+        savedToday: 8051,
+        drives: [
+          const Drive(id: 1, enterSteps: 28000, exitSteps: 29000),
+          const Drive(id: 2, enterSteps: 29500),
+        ],
+      );
+      expect((r.todaySteps, r.drivingSteps), (8451, 0));
+      expect(r.appliedDriveIds, [1]);
+    });
+
+    test('a drive already folded into the baseline is not removed twice', () {
+      // Saved, but the app stopped before the native drive was deleted.
+      final first = resolve(
+        hardwareSteps: 30000,
+        drives: [const Drive(id: 1, enterSteps: 28000, exitSteps: 29500)],
+      );
+      final again = resolveTodaySteps(
+        hardwareSteps: 30000,
+        baseline: first.baseline,
+        savedToday: first.todaySteps,
+        isNewDay: false,
+        drives: [const Drive(id: 1, enterSteps: 28000, exitSteps: 29500)],
+        appliedDriveIds: first.appliedDriveIds,
+      )!;
+      expect((again.todaySteps, again.drivingSteps), (1500, 0));
+      expect(again.appliedDriveIds, isEmpty);
+    });
+
+    test('no drives (no Play Services) counts exactly as before', () {
+      final before = resolveTodaySteps(
+        hardwareSteps: 30000,
+        baseline: 27000,
+        savedToday: 2500,
+        isNewDay: false,
+      )!;
+      final r = resolve(hardwareSteps: 30000, savedToday: 2500, drives: []);
+      expect((r.todaySteps, r.baseline), (before.todaySteps, before.baseline));
+      expect(r.drivingSteps, 0);
+      expect(r.appliedDriveIds, isEmpty);
+    });
+  });
+
+  group('rememberAppliedDrives', () {
+    test('adds the new ids and keeps only the most recent ones', () {
+      final ids = rememberAppliedDrives(
+        List.generate(appliedDrivesKept, (i) => i),
+        [100, 101],
+      );
+      expect(ids.length, appliedDrivesKept);
+      expect(ids.last, 101);
+      expect(ids.first, 2);
+    });
+  });
+
+  group('Drive.fromMap', () {
+    test('reads a finished drive from the platform channel', () {
+      final d = Drive.fromMap({'id': 3, 'enterSteps': 100, 'exitSteps': 250});
+      expect((d.id, d.enterSteps, d.exitSteps, d.isOpen), (3, 100, 250, false));
+    });
+
+    test('reads an open drive', () {
+      final d = Drive.fromMap({'id': 3, 'enterSteps': 100, 'exitSteps': null});
+      expect(d.isOpen, isTrue);
+    });
+  });
 }
