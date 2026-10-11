@@ -16,10 +16,22 @@ class StoreScreen extends ConsumerWidget {
       {'id': 'neon', 'title': 'Neon Mint Theme', 'icon': Icons.palette},
       {'id': 'ocean', 'title': 'Ocean Blue Theme', 'icon': Icons.water_drop},
       {'id': 'sunset', 'title': 'Sunset Orange Theme', 'icon': Icons.wb_sunny},
-      {'id': 'amethyst', 'title': 'Amethyst Purple Theme', 'icon': Icons.auto_awesome},
-      {'id': 'avatar_pro', 'title': 'Pro Avatar Frame', 'icon': Icons.account_circle},
+      {
+        'id': 'amethyst',
+        'title': 'Amethyst Purple Theme',
+        'icon': Icons.auto_awesome,
+      },
+      {
+        'id': 'avatar_pro',
+        'title': 'Pro Avatar Frame',
+        'icon': Icons.account_circle,
+      },
       {'id': 'icon_dark', 'title': 'Dark App Icon', 'icon': Icons.apps},
-      {'id': 'analytics', 'title': 'Premium Analytics', 'icon': Icons.analytics},
+      {
+        'id': 'analytics',
+        'title': 'Premium Analytics',
+        'icon': Icons.analytics,
+      },
     ];
 
     return Scaffold(
@@ -43,10 +55,17 @@ class StoreScreen extends ConsumerWidget {
                     ),
                   ),
                   GlassCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
-                        const Icon(Icons.monetization_on_outlined, color: AppColors.primaryEmerald, size: 20),
+                        const Icon(
+                          Icons.monetization_on_outlined,
+                          color: AppColors.primaryEmerald,
+                          size: 20,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           '${stepState.coins} Coins',
@@ -63,10 +82,17 @@ class StoreScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               GlassCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline, color: AppColors.primaryEmerald, size: 20),
+                    const Icon(
+                      Icons.info_outline,
+                      color: AppColors.primaryEmerald,
+                      size: 20,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -115,11 +141,7 @@ class ShopItemCard extends StatelessWidget {
   final String title;
   final IconData icon;
 
-  const ShopItemCard({
-    super.key,
-    required this.title,
-    required this.icon,
-  });
+  const ShopItemCard({super.key, required this.title, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +170,7 @@ class ShopItemCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 border: Border.all(
-                  color: AppColors.textSecondary.withOpacity(0.3),
+                  color: AppColors.textSecondary.withValues(alpha: 0.3),
                   width: 1.5,
                 ),
                 borderRadius: BorderRadius.circular(16),

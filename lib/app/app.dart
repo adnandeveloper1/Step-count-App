@@ -27,18 +27,20 @@ class BuildUpApp extends ConsumerWidget {
           primary: themeState.primaryColor,
           surface: AppColors.backgroundDark,
         ),
-        textTheme: GoogleFonts.interTextTheme(
-          Theme.of(context).textTheme,
-        ).apply(
-          bodyColor: AppColors.textPrimary,
-          displayColor: AppColors.textPrimary,
-        ),
+        textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme)
+            .apply(
+              bodyColor: AppColors.textPrimary,
+              displayColor: AppColors.textPrimary,
+            ),
         useMaterial3: true,
       ),
       home: authState.when(
-        data: (user) => user != null ? const MainNavigationScreen() : const AuthScreen(),
-        loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-        error: (error, stackTrace) => const Scaffold(body: Center(child: Text('Authentication Error'))),
+        data: (user) =>
+            user != null ? const MainNavigationScreen() : const AuthScreen(),
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (error, stackTrace) =>
+            const Scaffold(body: Center(child: Text('Authentication Error'))),
       ),
     );
   }

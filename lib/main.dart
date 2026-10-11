@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,8 +10,10 @@ import 'app/app.dart';
 import 'core/services/local_storage_service.dart';
 import 'core/services/native_health_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/step_sync_coordinator.dart';
 import 'core/services/widget_service.dart';
 import 'core/utils/step_counter_math.dart';
+import 'features/step_tracking/presentation/providers/step_provider.dart';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -21,14 +24,81 @@ void callbackDispatcher() {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    final storage = LocalStorageService();
-    await storage.init();
+    // The app is running in this process: it syncs with its own storage, so
+    // this isolate must not open a second copy of the box.
+    if (await StepSyncCoordinator.delegateToApp()) {
+      return Future.value(true);
+    }
+
+    // Read the sensor before taking storage: it can take up to 30 s.
+    final int hardwareSteps = await NativeHealthService().getHardwareSteps();
+    // No sensor or no reading in time: keep what is stored and try next run.
+    if (hardwareSteps <= 0) return Future.value(true);
+
+    // The account the saved data belongs to, read before saving so a switch
+    // during the run can't send it to another account's document.
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    // Checks again: the app may have started during the sensor read.
+    _BackgroundSyncResult? synced;
+    final outcome = await StepSyncCoordinator.runInBackground(() async {
+      synced = await _saveStepsInBackground(hardwareSteps);
+    });
+    if (outcome != BackgroundSyncOutcome.ranHere) return Future.value(true);
+    final result = synced;
+    if (result == null) return Future.value(true);
+
+    await WidgetService().updateWidgetData(
+      steps: result.todaySteps,
+      goal: result.goal,
+      distance: result.distanceKm,
+      calories: result.calories,
+    );
+
+    // 5. Silent Firebase Sync
+    if (uid != null) {
+      final now = DateTime.now();
+      final firebaseDateStr =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      int totalWeeklySteps = result.weekly.reduce((a, b) => a + b);
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'currentCoins': result.coins,
+        'todaySteps': result.todaySteps,
+        'todayCalories': result.calories,
+        'todayDistanceKm': result.distanceKm,
+        'weeklySteps': result.weekly,
+        'weeklyCalories': totalWeeklySteps * 0.04,
+        'lastUpdated': FieldValue.serverTimestamp(),
+        'dailyHistory': {firebaseDateStr: result.todaySteps},
+      }, SetOptions(merge: true));
+    }
+
+    return Future.value(true);
+  });
+}
+
+/// What the background task saved, for the widget and Firestore updates
+/// that run after it releases storage.
+typedef _BackgroundSyncResult = ({
+  int todaySteps,
+  int goal,
+  int coins,
+  double distanceKm,
+  double calories,
+  List<int> weekly,
+});
+
+/// Saves [hardwareSteps] to storage. Call only while holding storage (see
+/// StepSyncCoordinator.runAsStorageOwner). Returns null when the reading is
+/// not usable.
+Future<_BackgroundSyncResult?> _saveStepsInBackground(int hardwareSteps) async {
+  final storage = LocalStorageService();
+  await storage.init();
+  try {
     final now = DateTime.now();
-
-    final nativeHealth = NativeHealthService();
-    final int hardwareSteps = await nativeHealth.getHardwareSteps();
-
-    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final isNewDay = storage.getLastDate() != dateStr;
 
     final result = resolveTodaySteps(
@@ -37,8 +107,19 @@ void callbackDispatcher() {
       savedToday: storage.getSteps(),
       isNewDay: isNewDay,
     );
-    // No sensor or no reading in time: keep what is stored and try next run.
-    if (result == null) return Future.value(true);
+    if (result == null) return null;
+
+    // Only the app credits challenges; keep yesterday's uncredited steps for it.
+    final credit = settleChallengeSteps(
+      todaySteps: result.todaySteps,
+      previousSavedSteps: storage.getSteps(),
+      credited: storage.getChallengeCreditedSteps(),
+      pending: storage.getChallengePendingSteps(),
+      isNewDay: isNewDay,
+      canCredit: false,
+    );
+    storage.saveChallengeCreditedSteps(credit.credited);
+    storage.saveChallengePendingSteps(credit.pending);
 
     // 1. Process Daily and Weekly Resets
     if (isNewDay) {
@@ -48,10 +129,11 @@ void callbackDispatcher() {
       storage.saveGoalNotified(false);
 
       String weeklyData = storage.getWeeklySteps();
-      List<int> weekly = weeklyData.split(',').map((e) => int.tryParse(e) ?? 0).toList();
+      List<int> weekly = weeklyData
+          .split(',')
+          .map((e) => int.tryParse(e) ?? 0)
+          .toList();
       if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
-
-
       weekly[now.weekday - 1] = 0;
       storage.saveWeeklySteps(weekly.join(','));
     }
@@ -70,10 +152,13 @@ void callbackDispatcher() {
       storage.saveLastCoinStep(lastCoinStep + (newCoins * 100));
     }
 
-    // 4. Update Hive and Widget
+    // 4. Update Hive
     storage.saveSteps(todaySteps);
     String weeklyData = storage.getWeeklySteps();
-    List<int> weekly = weeklyData.split(',').map((e) => int.tryParse(e) ?? 0).toList();
+    List<int> weekly = weeklyData
+        .split(',')
+        .map((e) => int.tryParse(e) ?? 0)
+        .toList();
     if (weekly.length == 7) {
       weekly[now.weekday - 1] = todaySteps;
       storage.saveWeeklySteps(weekly.join(','));
@@ -84,52 +169,60 @@ void callbackDispatcher() {
     final double distanceKm = (todaySteps * strideLengthMeters) / 1000;
     final double calories = distanceKm * weight * 1.036;
 
-    final widgetService = WidgetService();
-    await widgetService.updateWidgetData(
-      steps: todaySteps,
+    return (
+      todaySteps: todaySteps,
       goal: storage.getStepGoal(),
-      distance: distanceKm,
+      coins: currentCoins,
+      distanceKm: distanceKm,
       calories: calories,
+      weekly: weekly,
     );
-
-    // 5. Silent Firebase Sync
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final firebaseDateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      int totalWeeklySteps = weekly.reduce((a, b) => a + b);
-
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'currentCoins': currentCoins,
-        'todaySteps': todaySteps,
-        'todayCalories': calories,      
-        'todayDistanceKm': distanceKm,
-        'weeklySteps': weekly,
-        'weeklyCalories': totalWeeklySteps * 0.04,
-        'lastUpdated': FieldValue.serverTimestamp(),
-        'dailyHistory': {
-          firebaseDateStr: todaySteps,
-        }
-      }, SetOptions(merge: true));
-    }
-
-    return Future.value(true);
-  });
+  } finally {
+    // Flushes the writes above before another isolate may open the box.
+    await storage.close();
+  }
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+
+  // Claim storage first: waits for a background task that is saving, then
+  // background tasks hand their sync to this isolate instead of opening the
+  // box themselves. The sync waits for storage to open, since a request can
+  // arrive first.
+  final container = ProviderContainer();
+  final storageReady = Completer<void>();
+  final storageClaim = await StepSyncCoordinator.claimForApp(() async {
+    await storageReady.future;
+    await container
+        .read(stepNotifierProvider.notifier)
+        .syncFromBackgroundRequest();
+  });
+  try {
+    await _startApp(container, storageReady);
+  } catch (_) {
+    // Without a running app, background tasks must save the steps themselves.
+    storageClaim.dispose();
+    rethrow;
+  }
+}
+
+Future<void> _startApp(
+  ProviderContainer container,
+  Completer<void> storageReady,
+) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await NotificationService().init();
 
   await g_sign_in.GoogleSignIn.instance.initialize(
-    serverClientId: '477084231873-0ehsragfu755ik8ijnh68pak6v36h2s3.apps.googleusercontent.com',
+    serverClientId:
+        '477084231873-0ehsragfu755ik8ijnh68pak6v36h2s3.apps.googleusercontent.com',
   );
 
   final storage = LocalStorageService();
   await storage.init();
+  storageReady.complete();
 
   final int steps = storage.getSteps();
   final int goal = storage.getStepGoal();
@@ -146,7 +239,7 @@ void main() async {
     calories: c,
   );
 
-  Workmanager().initialize(callbackDispatcher, isInDebugMode: true);
+  Workmanager().initialize(callbackDispatcher);
   Workmanager().registerPeriodicTask(
     "step_tracker_task_id",
     "process_background_steps",
@@ -154,8 +247,6 @@ void main() async {
   );
 
   runApp(
-    const ProviderScope(
-      child: BuildUpApp(),
-    ),
+    UncontrolledProviderScope(container: container, child: const BuildUpApp()),
   );
 }

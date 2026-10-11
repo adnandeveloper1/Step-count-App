@@ -6,7 +6,6 @@ import '../../../../app/theme/app_colors.dart';
 import '../../step_tracking/presentation/providers/step_provider.dart';
 import '../../step_tracking/presentation/widgets/glass_step_card.dart';
 
-
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
 
@@ -18,14 +17,23 @@ class InsightsScreen extends ConsumerWidget {
     final currentDayIndex = DateTime.now().weekday - 1;
 
     final List<int> rawWeeklySteps = List<int>.from(stepState.weeklySteps);
-    if (rawWeeklySteps.length == 7 && stepState.currentSteps > rawWeeklySteps[currentDayIndex]) {
+    if (rawWeeklySteps.length == 7 &&
+        stepState.currentSteps > rawWeeklySteps[currentDayIndex]) {
       rawWeeklySteps[currentDayIndex] = stepState.currentSteps;
     }
 
     final List<int> orderedSteps = [];
     final List<String> orderedLabels = [];
     const dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-    const fullDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const fullDayNames = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
 
     for (int i = 0; i < 7; i++) {
       int index = (currentDayIndex - 6 + i) % 7;
@@ -61,7 +69,9 @@ class InsightsScreen extends ConsumerWidget {
         bestDayRawIndex = i;
       }
     }
-    final String bestDayName = maxSteps > 0 ? fullDayNames[bestDayRawIndex] : 'None';
+    final String bestDayName = maxSteps > 0
+        ? fullDayNames[bestDayRawIndex]
+        : 'None';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -140,7 +150,8 @@ class InsightsScreen extends ConsumerWidget {
                           Expanded(
                             child: _buildInsightCard(
                               label: 'Active Time',
-                              value: '$hours:${minutes.toString().padLeft(2, '0')}',
+                              value:
+                                  '$hours:${minutes.toString().padLeft(2, '0')}',
                               unit: 'hrs',
                               icon: Icons.timer,
                             ),
@@ -194,14 +205,18 @@ class InsightsScreen extends ConsumerWidget {
                     Text(
                       trendText,
                       style: GoogleFonts.jetBrainsMono(
-                        color: isPositive ? AppColors.primaryEmerald : Colors.redAccent,
+                        color: isPositive
+                            ? AppColors.primaryEmerald
+                            : Colors.redAccent,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
                     ),
                     Icon(
                       isPositive ? Icons.arrow_upward : Icons.arrow_downward,
-                      color: isPositive ? AppColors.primaryEmerald : Colors.redAccent,
+                      color: isPositive
+                          ? AppColors.primaryEmerald
+                          : Colors.redAccent,
                       size: 14,
                     ),
                   ],
@@ -264,7 +279,9 @@ class InsightsScreen extends ConsumerWidget {
   }
 
   Widget _buildGraphCard(List<int> steps, List<String> labels, Size size) {
-    final double maxStep = steps.isEmpty ? 0 : steps.reduce((a, b) => a > b ? a : b).toDouble();
+    final double maxStep = steps.isEmpty
+        ? 0
+        : steps.reduce((a, b) => a > b ? a : b).toDouble();
     final double calculatedMaxY = maxStep > 10000 ? maxStep * 1.2 : 10000.0;
 
     return GlassCard(
@@ -279,9 +296,12 @@ class InsightsScreen extends ConsumerWidget {
             barTouchData: BarTouchData(
               enabled: true,
               touchTooltipData: BarTouchTooltipData(
-                getTooltipColor: (group) =>AppColors.backgroundDark,
+                getTooltipColor: (group) => AppColors.backgroundDark,
                 tooltipBorderRadius: BorderRadius.circular(20),
-                tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                tooltipPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 tooltipMargin: 8,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
                   return BarTooltipItem(
@@ -303,15 +323,21 @@ class InsightsScreen extends ConsumerWidget {
                   reservedSize: size.height * 0.030,
                   getTitlesWidget: (value, meta) {
                     final index = value.toInt();
-                    if (index < 0 || index >= labels.length) return const SizedBox.shrink();
+                    if (index < 0 || index >= labels.length) {
+                      return const SizedBox.shrink();
+                    }
                     final isToday = index == 6;
                     return Padding(
                       padding: EdgeInsets.only(top: size.height * 0.008),
                       child: Text(
                         labels[index],
                         style: GoogleFonts.jetBrainsMono(
-                          color: isToday ? AppColors.primaryEmerald : AppColors.textSecondary,
-                          fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                          color: isToday
+                              ? AppColors.primaryEmerald
+                              : AppColors.textSecondary,
+                          fontWeight: isToday
+                              ? FontWeight.w800
+                              : FontWeight.w600,
                           fontSize: size.width * 0.032,
                         ),
                       ),
@@ -319,15 +345,21 @@ class InsightsScreen extends ConsumerWidget {
                   },
                 ),
               ),
-              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
             ),
             gridData: const FlGridData(show: false),
             borderData: FlBorderData(show: false),
             barGroups: List.generate(
               7,
-                  (index) => BarChartGroupData(
+              (index) => BarChartGroupData(
                 x: index,
                 barRods: [
                   BarChartRodData(

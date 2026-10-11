@@ -26,8 +26,9 @@ class StreakState {
   }
 }
 
-final streakProvider =
-NotifierProvider<StreakNotifier, StreakState>(StreakNotifier.new);
+final streakProvider = NotifierProvider<StreakNotifier, StreakState>(
+  StreakNotifier.new,
+);
 
 class StreakNotifier extends Notifier<StreakState> {
   @override
@@ -67,11 +68,7 @@ class StreakNotifier extends Notifier<StreakState> {
       ),
     ];
 
-    return StreakState(
-      currentStreak: 5,
-      bestStreak: 12,
-      badges: initialBadges,
-    );
+    return StreakState(currentStreak: 5, bestStreak: 12, badges: initialBadges);
   }
 
   void checkAchievements() {

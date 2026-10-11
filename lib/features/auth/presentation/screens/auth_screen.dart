@@ -7,7 +7,6 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../providers/auth_provider.dart';
 
-
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
@@ -39,9 +38,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         backgroundColor: isError ? Colors.redAccent : AppColors.primaryEmerald,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         elevation: 8,
         duration: const Duration(seconds: 3),
       ),
@@ -53,7 +50,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      _showCustomSnackBar('Please enter both email and password', isError: true);
+      _showCustomSnackBar(
+        'Please enter both email and password',
+        isError: true,
+      );
       return;
     }
 
@@ -107,12 +107,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       _showCustomSnackBar(errorMessage, isError: true);
     } catch (e) {
       _showCustomSnackBar('Sign-in cancelled.', isError: true);
-    }finally {
+    } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
+
   Future<void> _submitGuestLogin() async {
     setState(() => _isLoading = true);
     try {
@@ -153,10 +154,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     );
   }
 
-  void _showForgotPasswordDialog()
-  {
-
-    final resetEmailController = TextEditingController(text: _emailController.text);
+  void _showForgotPasswordDialog() {
+    final resetEmailController = TextEditingController(
+      text: _emailController.text,
+    );
 
     showDialog(
       context: context,
@@ -196,7 +197,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     hintStyle: const TextStyle(color: Colors.white60),
                     filled: true,
                     fillColor: AppColors.glassCardBackground,
-                    prefixIcon: const Icon(Icons.mail_outline, color: Colors.white60),
+                    prefixIcon: const Icon(
+                      Icons.mail_outline,
+                      color: Colors.white60,
+                    ),
                     border: OutlineInputBorder(
                       borderSide: BorderSide.none,
                       borderRadius: BorderRadius.circular(8),
@@ -212,12 +216,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     onPressed: () async {
                       final email = resetEmailController.text.trim();
                       if (email.isEmpty) {
-                        _showCustomSnackBar('Enter email for reset', isError: true);
+                        _showCustomSnackBar(
+                          'Enter email for reset',
+                          isError: true,
+                        );
                         return;
                       }
 
                       try {
-                        await ref.read(authControllerProvider).resetPassword(email);
+                        await ref
+                            .read(authControllerProvider)
+                            .resetPassword(email);
                         if (context.mounted) {
                           Navigator.pop(context);
                           _showCustomSnackBar('Reset link sent to your email');
@@ -264,6 +273,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -275,7 +285,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-
                 Text(
                   'BUILD UP',
                   style: GoogleFonts.sora(
@@ -302,15 +311,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           hintText: 'runner@gmail.com',
                           hintStyle: const TextStyle(color: Colors.white60),
                           filled: true,
-                          fillColor:AppColors.glassCardBackground,
-                          prefixIcon: const Icon(Icons.mail_outline,
-                              color: Colors.white60),
+                          fillColor: AppColors.glassCardBackground,
+                          prefixIcon: const Icon(
+                            Icons.mail_outline,
+                            color: Colors.white60,
+                          ),
                           border: OutlineInputBorder(
                             borderSide: BorderSide.none,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          contentPadding:
-                          const EdgeInsets.symmetric(vertical: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -346,8 +358,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           hintStyle: const TextStyle(color: Colors.white60),
                           filled: true,
                           fillColor: AppColors.glassCardBackground,
-                          prefixIcon: const Icon(Icons.lock_outline,
-                              color: Colors.white60),
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: Colors.white60,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword
@@ -365,15 +379,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             borderSide: BorderSide.none,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          contentPadding:
-                          const EdgeInsets.symmetric(vertical: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 32),
                       if (_isLoading)
                         const Center(
-                            child: CircularProgressIndicator(
-                                color: AppColors.primaryEmerald))
+                          child: CircularProgressIndicator(
+                            color: AppColors.primaryEmerald,
+                          ),
+                        )
                       else ...[
                         SizedBox(
                           width: double.infinity,
@@ -412,7 +429,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.g_mobiledata, color: Colors.white, size: 32),
+                                const Icon(
+                                  Icons.g_mobiledata,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Sign in with Google',
@@ -448,7 +469,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const SignUpScreen()),
+                              MaterialPageRoute(
+                                builder: (context) => const SignUpScreen(),
+                              ),
                             );
                           },
                           child: RichText(

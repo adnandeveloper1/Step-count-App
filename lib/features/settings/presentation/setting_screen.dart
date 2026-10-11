@@ -18,17 +18,16 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-
     final stepState = ref.watch(stepNotifierProvider);
     final exportService = ExportService();
     final authController = ref.watch(authControllerProvider);
 
     final profileAsync = ref.watch(userProfileProvider);
     final profile = profileAsync.value;
-    
-    final displayName = profile?['name'] ?? profile?['displayName'] ?? 'Build Up User';
-    final avatar = profile?['avatarUrl'] ?? '👦';
 
+    final displayName =
+        profile?['name'] ?? profile?['displayName'] ?? 'Build Up User';
+    final avatar = profile?['avatarUrl'] ?? '👦';
 
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
@@ -38,7 +37,7 @@ class SettingsScreen extends ConsumerWidget {
     const String privacyPolicyUrl =
         'https://sites.google.com/view/buildup-app-buildup-app-/home';
 
-    Future<void> _openPrivacyPolicy() async {
+    Future<void> openPrivacyPolicy() async {
       final Uri url = Uri.parse(privacyPolicyUrl);
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         throw Exception('Could not launch $privacyPolicyUrl');
@@ -58,11 +57,11 @@ class SettingsScreen extends ConsumerWidget {
                   child: Column(
                     children: [
                       ProfileAvatarWithTier(
-                        avatarEmoji: avatar, 
-                        tier: stepState.currentLeague, 
-                        tierName: '${stepState.tierName}',
+                        avatarEmoji: avatar,
+                        tier: stepState.currentLeague,
+                        tierName: stepState.tierName,
                       ),
-                      
+
                       SizedBox(height: screenHeight * 0.01),
                       Text(
                         displayName,
@@ -83,10 +82,14 @@ class SettingsScreen extends ConsumerWidget {
                     leading: Container(
                       padding: EdgeInsets.all(screenWidth * 0.025),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryEmerald.withOpacity(0.2),
+                        color: AppColors.primaryEmerald.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.edit, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
+                      child: Icon(
+                        Icons.edit,
+                        color: AppColors.primaryEmerald,
+                        size: screenWidth * 0.06,
+                      ),
                     ),
                     title: Text(
                       'Edit Profile',
@@ -103,7 +106,11 @@ class SettingsScreen extends ConsumerWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    trailing: Icon(Icons.chevron_right, color: AppColors.textSecondary, size: screenWidth * 0.05),
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      color: AppColors.textSecondary,
+                      size: screenWidth * 0.05,
+                    ),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -114,7 +121,7 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                 ),
-      
+
                 SizedBox(height: screenHeight * 0.03),
                 Text(
                   'SETTINGS',
@@ -130,19 +137,43 @@ class SettingsScreen extends ConsumerWidget {
                   child: Column(
                     children: [
                       ListTile(
-                        leading: Icon(Icons.notifications, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
-                        title: Text('Stand Alerts', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
+                        leading: Icon(
+                          Icons.notifications,
+                          color: AppColors.primaryEmerald,
+                          size: screenWidth * 0.06,
+                        ),
+                        title: Text(
+                          'Stand Alerts',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: screenWidth * 0.04,
+                          ),
+                        ),
                         trailing: Switch(
                           value: true,
                           onChanged: (bool value) {},
-                          activeColor: AppColors.primaryEmerald,
+                          activeThumbColor: AppColors.primaryEmerald,
                         ),
                       ),
                       const Divider(color: Colors.white24),
                       ListTile(
-                        leading: Icon(Icons.storefront, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
-                        title: Text('Store', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
-                        trailing: Icon(Icons.chevron_right, color: AppColors.textSecondary, size: screenWidth * 0.05),
+                        leading: Icon(
+                          Icons.storefront,
+                          color: AppColors.primaryEmerald,
+                          size: screenWidth * 0.06,
+                        ),
+                        title: Text(
+                          'Store',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: screenWidth * 0.04,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textSecondary,
+                          size: screenWidth * 0.05,
+                        ),
                         onTap: () {
                           Navigator.push(
                             context,
@@ -154,9 +185,23 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       const Divider(color: Colors.white24),
                       ListTile(
-                        leading: Icon(Icons.timer, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
-                        title: Text('Daily Walk Scheduler', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
-                        trailing: Icon(Icons.chevron_right, color: AppColors.textSecondary, size: screenWidth * 0.05),
+                        leading: Icon(
+                          Icons.timer,
+                          color: AppColors.primaryEmerald,
+                          size: screenWidth * 0.06,
+                        ),
+                        title: Text(
+                          'Daily Walk Scheduler',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: screenWidth * 0.04,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textSecondary,
+                          size: screenWidth * 0.05,
+                        ),
                         onTap: () {
                           Navigator.push(
                             context,
@@ -168,8 +213,18 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       const Divider(color: Colors.white24),
                       ListTile(
-                        leading: Icon(Icons.picture_as_pdf, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
-                        title: Text('Export PDF Report', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
+                        leading: Icon(
+                          Icons.picture_as_pdf,
+                          color: AppColors.primaryEmerald,
+                          size: screenWidth * 0.06,
+                        ),
+                        title: Text(
+                          'Export PDF Report',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: screenWidth * 0.04,
+                          ),
+                        ),
                         onTap: () {
                           exportService.exportToPdf(
                             stepState.currentSteps,
@@ -180,27 +235,44 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       const Divider(color: Colors.white24),
                       ListTile(
-                        leading: Icon(Icons.table_chart, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
-                        title: Text('Export CSV Data', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
+                        leading: Icon(
+                          Icons.table_chart,
+                          color: AppColors.primaryEmerald,
+                          size: screenWidth * 0.06,
+                        ),
+                        title: Text(
+                          'Export CSV Data',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: screenWidth * 0.04,
+                          ),
+                        ),
                         onTap: () {
                           exportService.exportToCsv(
                             stepState.currentSteps,
                             stepState.calories,
                             stepState.distanceKm,
                           );
-
                         },
                       ),
                       const Divider(color: Colors.white24),
                       ListTile(
-                        leading: Icon(Icons.privacy_tip_rounded, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
-                        title: Text('Privacy & Policy', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
+                        leading: Icon(
+                          Icons.privacy_tip_rounded,
+                          color: AppColors.primaryEmerald,
+                          size: screenWidth * 0.06,
+                        ),
+                        title: Text(
+                          'Privacy & Policy',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: screenWidth * 0.04,
+                          ),
+                        ),
                         onTap: () {
-                          _openPrivacyPolicy();
-
+                          openPrivacyPolicy();
                         },
                       ),
-
                     ],
                   ),
                 ),
@@ -217,8 +289,18 @@ class SettingsScreen extends ConsumerWidget {
                 GlassCard(
                   padding: EdgeInsets.all(screenWidth * 0.04),
                   child: ListTile(
-                    leading: Icon(Icons.logout, color: Colors.orangeAccent, size: screenWidth * 0.06),
-                    title: Text('Sign Out', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
+                    leading: Icon(
+                      Icons.logout,
+                      color: Colors.orangeAccent,
+                      size: screenWidth * 0.06,
+                    ),
+                    title: Text(
+                      'Sign Out',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: screenWidth * 0.04,
+                      ),
+                    ),
                     onTap: () async {
                       await authController.signOut();
                     },
@@ -241,7 +323,7 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     );
                   },
-                )
+                ),
               ],
             ),
           ),
@@ -261,9 +343,11 @@ class HealthConnectNotice extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(screenWidth * 0.04),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primaryEmerald.withOpacity(0.3)),
+        border: Border.all(
+          color: AppColors.primaryEmerald.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,7 +387,6 @@ class HealthConnectNotice extends StatelessWidget {
     );
   }
 }
-
 
 class ProfileAvatarWithTier extends StatelessWidget {
   final String avatarEmoji;
@@ -354,12 +437,10 @@ class ProfileAvatarWithTier extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           GestureDetector(
-            onTap: (){
+            onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const TierInfoScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const TierInfoScreen()),
               );
             },
             child: Container(
@@ -367,14 +448,14 @@ class ProfileAvatarWithTier extends StatelessWidget {
               height: avatarSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.textSecondary.withOpacity(0.1),
+                color: AppColors.textSecondary.withValues(alpha: 0.1),
                 border: Border.all(
                   color: tierColor,
                   width: screenWidth * 0.008,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: tierColor.withOpacity(0.35),
+                    color: tierColor.withValues(alpha: 0.35),
                     blurRadius: 16,
                     spreadRadius: 2,
                   ),
@@ -395,15 +476,15 @@ class ProfileAvatarWithTier extends StatelessWidget {
               bottom: 4,
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.035, 
-                  vertical: screenWidth * 0.015
+                  horizontal: screenWidth * 0.035,
+                  vertical: screenWidth * 0.015,
                 ),
                 decoration: BoxDecoration(
                   color: tierColor,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),

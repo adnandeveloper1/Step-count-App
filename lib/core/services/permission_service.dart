@@ -4,6 +4,4 @@ final permissionServiceProvider = Provider<PermissionService>((ref) {
   return PermissionService();
 });
 
-class PermissionService {
-
-}
+class PermissionService {}

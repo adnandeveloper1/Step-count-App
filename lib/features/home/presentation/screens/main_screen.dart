@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/gps_tracking_screen.dart';
 import 'package:flutter/material.dart';
@@ -8,12 +7,12 @@ import '../../../settings/presentation/setting_screen.dart';
 import '../../../social/presentation/screens/social_screen.dart';
 import '../../../step_tracking/presentation/screens/dashboard_screen.dart';
 
-
 class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
 
   @override
-  ConsumerState<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() =>
+      _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
@@ -21,8 +20,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   final List<Widget> _screens = [
     const DashboardView(),
-    InsightsScreen (),
-     ChallengeScreen(),
+    InsightsScreen(),
+    ChallengeScreen(),
     GpsTrackingScreen(),
     SettingsScreen(),
   ];
@@ -31,8 +30,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   void initState() {
     super.initState();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -48,12 +45,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             color: const Color(0xFF141618),
             borderRadius: BorderRadius.circular(40),
             border: Border.all(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white.withValues(alpha: 0.08),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),

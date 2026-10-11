@@ -23,28 +23,32 @@ final appTiers = [
     id: '1',
     name: 'Diamond Tier',
     criteria: '12,000+ Daily Average',
-    description: 'Elite performance. You have mastered daily movement and endurance.',
+    description:
+        'Elite performance. You have mastered daily movement and endurance.',
     badgeColor: AppColors.primaryEmerald,
   ),
   const TierLevel(
     id: '2',
     name: 'Gold Tier',
     criteria: '8,000+ Daily Average',
-    description: 'Advanced dedication. Your step counts sit well above average.',
+    description:
+        'Advanced dedication. Your step counts sit well above average.',
     badgeColor: Colors.amber,
   ),
   const TierLevel(
     id: '3',
     name: 'Silver Tier',
     criteria: '5,000+ Daily Average',
-    description: 'Consistent movement. You are establishing a solid walking routine.',
+    description:
+        'Consistent movement. You are establishing a solid walking routine.',
     badgeColor: Colors.grey,
   ),
   const TierLevel(
     id: '4',
     name: 'Bronze Tier',
     criteria: '< 5,000 Daily Average',
-    description: 'The starting point. Begin your fitness journey and build daily habits.',
+    description:
+        'The starting point. Begin your fitness journey and build daily habits.',
     badgeColor: Colors.orangeAccent,
   ),
 ];
@@ -93,10 +97,10 @@ class TierInfoScreen extends StatelessWidget {
             margin: EdgeInsets.only(bottom: size.height * 0.02),
             padding: EdgeInsets.all(cardPadding),
             decoration: BoxDecoration(
-              color: AppColors.glassCardBackground.withOpacity(0.1),
+              color: AppColors.glassCardBackground.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: tier.badgeColor.withOpacity(0.5),
+                color: tier.badgeColor.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
@@ -107,12 +111,9 @@ class TierInfoScreen extends StatelessWidget {
                   width: size.width * 0.15,
                   height: size.width * 0.15,
                   decoration: BoxDecoration(
-                    color: tier.badgeColor.withOpacity(0.15),
+                    color: tier.badgeColor.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: tier.badgeColor,
-                      width: 2,
-                    ),
+                    border: Border.all(color: tier.badgeColor, width: 2),
                   ),
                   child: Icon(
                     Icons.military_tech,
@@ -140,7 +141,7 @@ class TierInfoScreen extends StatelessWidget {
                           vertical: size.height * 0.004,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B).withOpacity(0.8),
+                          color: const Color(0xFF1E293B).withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(

@@ -6,6 +6,59 @@ class StepCounterResult {
   const StepCounterResult({required this.todaySteps, required this.baseline});
 }
 
+/// Result of settling which steps still need to go to active challenges.
+class ChallengeCredit {
+  /// Steps to add to active challenges now.
+  final int stepsToCredit;
+
+  /// How many of today's steps have been credited, to store.
+  final int credited;
+
+  /// Steps from an earlier day not yet credited, to store.
+  final int pending;
+
+  const ChallengeCredit({
+    required this.stepsToCredit,
+    required this.credited,
+    required this.pending,
+  });
+}
+
+/// Works out which steps go to challenges.
+///
+/// [credited] is how many of today's steps were already credited and
+/// [pending] how many steps from an earlier day still wait to be credited.
+/// Only the app can credit challenges ([canCredit]); the background task
+/// passes false so steps it counts wait for the app.
+ChallengeCredit settleChallengeSteps({
+  required int todaySteps,
+  required int previousSavedSteps,
+  required int credited,
+  required int pending,
+  required bool isNewDay,
+  required bool canCredit,
+}) {
+  if (isNewDay) {
+    // Yesterday's steps that were never credited carry over.
+    final leftover = previousSavedSteps - credited;
+    if (leftover > 0) pending += leftover;
+    credited = 0;
+  }
+  if (!canCredit) {
+    return ChallengeCredit(
+      stepsToCredit: 0,
+      credited: credited,
+      pending: pending,
+    );
+  }
+  final newSteps = todaySteps - credited;
+  return ChallengeCredit(
+    stepsToCredit: pending + (newSteps > 0 ? newSteps : 0),
+    credited: newSteps > 0 ? todaySteps : credited,
+    pending: 0,
+  );
+}
+
 /// Converts the cumulative-since-boot [hardwareSteps] into today's steps.
 ///
 /// [baseline] is the stored hardware reading that corresponds to zero steps

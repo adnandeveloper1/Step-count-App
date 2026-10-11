@@ -26,7 +26,9 @@ class ThemeState {
   }
 }
 
-final themeProvider = NotifierProvider<ThemeNotifier, ThemeState>(ThemeNotifier.new);
+final themeProvider = NotifierProvider<ThemeNotifier, ThemeState>(
+  ThemeNotifier.new,
+);
 
 class ThemeNotifier extends Notifier<ThemeState> {
   final Map<String, Color> themeColors = {
@@ -60,7 +62,8 @@ class ThemeNotifier extends Notifier<ThemeState> {
 
     if (success) {
       final storage = ref.read(storageProvider);
-      final updatedPurchased = List<String>.from(state.purchasedThemes)..add(themeId);
+      final updatedPurchased = List<String>.from(state.purchasedThemes)
+        ..add(themeId);
 
       storage.savePurchasedThemes(updatedPurchased);
       state = state.copyWith(purchasedThemes: updatedPurchased);

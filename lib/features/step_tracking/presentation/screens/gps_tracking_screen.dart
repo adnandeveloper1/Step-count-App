@@ -96,7 +96,7 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                 border: Border.all(color: Colors.grey.shade300),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                   ),
                 ],
@@ -138,7 +138,7 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
         backgroundColor: AppColors.backgroundDark,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         title: const Text(
           'Workout Complete',
@@ -296,7 +296,6 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                         letterSpacing: .1,
                       ),
                     ),
-        
 
                     Expanded(
                       child: Align(
@@ -306,7 +305,8 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const RouteHistoryScreen(),
+                                builder: (context) =>
+                                    const RouteHistoryScreen(),
                               ),
                             );
                           },
@@ -350,7 +350,8 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                               trackingState.currentPosition!.longitude,
                             ),
                             initialZoom: 17.0,
-                            onMapReady: () => setState(() => _isMapReady = true),
+                            onMapReady: () =>
+                                setState(() => _isMapReady = true),
                           ),
                           children: [
                             TileLayer(
@@ -436,7 +437,9 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                           ),
                         ),
                         child: Text(
-                          trackingState.isTracking ? 'Stop Route' : 'Start Route',
+                          trackingState.isTracking
+                              ? 'Stop Route'
+                              : 'Start Route',
                           style: const TextStyle(
                             color: Colors.black87,
                             fontSize: 18,

@@ -47,7 +47,9 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
   Future<void> checkPermissionAndStart() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      state = state.copyWith(errorMessage: "Location services are turned off. Please enable GPS.");
+      state = state.copyWith(
+        errorMessage: "Location services are turned off. Please enable GPS.",
+      );
       return;
     }
 
@@ -61,7 +63,10 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
     }
 
     if (permission == LocationPermission.deniedForever) {
-      state = state.copyWith(errorMessage: "Location permission permanently denied. Enable it in Settings.");
+      state = state.copyWith(
+        errorMessage:
+            "Location permission permanently denied. Enable it in Settings.",
+      );
       return;
     }
 
@@ -90,18 +95,19 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
       );
     }
 
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      if (state.isTracking) {
-        state = state.copyWith(
-          currentPosition: position,
-          recordedPositions: [...state.recordedPositions, position],
+    _positionSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+          (Position position) {
+            if (state.isTracking) {
+              state = state.copyWith(
+                currentPosition: position,
+                recordedPositions: [...state.recordedPositions, position],
+              );
+            } else {
+              state = state.copyWith(currentPosition: position);
+            }
+          },
         );
-      } else {
-        state = state.copyWith(currentPosition: position);
-      }
-    });
   }
 
   void startTracking() {
@@ -123,11 +129,9 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final routeData = state.recordedPositions.map((p) => {
-      'lat': p.latitude,
-      'lng': p.longitude,
-      'speed': p.speed,
-    }).toList();
+    final routeData = state.recordedPositions
+        .map((p) => {'lat': p.latitude, 'lng': p.longitude, 'speed': p.speed})
+        .toList();
 
     try {
       await FirebaseFirestore.instance
@@ -135,10 +139,10 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
           .doc(user.uid)
           .collection('routes')
           .add({
-        'timestamp': FieldValue.serverTimestamp(),
-        'points': routeData,
-        'pointCount': state.recordedPositions.length,
-      });
+            'timestamp': FieldValue.serverTimestamp(),
+            'points': routeData,
+            'pointCount': state.recordedPositions.length,
+          });
     } catch (e) {
       debugPrint('Failed to save route');
     }
@@ -150,6 +154,7 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
   }
 }
 
-final gpsTrackingProvider = StateNotifierProvider<GpsTrackingNotifier, GpsTrackingState>((ref) {
-  return GpsTrackingNotifier(ref);
-});
+final gpsTrackingProvider =
+    StateNotifierProvider<GpsTrackingNotifier, GpsTrackingState>((ref) {
+      return GpsTrackingNotifier(ref);
+    });

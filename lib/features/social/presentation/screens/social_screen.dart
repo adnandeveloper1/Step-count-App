@@ -29,24 +29,27 @@ class ChallengeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-
     final themeState = ref.watch(themeProvider);
     final leaderboardAsync = ref.watch(leaderboardProvider);
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
     final challenges = ref.watch(challengeProvider);
-    
+
     final double horizontalPadding = size.width * 0.05;
     final double verticalSpacing = size.height * 0.02;
     final double titleFontSize = size.width * 0.06;
 
-     //DisplayList logic
-    final activeList = challenges.where((c) => c.isActive && !c.isCompleted).toList();
+    //DisplayList logic
+    final activeList = challenges
+        .where((c) => c.isActive && !c.isCompleted)
+        .toList();
     final displayList = [...activeList.take(2)];
 
     if (displayList.length < 2) {
       final fallbackList = challenges
-          .where((c) => !c.isActive && !c.isCompleted && !displayList.contains(c))
+          .where(
+            (c) => !c.isActive && !c.isCompleted && !displayList.contains(c),
+          )
           .toList();
       displayList.addAll(fallbackList.take(2 - displayList.length));
     }
@@ -55,7 +58,6 @@ class ChallengeScreen extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
-
           children: [
             Padding(
               padding: EdgeInsets.symmetric(
@@ -70,7 +72,8 @@ class ChallengeScreen extends ConsumerWidget {
                     const Expanded(child: SizedBox.shrink()),
                     Text(
                       'CHALLENGES',
-                      style: GoogleFonts.sora( // Changed to Sora for consistency
+                      style: GoogleFonts.sora(
+                        // Changed to Sora for consistency
                         fontSize: screenWidth * 0.06,
                         fontWeight: FontWeight.w900,
                         color: AppColors.textPrimary,
@@ -89,7 +92,9 @@ class ChallengeScreen extends ConsumerWidget {
                   children: [
                     SizedBox(height: verticalSpacing),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 1.5),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding * 1.5,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -107,7 +112,8 @@ class ChallengeScreen extends ConsumerWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const AllChallengesScreen(),
+                                  builder: (context) =>
+                                      const AllChallengesScreen(),
                                 ),
                               );
                             },
@@ -126,7 +132,9 @@ class ChallengeScreen extends ConsumerWidget {
                     ),
 
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                      ),
                       child: Column(
                         children: displayList.map((c) {
                           return Padding(
@@ -151,7 +159,9 @@ class ChallengeScreen extends ConsumerWidget {
                     ),
                     SizedBox(height: verticalSpacing),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                      ),
                       child: leaderboardAsync.when(
                         data: (users) {
                           if (users.isEmpty) {
@@ -160,7 +170,9 @@ class ChallengeScreen extends ConsumerWidget {
                                 padding: EdgeInsets.all(20.0),
                                 child: Text(
                                   'No data available',
-                                  style: TextStyle(color: AppColors.textSecondary),
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ),
                             );
@@ -172,20 +184,24 @@ class ChallengeScreen extends ConsumerWidget {
                             itemCount: users.length,
                             itemBuilder: (context, index) {
                               final user = users[index];
-                              final bool isImageUrl = user.avatarUrl.startsWith('http');
+                              final bool isImageUrl = user.avatarUrl.startsWith(
+                                'http',
+                              );
                               final double avatarSize = size.width * 0.12;
                               final userTierColor = _getUserTierColor(user);
 
                               return Container(
-                                margin: EdgeInsets.only(bottom: size.height * 0.015),
+                                margin: EdgeInsets.only(
+                                  bottom: size.height * 0.015,
+                                ),
                                 padding: EdgeInsets.symmetric(
                                   horizontal: size.width * 0.05,
                                   vertical: size.height * 0.02,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.glassCardBackground.withOpacity(0.1),
+                                  color: AppColors.glassCardBackground
+                                      .withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(24),
-
                                 ),
                                 child: Row(
                                   children: [
@@ -200,20 +216,38 @@ class ChallengeScreen extends ConsumerWidget {
                                         ),
                                       ),
                                       child: CircleAvatar(
-                                        backgroundColor: const Color(0xFF1E293B),
-                                        backgroundImage: isImageUrl ? NetworkImage(user.avatarUrl) : null,
-                                        child: !isImageUrl && user.avatarUrl.isNotEmpty
-                                            ? Text(user.avatarUrl, style: TextStyle(fontSize: size.width * 0.06))
+                                        backgroundColor: const Color(
+                                          0xFF1E293B,
+                                        ),
+                                        backgroundImage: isImageUrl
+                                            ? NetworkImage(user.avatarUrl)
+                                            : null,
+                                        child:
+                                            !isImageUrl &&
+                                                user.avatarUrl.isNotEmpty
+                                            ? Text(
+                                                user.avatarUrl,
+                                                style: TextStyle(
+                                                  fontSize: size.width * 0.06,
+                                                ),
+                                              )
                                             : (user.avatarUrl.isEmpty
-                                            ? Icon(Icons.person, color: AppColors.primaryEmerald, size: size.width * 0.06)
-                                            : null),
+                                                  ? Icon(
+                                                      Icons.person,
+                                                      color: AppColors
+                                                          .primaryEmerald,
+                                                      size: size.width * 0.06,
+                                                    )
+                                                  : null),
                                       ),
                                     ),
                                     SizedBox(width: size.width * 0.04),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Text(
                                             user.name,
@@ -253,7 +287,9 @@ class ChallengeScreen extends ConsumerWidget {
                         loading: () => Center(
                           child: Padding(
                             padding: const EdgeInsets.all(20.0),
-                            child: CircularProgressIndicator(color: themeState.primaryColor),
+                            child: CircularProgressIndicator(
+                              color: themeState.primaryColor,
+                            ),
                           ),
                         ),
                         error: (error, stack) => Center(

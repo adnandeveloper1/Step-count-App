@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_colors.dart';
 import 'glass_step_card.dart';
 
-
 class MetricGlassCard extends StatelessWidget {
   final String label;
   final String value;
@@ -38,12 +37,12 @@ class MetricGlassCard extends StatelessWidget {
           ),
           Text(
             label,
-            style:  GoogleFonts.sora(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-            letterSpacing: .8,
-          ),
+            style: GoogleFonts.sora(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+              letterSpacing: .8,
+            ),
           ),
         ],
       ),

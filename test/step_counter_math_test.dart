@@ -2,6 +2,127 @@ import 'package:build_up/core/utils/step_counter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('settleChallengeSteps', () {
+    test(
+      'the app credits steps the background task counted while it was closed',
+      () {
+        // 8051 credited before closing; the background task then saved 10051.
+        final r = settleChallengeSteps(
+          todaySteps: 10051,
+          previousSavedSteps: 10051,
+          credited: 8051,
+          pending: 0,
+          isNewDay: false,
+          canCredit: true,
+        );
+        expect((r.stepsToCredit, r.credited, r.pending), (2000, 10051, 0));
+      },
+    );
+
+    test(
+      'a background midnight rollover keeps yesterday\'s uncredited steps for the app',
+      () {
+        // Yesterday ended at 9000 with 8000 credited; the background task starts today.
+        final rollover = settleChallengeSteps(
+          todaySteps: 0,
+          previousSavedSteps: 9000,
+          credited: 8000,
+          pending: 0,
+          isNewDay: true,
+          canCredit: false,
+        );
+        expect(
+          (rollover.stepsToCredit, rollover.credited, rollover.pending),
+          (0, 0, 1000),
+        );
+
+        // Later the app opens with 300 steps today.
+        final open = settleChallengeSteps(
+          todaySteps: 300,
+          previousSavedSteps: 300,
+          credited: rollover.credited,
+          pending: rollover.pending,
+          isNewDay: false,
+          canCredit: true,
+        );
+        expect(
+          (open.stepsToCredit, open.credited, open.pending),
+          (1300, 300, 0),
+        );
+      },
+    );
+
+    test('the app open over midnight credits yesterday\'s last steps', () {
+      final r = settleChallengeSteps(
+        todaySteps: 0,
+        previousSavedSteps: 9000,
+        credited: 8800,
+        pending: 0,
+        isNewDay: true,
+        canCredit: true,
+      );
+      expect((r.stepsToCredit, r.credited, r.pending), (200, 0, 0));
+    });
+
+    test('the background task on the same day leaves credit for the app', () {
+      final r = settleChallengeSteps(
+        todaySteps: 9500,
+        previousSavedSteps: 9000,
+        credited: 8000,
+        pending: 400,
+        isNewDay: false,
+        canCredit: false,
+      );
+      expect((r.stepsToCredit, r.credited, r.pending), (0, 8000, 400));
+    });
+
+    test('two background rollovers before the app opens keep both days', () {
+      final day2 = settleChallengeSteps(
+        todaySteps: 0,
+        previousSavedSteps: 9000,
+        credited: 8000,
+        pending: 0,
+        isNewDay: true,
+        canCredit: false,
+      );
+      // Background task counted 5000 on day 2, then day 3 starts.
+      final day3 = settleChallengeSteps(
+        todaySteps: 0,
+        previousSavedSteps: 5000,
+        credited: day2.credited,
+        pending: day2.pending,
+        isNewDay: true,
+        canCredit: false,
+      );
+      expect((day3.stepsToCredit, day3.credited, day3.pending), (0, 0, 6000));
+    });
+
+    test('a rollover never makes pending steps negative', () {
+      final r = settleChallengeSteps(
+        todaySteps: 0,
+        previousSavedSteps: 500,
+        credited: 800,
+        pending: 100,
+        isNewDay: true,
+        canCredit: false,
+      );
+      expect(r.pending, 100);
+    });
+
+    test('fewer steps than already credited credits nothing', () {
+      // e.g. a lower count restored from Firestore after sign-in.
+      final r = settleChallengeSteps(
+        todaySteps: 500,
+        previousSavedSteps: 500,
+        credited: 800,
+        pending: 0,
+        isNewDay: false,
+        canCredit: true,
+      );
+      expect((r.stepsToCredit, r.credited, r.pending), (0, 800, 0));
+    });
+  });
+
   group('resolveTodaySteps', () {
     test('counts steps since the baseline', () {
       final r = resolveTodaySteps(

@@ -26,7 +26,26 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   bool _isSaving = false;
 
   final List<String> avatars = [
-    '🤖', '👦', '👧', '👨', '👩', '🧔', '👱‍♀️', '👾', '🦊', '🦁', '🐯', '🐼', '🐨', '🦖', '🏀', '⚽', '🎮', '🎧', '🚀', '🌈'
+    '🤖',
+    '👦',
+    '👧',
+    '👨',
+    '👩',
+    '🧔',
+    '👱‍♀️',
+    '👾',
+    '🦊',
+    '🦁',
+    '🐯',
+    '🐼',
+    '🐨',
+    '🦖',
+    '🏀',
+    '⚽',
+    '🎮',
+    '🎧',
+    '🚀',
+    '🌈',
   ];
 
   @override
@@ -37,7 +56,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final displayName = user?.displayName ?? 'Build Up User';
 
     nameController = TextEditingController(text: displayName);
-    goalController = TextEditingController(text: stepState.goalSteps.toString());
+    goalController = TextEditingController(
+      text: stepState.goalSteps.toString(),
+    );
     weightController = TextEditingController();
     heightController = TextEditingController();
     bodyFatController = TextEditingController();
@@ -49,7 +70,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         if (doc.exists) {
           final data = doc.data();
           if (data?['avatarUrl'] != null) {
@@ -117,7 +141,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           'bmi': bmi,
           'lastUpdated': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-
       }
 
       ref.read(stepNotifierProvider.notifier).updateProfile(height, weight);
@@ -176,12 +199,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildInputField(TextEditingController controller, String hint, IconData icon, {bool isNumber = false}) {
+  Widget _buildInputField(
+    TextEditingController controller,
+    String hint,
+    IconData icon, {
+    bool isNumber = false,
+  }) {
     return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: TextField(
         controller: controller,
-        keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+        keyboardType: isNumber
+            ? const TextInputType.numberWithOptions(decimal: true)
+            : TextInputType.text,
         style: GoogleFonts.sora(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w600,
@@ -269,16 +299,36 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             _buildInputField(nameController, 'Enter your name', Icons.badge),
 
             _buildLabel('DAILY STEP GOAL'),
-            _buildInputField(goalController, 'e.g. 10000', Icons.directions_walk, isNumber: true),
+            _buildInputField(
+              goalController,
+              'e.g. 10000',
+              Icons.directions_walk,
+              isNumber: true,
+            ),
 
             _buildLabel('WEIGHT (KG)'),
-            _buildInputField(weightController, 'e.g. 70.5', Icons.monitor_weight, isNumber: true),
+            _buildInputField(
+              weightController,
+              'e.g. 70.5',
+              Icons.monitor_weight,
+              isNumber: true,
+            ),
 
             _buildLabel('HEIGHT (CM)'),
-            _buildInputField(heightController, 'e.g. 175', Icons.height, isNumber: true),
+            _buildInputField(
+              heightController,
+              'e.g. 175',
+              Icons.height,
+              isNumber: true,
+            ),
 
             _buildLabel('BODY FAT (%)'),
-            _buildInputField(bodyFatController, 'e.g. 15', Icons.percent, isNumber: true),
+            _buildInputField(
+              bodyFatController,
+              'e.g. 15',
+              Icons.percent,
+              isNumber: true,
+            ),
 
             const SizedBox(height: 48),
             SizedBox(
@@ -295,22 +345,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 onPressed: _isSaving ? null : saveProfile,
                 child: _isSaving
                     ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    color: AppColors.backgroundDark,
-                    strokeWidth: 2,
-                  ),
-                )
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          color: AppColors.backgroundDark,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : Text(
-                  'SAVE CHANGES',
-                  style: GoogleFonts.sora(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.backgroundDark,
-                    letterSpacing: 1.2,
-                  ),
-                ),
+                        'SAVE CHANGES',
+                        style: GoogleFonts.sora(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.backgroundDark,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 40),

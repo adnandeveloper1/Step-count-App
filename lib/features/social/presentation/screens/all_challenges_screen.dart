@@ -13,9 +13,13 @@ class AllChallengesScreen extends ConsumerWidget {
     final challenges = ref.watch(challengeProvider);
 
     // Filter challenges into three distinct groups
-    final activeNow = challenges.where((c) => c.isActive && !c.isCompleted).toList();
+    final activeNow = challenges
+        .where((c) => c.isActive && !c.isCompleted)
+        .toList();
     final completed = challenges.where((c) => c.isCompleted).toList();
-    final available = challenges.where((c) => !c.isActive && !c.isCompleted).toList();
+    final available = challenges
+        .where((c) => !c.isActive && !c.isCompleted)
+        .toList();
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -43,10 +47,12 @@ class AllChallengesScreen extends ConsumerWidget {
               if (activeNow.isNotEmpty) ...[
                 _buildSectionHeader('ACTIVE NOW', Colors.grey),
                 const SizedBox(height: 12),
-                ...activeNow.map((c) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: ChallengeCard(challenge: c),
-                    )),
+                ...activeNow.map(
+                  (c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: ChallengeCard(challenge: c),
+                  ),
+                ),
                 const SizedBox(height: 16),
               ],
 
@@ -54,10 +60,12 @@ class AllChallengesScreen extends ConsumerWidget {
               if (completed.isNotEmpty) ...[
                 _buildSectionHeader('COMPLETED', Colors.grey),
                 const SizedBox(height: 12),
-                ...completed.map((c) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: ChallengeCard(challenge: c),
-                    )),
+                ...completed.map(
+                  (c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: ChallengeCard(challenge: c),
+                  ),
+                ),
                 const SizedBox(height: 16),
               ],
 
@@ -65,12 +73,14 @@ class AllChallengesScreen extends ConsumerWidget {
               if (available.isNotEmpty) ...[
                 _buildSectionHeader('AVAILABLE', AppColors.textSecondary),
                 const SizedBox(height: 12),
-                ...available.map((c) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: ChallengeCard(challenge: c),
-                    )),
+                ...available.map(
+                  (c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: ChallengeCard(challenge: c),
+                  ),
+                ),
               ],
-              
+
               const SizedBox(height: 20),
             ],
           ),

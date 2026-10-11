@@ -38,6 +38,8 @@ final leaderboardProvider = StreamProvider<List<LeaderboardUser>>((ref) {
       .limit(50)
       .snapshots()
       .map((snapshot) {
-    return snapshot.docs.map((doc) => LeaderboardUser.fromDocument(doc)).toList();
-  });
+        return snapshot.docs
+            .map((doc) => LeaderboardUser.fromDocument(doc))
+            .toList();
+      });
 });

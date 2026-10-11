@@ -38,7 +38,10 @@ class AchievementsScreen extends ConsumerWidget {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   const Text(
@@ -147,7 +150,7 @@ class AchievementsScreen extends ConsumerWidget {
                         CircleAvatar(
                           radius: 28,
                           backgroundColor: badge.isUnlocked
-                              ? AppColors.primaryEmerald.withOpacity(0.2)
+                              ? AppColors.primaryEmerald.withValues(alpha: 0.2)
                               : AppColors.glassCardBorder,
                           child: Icon(
                             _resolveIcon(badge.iconName),

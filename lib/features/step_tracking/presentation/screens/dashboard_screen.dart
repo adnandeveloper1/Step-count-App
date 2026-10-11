@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:build_up/features/settings/presentation/setting_screen.dart';
 import 'package:build_up/features/shop/presentation/screens/store_screen.dart';
-import 'package:build_up/features/step_tracking/presentation/screens/route_history_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/step_details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,6 +123,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
+                                  key: const Key('dashboard_coins'),
                                   '${stepState.coins} ',
                                   style: GoogleFonts.inter(
                                     color: AppColors.textPrimary,
@@ -174,7 +174,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                       : 0.0,
                                   strokeWidth: screenWidth * 0.05,
                                   backgroundColor: AppColors.primaryEmerald
-                                      .withOpacity(0.1),
+                                      .withValues(alpha: 0.1),
                                   valueColor:
                                       const AlwaysStoppedAnimation<Color>(
                                         AppColors.primaryEmerald,
@@ -200,6 +200,9 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                           MainAxisAlignment.center,
                                       children: [
                                         Text(
+                                          key: const Key(
+                                            'dashboard_step_count',
+                                          ),
                                           '${stepState.currentSteps}',
                                           style: GoogleFonts.sora(
                                             fontSize: screenWidth * 0.105,
@@ -260,8 +263,8 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                 padding: EdgeInsets.all(screenWidth * 0.035),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: AppColors.primaryEmerald.withOpacity(
-                                    0.15,
+                                  color: AppColors.primaryEmerald.withValues(
+                                    alpha: 0.15,
                                   ),
                                 ),
                                 child: Icon(
@@ -316,8 +319,8 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                 Container(
                                   padding: EdgeInsets.all(screenWidth * 0.03),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primaryEmerald.withOpacity(
-                                      0.2,
+                                    color: AppColors.primaryEmerald.withValues(
+                                      alpha: 0.2,
                                     ),
                                     borderRadius: BorderRadius.circular(
                                       screenWidth * 0.04,

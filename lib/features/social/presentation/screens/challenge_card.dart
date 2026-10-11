@@ -20,7 +20,7 @@ class ChallengeCard extends ConsumerWidget {
     final isCompleted = challenge.isCompleted;
     final isFailed = challenge.isFailed;
 
-    String _formatNumber(int number) {
+    String formatNumber(int number) {
       if (number >= 100000) {
         double val = number / 100000;
         return '${val % 1 == 0 ? val.toInt() : val.toStringAsFixed(1)}L';
@@ -63,20 +63,19 @@ class ChallengeCard extends ConsumerWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.redAccent.withOpacity(0.1),
-                  Colors.redAccent.withOpacity(0.3),
+                  Colors.redAccent.withValues(alpha: 0.1),
+                  Colors.redAccent.withValues(alpha: 0.3),
                 ],
               )
             : LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppColors.glassCardBackground.withOpacity(0.15),
-                  AppColors.primaryEmerald.withOpacity(0.4),
+                  AppColors.glassCardBackground.withValues(alpha: 0.15),
+                  AppColors.primaryEmerald.withValues(alpha: 0.4),
                 ],
               ),
         borderRadius: BorderRadius.circular(20),
-
       ),
 
       padding: EdgeInsets.all(cardPadding),
@@ -90,7 +89,6 @@ class ChallengeCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -123,18 +121,15 @@ class ChallengeCard extends ConsumerWidget {
                         SizedBox(width: 12),
 
                         Column(
-                          crossAxisAlignment: CrossAxisAlignment
-                              .start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-
                             Container(
                               padding: EdgeInsets.symmetric(
                                 horizontal: size.width * 0.01,
                                 vertical: size.height * 0.006,
                               ),
                               child: Row(
-                                mainAxisSize: MainAxisSize
-                                    .min,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
                                     badgeIcon,
@@ -193,7 +188,7 @@ class ChallengeCard extends ConsumerWidget {
                       children: [
                         SizedBox(width: size.width * 0.012),
                         Text(
-                          _formatNumber(challenge.currentSteps),
+                          formatNumber(challenge.currentSteps),
                           style: GoogleFonts.inter(
                             color: AppColors.primaryEmerald,
                             fontSize: numberFontSize * 1.5,
@@ -201,7 +196,7 @@ class ChallengeCard extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          ' /${_formatNumber(challenge.targetSteps)}',
+                          ' /${formatNumber(challenge.targetSteps)}',
                           style: GoogleFonts.inter(
                             color: AppColors.textSecondary,
                             fontSize: size.width * 0.04,
@@ -213,7 +208,6 @@ class ChallengeCard extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
-
                               children: [
                                 Text(
                                   isCompleted
@@ -227,8 +221,9 @@ class ChallengeCard extends ConsumerWidget {
                                         : (challenge.isActive
                                               ? AppColors.primaryEmerald
                                               : AppColors.textSecondary),
-                                    fontSize: isCompleted ?
-                                    size.width * 0.042  :  size.width * 0.032,
+                                    fontSize: isCompleted
+                                        ? size.width * 0.042
+                                        : size.width * 0.032,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 1.0,
                                   ),
@@ -238,7 +233,8 @@ class ChallengeCard extends ConsumerWidget {
                                     scale: 0.8,
                                     child: CupertinoSwitch(
                                       value: challenge.isActive,
-                                      activeColor: AppColors.primaryEmerald,
+                                      activeTrackColor:
+                                          AppColors.primaryEmerald,
                                       onChanged: (bool value) {
                                         if (value) {
                                           ref

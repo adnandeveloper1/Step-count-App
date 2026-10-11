@@ -8,5 +8,4 @@ class AppColors {
   static const Color textPrimary = Colors.white;
   static const Color textSecondary = Color(0xFF9CA3AF);
   static const Color neonGreen = Color(0xFF00E676);
-
 }

@@ -39,9 +39,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         backgroundColor: isError ? Colors.redAccent : AppColors.primaryEmerald,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         elevation: 8,
         duration: const Duration(seconds: 3),
       ),
@@ -125,15 +123,15 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         hintText: hintText,
         hintStyle: const TextStyle(color: Colors.white38),
         filled: true,
-        fillColor: Colors.black.withOpacity(0.4),
+        fillColor: Colors.black.withValues(alpha: 0.4),
         prefixIcon: Icon(icon, color: Colors.white38),
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           borderRadius: BorderRadius.circular(8),
         ),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           borderRadius: BorderRadius.circular(8),
         ),
         focusedBorder: OutlineInputBorder(
@@ -239,9 +237,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       Row(
                         children: [
                           Theme(
-                            data: Theme.of(context).copyWith(
-                              unselectedWidgetColor: Colors.white38,
-                            ),
+                            data: Theme.of(
+                              context,
+                            ).copyWith(unselectedWidgetColor: Colors.white38),
                             child: Checkbox(
                               value: _agreeToTerms,
                               activeColor: AppColors.primaryEmerald,
@@ -290,8 +288,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       const SizedBox(height: 32),
                       if (_isLoading)
                         const Center(
-                            child: CircularProgressIndicator(
-                                color: AppColors.primaryEmerald))
+                          child: CircularProgressIndicator(
+                            color: AppColors.primaryEmerald,
+                          ),
+                        )
                       else
                         SizedBox(
                           width: double.infinity,
@@ -337,7 +337,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                               ),
                               children: [
                                 const TextSpan(
-                                    text: 'Already have an account? '),
+                                  text: 'Already have an account? ',
+                                ),
                                 TextSpan(
                                   text: 'Login',
                                   style: GoogleFonts.sora(

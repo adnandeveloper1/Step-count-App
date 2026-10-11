@@ -8,7 +8,8 @@ class WalkSchedulerScreen extends ConsumerStatefulWidget {
   const WalkSchedulerScreen({super.key});
 
   @override
-  ConsumerState<WalkSchedulerScreen> createState() => _WalkSchedulerScreenState();
+  ConsumerState<WalkSchedulerScreen> createState() =>
+      _WalkSchedulerScreenState();
 }
 
 class _WalkSchedulerScreenState extends ConsumerState<WalkSchedulerScreen> {
@@ -88,26 +89,34 @@ class _WalkSchedulerScreenState extends ConsumerState<WalkSchedulerScreen> {
           children: [
             const Text(
               'Set a daily reminder to get your steps in.',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
             ),
             const SizedBox(height: 32),
             GlassCard(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  const Icon(Icons.timer, color: AppColors.primaryEmerald, size: 48),
+                  const Icon(
+                    Icons.timer,
+                    color: AppColors.primaryEmerald,
+                    size: 48,
+                  ),
                   const SizedBox(height: 24),
                   GestureDetector(
                     onTap: () => _selectTime(context),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryEmerald.withOpacity(0.1),
+                        color: AppColors.primaryEmerald.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.primaryEmerald.withOpacity(0.3)),
+                        border: Border.all(
+                          color: AppColors.primaryEmerald.withValues(
+                            alpha: 0.3,
+                          ),
+                        ),
                       ),
                       child: Text(
                         selectedTime.format(context),
@@ -125,7 +134,9 @@ class _WalkSchedulerScreenState extends ConsumerState<WalkSchedulerScreen> {
                     child: ElevatedButton(
                       onPressed: _scheduleWalk,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isScheduled ? AppColors.glassCardBorder : AppColors.primaryEmerald,
+                        backgroundColor: isScheduled
+                            ? AppColors.glassCardBorder
+                            : AppColors.primaryEmerald,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -134,7 +145,9 @@ class _WalkSchedulerScreenState extends ConsumerState<WalkSchedulerScreen> {
                       child: Text(
                         isScheduled ? 'Scheduled' : 'Set Reminder',
                         style: TextStyle(
-                          color: isScheduled ? AppColors.textSecondary : Colors.black,
+                          color: isScheduled
+                              ? AppColors.textSecondary
+                              : Colors.black,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
