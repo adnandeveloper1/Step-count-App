@@ -150,12 +150,7 @@ Future<_BackgroundSyncResult?> _saveStepsInBackground(
     }
 
     storage.saveHardwareBaseline(result.baseline);
-    storage.saveAppliedDriveIds(
-      rememberAppliedDrives(
-        storage.getAppliedDriveIds(),
-        result.appliedDriveIds,
-      ),
-    );
+    storage.markDrivesApplied(result.appliedDriveIds);
     final int todaySteps = result.todaySteps;
 
     // 3. Process Coins

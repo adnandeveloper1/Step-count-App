@@ -332,12 +332,7 @@ class StepNotifier extends Notifier<StepState> {
 
     if (isNewDay) _resetDay(dateStr, now);
     storage.saveHardwareBaseline(result.baseline);
-    storage.saveAppliedDriveIds(
-      rememberAppliedDrives(
-        storage.getAppliedDriveIds(),
-        result.appliedDriveIds,
-      ),
-    );
+    storage.markDrivesApplied(result.appliedDriveIds);
 
     _processSteps(
       result.todaySteps,

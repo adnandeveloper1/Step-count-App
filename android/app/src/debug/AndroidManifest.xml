@@ -8,7 +8,7 @@
     <application>
         <!-- Fake vehicle transitions over adb; see docs/verification.md. -->
         <receiver
-            android:name="com.nexappra.stepsensor.DebugDriveReceiver"
+            android:name="com.nexappra.buildup.DebugDriveReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.nexappra.buildup.DEBUG_DRIVE" />

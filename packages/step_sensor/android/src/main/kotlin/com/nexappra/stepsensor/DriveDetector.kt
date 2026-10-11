@@ -50,10 +50,16 @@ object DriveDetector {
             .addOnFailureListener { onResult(false) }
     }
 
-    // Reads the step counter and saves an enter or exit at [atMs].
-    fun record(context: Context, isEnter: Boolean, atMs: Long, done: () -> Unit) {
+    // An enter (true) or exit (false) and when it happened.
+    data class Transition(val isEnter: Boolean, val atMs: Long)
+
+    // Reads the step counter once and saves [transitions] in order: one
+    // delivery can hold both an enter and an exit.
+    fun record(context: Context, transitions: List<Transition>, done: () -> Unit) {
         StepCounterReader.read(context, SENSOR_TIMEOUT_MS) { steps ->
-            if (isEnter) DriveStore.enter(context, steps, atMs) else DriveStore.exit(context, steps, atMs)
+            for (t in transitions) {
+                if (t.isEnter) DriveStore.enter(context, steps, t.atMs) else DriveStore.exit(context, steps, t.atMs)
+            }
             done()
         }
     }
@@ -76,31 +82,20 @@ class DriveTransitionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!ActivityTransitionResult.hasResult(intent)) return
         val events = ActivityTransitionResult.extractResult(intent)?.transitionEvents ?: return
-        val event = events.lastOrNull { it.activityType == DetectedActivity.IN_VEHICLE } ?: return
-        // When the transition happened; it can arrive a little later.
-        val ageMs = (SystemClock.elapsedRealtimeNanos() - event.elapsedRealTimeNanos) / 1_000_000
+        val nowMs = System.currentTimeMillis()
+        val nowNanos = SystemClock.elapsedRealtimeNanos()
+        val transitions = events
+            .filter { it.activityType == DetectedActivity.IN_VEHICLE }
+            .sortedBy { it.elapsedRealTimeNanos }
+            .map {
+                // When the transition happened; it can arrive a little later.
+                DriveDetector.Transition(
+                    isEnter = it.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER,
+                    atMs = nowMs - (nowNanos - it.elapsedRealTimeNanos) / 1_000_000,
+                )
+            }
+        if (transitions.isEmpty()) return
         val pending = goAsync()
-        DriveDetector.record(
-            context.applicationContext,
-            isEnter = event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER,
-            atMs = System.currentTimeMillis() - ageMs,
-        ) { pending.finish() }
-    }
-}
-
-// Debug builds only (registered in the app's debug manifest): fakes a vehicle
-// transition so drive removal can be checked without driving. See
-// docs/verification.md for the adb commands.
-class DebugDriveReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val isEnter = when (intent.getStringExtra("type")) {
-            "enter" -> true
-            "exit" -> false
-            else -> return
-        }
-        val pending = goAsync()
-        DriveDetector.record(context.applicationContext, isEnter, System.currentTimeMillis()) {
-            pending.finish()
-        }
+        DriveDetector.record(context.applicationContext, transitions) { pending.finish() }
     }
 }

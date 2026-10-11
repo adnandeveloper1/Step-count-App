@@ -1,5 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../utils/step_counter_math.dart';
+
 class LocalStorageService {
   static const String _boxName = 'buildUpData';
 
@@ -186,7 +188,15 @@ class LocalStorageService {
   List<int> getAppliedDriveIds() =>
       List<int>.from(_box.get('appliedDriveIds', defaultValue: const <int>[]));
 
-  void saveAppliedDriveIds(List<int> ids) => _box.put('appliedDriveIds', ids);
+  /// Records drives just folded into the saved baseline. Save the baseline
+  /// first, then delete the drives natively.
+  void markDrivesApplied(List<int> ids) {
+    if (ids.isEmpty) return;
+    _box.put(
+      'appliedDriveIds',
+      rememberAppliedDrives(getAppliedDriveIds(), ids),
+    );
+  }
 
   Future<void> clearAllUserData() async {
     await _box.clear();

@@ -385,6 +385,19 @@ void main() {
       expect(again.appliedDriveIds, isEmpty);
     });
 
+    test('after sign-out, drives left natively remove nothing', () {
+      // Sign-out clears the baseline, saved steps and applied ids, but the
+      // drives recorded before it are still in native storage.
+      final r = resolve(
+        hardwareSteps: 30000,
+        baseline: 0,
+        savedToday: 0,
+        drives: [const Drive(id: 1, enterSteps: 28000, exitSteps: 29500)],
+      );
+      expect((r.todaySteps, r.baseline, r.drivingSteps), (0, 30000, 0));
+      expect(r.appliedDriveIds, [1]);
+    });
+
     test('no drives (no Play Services) counts exactly as before', () {
       final before = resolveTodaySteps(
         hardwareSteps: 30000,
