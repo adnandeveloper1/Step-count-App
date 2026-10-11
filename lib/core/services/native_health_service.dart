@@ -14,6 +14,8 @@ class NativeHealthService {
       return steps;
     } on PlatformException {
       return 0;
+    } on MissingPluginException {
+      return 0;
     }
   }
 

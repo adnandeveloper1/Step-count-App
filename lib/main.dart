@@ -10,6 +10,7 @@ import 'core/services/local_storage_service.dart';
 import 'core/services/native_health_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/widget_service.dart';
+import 'core/utils/step_counter_math.dart';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -25,24 +26,26 @@ void callbackDispatcher() {
     final now = DateTime.now();
 
     final nativeHealth = NativeHealthService();
-    int hardwareSteps = await nativeHealth.getHardwareSteps();
-
-    if (hardwareSteps == 0) return Future.value(true);
-
+    final int hardwareSteps = await nativeHealth.getHardwareSteps();
 
     final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    String lastDate = storage.getLastDate();
-    int baseline = storage.getHardwareBaseline();
+    final isNewDay = storage.getLastDate() != dateStr;
+
+    final result = resolveTodaySteps(
+      hardwareSteps: hardwareSteps,
+      baseline: storage.getHardwareBaseline(),
+      savedToday: storage.getSteps(),
+      isNewDay: isNewDay,
+    );
+    // No sensor or no reading in time: keep what is stored and try next run.
+    if (result == null) return Future.value(true);
 
     // 1. Process Daily and Weekly Resets
-    if (lastDate != dateStr) {
+    if (isNewDay) {
       storage.saveLastDate(dateStr);
       storage.saveSteps(0);
       storage.saveLastCoinStep(0);
       storage.saveGoalNotified(false);
-
-      storage.saveHardwareBaseline(hardwareSteps);
-      baseline = hardwareSteps;
 
       String weeklyData = storage.getWeeklySteps();
       List<int> weekly = weeklyData.split(',').map((e) => int.tryParse(e) ?? 0).toList();
@@ -53,20 +56,8 @@ void callbackDispatcher() {
       storage.saveWeeklySteps(weekly.join(','));
     }
 
-    if (baseline > 0 && hardwareSteps < baseline) {
-      int savedStepsToday = storage.getSteps();
-      int newBaseline = -savedStepsToday;
-      storage.saveHardwareBaseline(newBaseline);
-      baseline = newBaseline;
-    }
-    int todaySteps = hardwareSteps - baseline;
-
-    if (todaySteps < 0) {
-      int savedStepsToday = storage.getSteps();
-      int accumulatedSteps = savedStepsToday + hardwareSteps;
-      storage.saveHardwareBaseline(hardwareSteps - accumulatedSteps);
-      todaySteps = accumulatedSteps;
-    }
+    storage.saveHardwareBaseline(result.baseline);
+    final int todaySteps = result.todaySteps;
 
     // 3. Process Coins
     int lastCoinStep = storage.getLastCoinStep();
@@ -81,7 +72,6 @@ void callbackDispatcher() {
 
     // 4. Update Hive and Widget
     storage.saveSteps(todaySteps);
-
     String weeklyData = storage.getWeeklySteps();
     List<int> weekly = weeklyData.split(',').map((e) => int.tryParse(e) ?? 0).toList();
     if (weekly.length == 7) {

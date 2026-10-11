@@ -8,6 +8,7 @@ import '../../../../core/notification_provider/notification_provider.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../../core/services/native_health_service.dart';
 import '../../../../core/services/widget_service.dart';
+import '../../../../core/utils/step_counter_math.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
 
 // list of all  ranks users can reach based on their walking.
@@ -224,43 +225,18 @@ class StepNotifier extends Notifier<StepState> {
 
   // Every morning resets everything back
 
-  void _handleDailyResetIfNeeded({int? hardwareSteps}) {
+  void _resetDay(String dateStr, DateTime now) {
     final storage = ref.read(storageProvider);
-    final now = DateTime.now();
-    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    storage.saveLastDate(dateStr);
+    storage.saveSteps(0);
+    storage.saveLastCoinStep(0);
+    storage.saveGoalNotified(false);
 
-    // 1. Handle hardware reboots / system step counter resets first
-    if (hardwareSteps != null && hardwareSteps > 0) {
-      int currentBaseline = storage.getHardwareBaseline();
-      if (hardwareSteps < currentBaseline) {
-        storage.saveHardwareBaseline(0);
-      }
-    }
-    if (storage.getLastDate() != dateStr) {
-      storage.saveLastDate(dateStr);
-      storage.saveSteps(0);
-      storage.saveLastCoinStep(0);
-      storage.saveGoalNotified(false);
-
-      String weeklyData = storage.getWeeklySteps();
-      List<int> weekly = weeklyData.split(',').map((e) => int.tryParse(e) ?? 0).toList();
-      if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
-      weekly[now.weekday - 1] = 0;
-      storage.saveWeeklySteps(weekly.join(','));
-
-      if (hardwareSteps != null && hardwareSteps > 0) {
-        storage.saveHardwareBaseline(hardwareSteps);
-      } else {
-        storage.saveHardwareBaseline(0);
-      }
-    }
-
-    if (hardwareSteps != null && hardwareSteps > 0) {
-
-      if (storage.getHardwareBaseline() == 0) {
-        storage.saveHardwareBaseline(hardwareSteps);
-      }
-    }
+    String weeklyData = storage.getWeeklySteps();
+    List<int> weekly = weeklyData.split(',').map((e) => int.tryParse(e) ?? 0).toList();
+    if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
+    weekly[now.weekday - 1] = 0;
+    storage.saveWeeklySteps(weekly.join(','));
   }
 
   Future initializeTracking() async {
@@ -273,6 +249,7 @@ class StepNotifier extends Notifier<StepState> {
 
     await _setupFallbackTracking();
   }
+
   Future<void> _setupFallbackTracking() async {
     await _fetchFallbackData();
     _pollingTimer?.cancel();
@@ -290,29 +267,23 @@ class StepNotifier extends Notifier<StepState> {
       return;
     }
 
-    _handleDailyResetIfNeeded(hardwareSteps: hardwareSteps);
-
-    if (state.pedestrianStatus != 'fallback') {
-      state = state.copyWith(pedestrianStatus: 'fallback');
-    }
-
-    if (hardwareSteps == 0) return;
-
     final storage = ref.read(storageProvider);
-    int baseline = storage.getHardwareBaseline();
-    if (baseline > 0 && hardwareSteps < baseline) {
-      int savedStepsToday = storage.getSteps();
-      int newBaseline = hardwareSteps - savedStepsToday;
-      storage.saveHardwareBaseline(newBaseline);
-      baseline = newBaseline;
-    }
-    if (baseline == 0) {
-      storage.saveHardwareBaseline(hardwareSteps);
-      baseline = hardwareSteps;
-    }
-    int todaySteps = hardwareSteps - baseline;
-    if (todaySteps < 0) todaySteps = 0;
-    _processSteps(todaySteps, 'fallback');
+    final now = DateTime.now();
+    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final isNewDay = storage.getLastDate() != dateStr;
+
+    final result = resolveTodaySteps(
+      hardwareSteps: hardwareSteps,
+      baseline: storage.getHardwareBaseline(),
+      savedToday: storage.getSteps(),
+      isNewDay: isNewDay,
+    );
+    if (result == null) return;
+
+    if (isNewDay) _resetDay(dateStr, now);
+    storage.saveHardwareBaseline(result.baseline);
+
+    _processSteps(result.todaySteps, 'fallback');
   }
 
 
