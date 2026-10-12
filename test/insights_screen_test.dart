@@ -3,6 +3,7 @@ import 'package:build_up/core/utils/number_format.dart';
 import 'package:build_up/core/utils/step_history.dart';
 import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/providers/step_provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' hide StepState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -62,7 +63,12 @@ void main() {
     await pumpInsights(tester);
 
     expect(text(tester, 'insights.weekTitle'), 'THIS WEEK');
-    expect(text(tester, 'insights.average'), '7,000');
+    // Every day so far this week walked 7,000.
+    final daysSoFar = DateTime.now().weekday;
+    expect(
+      text(tester, 'insights.totalSteps'),
+      formatThousands(7000 * daysSoFar),
+    );
     final newer = tester.widget<IconButton>(
       find.byKey(const Key('insights.newerWeek')),
     );
@@ -79,30 +85,31 @@ void main() {
 
     expect(text(tester, 'insights.weekTitle'), 'LAST WEEK');
     // 6 days at 7,000 and one at 12,000.
-    expect(text(tester, 'insights.average'), formatThousands(54000 ~/ 7));
-    expect(text(tester, 'insights.goalDays'), 'GOAL MET 1 OF 7 DAYS');
+    expect(text(tester, 'insights.totalSteps'), '54,000');
   });
 
-  testWidgets('compares a full week with the week before', (tester) async {
-    await pumpInsights(tester);
-
-    await tester.tap(find.byKey(const Key('insights.olderWeek')));
-    await tester.pumpAndSettle();
-
-    // Last week averaged 7,714 against 7,000 the week before.
-    expect(text(tester, 'insights.trend'), '10% vs prev');
-  });
-
-  testWidgets('hides the comparison in the first days of a week', (
+  testWidgets('chart card has no daily average, trend or goal-met chip', (
     tester,
   ) async {
     await pumpInsights(tester);
 
-    final daysIn = DateTime.now().weekday;
-    expect(
-      find.byKey(const Key('insights.trend')),
-      daysIn < 3 ? findsNothing : findsOneWidget,
-    );
+    expect(find.text('DAILY AVERAGE'), findsNothing);
+    expect(find.textContaining('vs prev'), findsNothing);
+    expect(find.textContaining('GOAL MET'), findsNothing);
+  });
+
+  // The step count shown when a bar is held was drawn above the bar, so the
+  // tallest bar's count was cut off at the top of the chart card.
+  testWidgets('bar tooltip stays inside the chart', (tester) async {
+    await pumpInsights(tester);
+
+    final tooltip = tester
+        .widget<BarChart>(find.byType(BarChart).first)
+        .data
+        .barTouchData
+        .touchTooltipData;
+    expect(tooltip.fitInsideVertically, isTrue);
+    expect(tooltip.fitInsideHorizontally, isTrue);
   });
 
   testWidgets('swiping right goes back a week and forward arrow returns', (
