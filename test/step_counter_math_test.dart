@@ -280,6 +280,29 @@ void main() {
       expect(r.appliedDriveIds, isEmpty);
     });
 
+    test('reports each drive with the steps it left out', () {
+      final enteredAt = DateTime(2026, 10, 12, 8);
+      final r = resolve(
+        hardwareSteps: 33000,
+        drives: [
+          const Drive(id: 1, enterSteps: 28000, exitSteps: 29500),
+          Drive(
+            id: 2,
+            enterSteps: 29600,
+            exitSteps: 29700,
+            enteredAt: enteredAt,
+            exitedAt: enteredAt.add(openDriveTimeout * 2),
+          ),
+          const Drive(id: 3, enterSteps: 32000),
+        ],
+      );
+      expect(r.rides.map((ride) => (ride.drive.id, ride.steps, ride.status)), [
+        (1, 1500, RideStatus.ended),
+        (2, 0, RideStatus.timedOut),
+        (3, 1000, RideStatus.ongoing),
+      ]);
+    });
+
     test('the same drive, once finished, keeps the total it showed', () {
       final during = resolve(
         hardwareSteps: 29500,

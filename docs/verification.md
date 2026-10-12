@@ -6,6 +6,15 @@ Stable widget keys for driving the app in integration tests and Flutter Driver.
 | --- | --- | --- |
 | `dashboard_step_count` | Dashboard ring | Today's step count |
 | `dashboard_coins` | Dashboard header | Current coin balance |
+| `dashboard_activity_card` | Dashboard card | Opens the Activity screen |
+| `activity_log_title` | Activity app bar | Long-press: shows / hides every step check |
+| `activity_log_day_<n>` | Activity day selector | The day `n` days ago (0 = today) |
+| `activity_log_total` | Activity summary | Steps that day |
+| `activity_log_ride_steps` | Activity summary | Steps not counted in a vehicle (hidden with no rides) |
+| `activity_log_hourly_chart` | Activity chart | Steps per hour |
+| `activity_log_ride_<id>` | Activity timeline | One vehicle ride |
+| `activity_log_empty` | Activity timeline | No walks or rides that day |
+| `activity_log_syncs` | Activity, after the long-press | Each step check: time, total, change, `app` / `bg` |
 | `background_access_dialog` | One-time message | Battery use is Restricted: how to allow background use |
 | `background_access_open_settings` | Message button | Opens the app's settings page |
 | `background_access_not_now` | Message button | Closes the message |
@@ -20,6 +29,10 @@ Stable widget keys for driving the app in integration tests and Flutter Driver.
 | `insights.olderWeek` / `insights.newerWeek` | Insights week selector | Previous / next week |
 | `insights.weekTitle` / `insights.weekRange` | Insights week selector | `THIS WEEK`, `LAST WEEK`, `N WEEKS AGO` / date range |
 | `insights.totalSteps` | Insights Total Steps card | Steps for the selected week |
+
+## Vehicle rides on a device
+
+To check that a ride's steps are left out: note the step count, ride without walking, then wait a couple of minutes after getting out. Open Activity: the ride should be listed with its times and "N steps not counted", and the total should have barely moved. Long-press the ACTIVITY title for each step check (`bg` = background task, every ~15 minutes).
 
 ## Background step sync on a device
 
