@@ -7,6 +7,9 @@ Stable widget keys for driving the app in integration tests and Flutter Driver.
 | `dashboard_step_count` | Dashboard ring | Today's step count |
 | `dashboard_coins` | Dashboard header | Current coin balance |
 | `step_details_driving_steps` | Step details, today only | Steps removed while driving today (hidden when 0) |
+| `background_access_dialog` | One-time message | Battery use is Restricted: how to allow background use |
+| `background_access_open_settings` | Message button | Opens the app's settings page |
+| `background_access_not_now` | Message button | Closes the message |
 
 ## Background step sync on a device
 
@@ -41,3 +44,7 @@ adb shell run-as com.nexappra.buildup cat shared_prefs/step_sensor_drives.xml
 4. The widget and Firestore `todaySteps` show the same number as the dashboard.
 
 Always send `exit` after a test `enter`: an open drive keeps the count frozen.
+
+## Restricted battery message
+
+Shown once, after the Physical activity permission request, when Android has the app's battery use set to Restricted. To see it on a test phone: Settings > Apps > Build Up > App battery usage, turn off Allow background usage (Restricted), then clear the app's data or reinstall and open the app.

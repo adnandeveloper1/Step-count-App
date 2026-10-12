@@ -34,6 +34,20 @@ class NativeHealthService {
     }
   }
 
+  /// Whether Android has the app's battery use set to Restricted, which
+  /// stops background step syncs and drive detection. False before
+  /// Android 9, which has no such setting.
+  Future<bool> isBackgroundRestricted() async {
+    try {
+      return await platform.invokeMethod<bool>('isBackgroundRestricted') ??
+          false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   /// Asks Activity Recognition whether the user is still in a vehicle (see
   /// needsDriveCheck). The answer confirms or ends the open drive natively
   /// and shows up in a later [getDrives].

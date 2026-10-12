@@ -141,6 +141,14 @@ class LocalStorageService {
     _box.put('batteryPromptShown', value);
   }
 
+  // The one-time message about Restricted battery use (see
+  // showBackgroundAccessPromptIfNeeded).
+  bool getBackgroundAccessPromptShown() =>
+      _box.get('backgroundAccessPromptShown', defaultValue: false);
+
+  void saveBackgroundAccessPromptShown(bool value) =>
+      _box.put('backgroundAccessPromptShown', value);
+
   String getWeeklySteps() {
     final data = _box.get('weeklySteps');
     if (data == null || data is! String) {
