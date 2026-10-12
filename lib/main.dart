@@ -14,6 +14,7 @@ import 'core/services/notification_service.dart';
 import 'core/services/step_sync_coordinator.dart';
 import 'core/services/widget_service.dart';
 import 'core/utils/step_counter_math.dart';
+import 'core/utils/step_history.dart';
 import 'features/step_tracking/presentation/providers/step_provider.dart';
 import 'firebase_options.dart';
 
@@ -93,7 +94,11 @@ void callbackDispatcher() {
         'weeklySteps': result.weekly,
         'weeklyCalories': totalWeeklySteps * 0.04,
         'lastUpdated': FieldValue.serverTimestamp(),
-        'dailyHistory': {firebaseDateStr: result.todaySteps},
+        'dailyHistory': {
+          firebaseDateStr: result.todaySteps,
+          // Keep only the last 31 days in the cloud too.
+          for (final key in expiredDayKeys(now)) key: FieldValue.delete(),
+        },
       }, SetOptions(merge: true));
     }
 
