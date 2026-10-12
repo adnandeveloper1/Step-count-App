@@ -287,7 +287,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
     return BarChart(
       BarChartData(
-        alignment: BarChartAlignment.spaceAround,
+        alignment: BarChartAlignment.spaceBetween,
         maxY: maxY,
         barTouchData: BarTouchData(
           enabled: true,
@@ -311,27 +311,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               );
             },
           ),
-        ),
-        extraLinesData: ExtraLinesData(
-          horizontalLines: [
-            if (goalSteps > 0)
-              HorizontalLine(
-                y: goalSteps.toDouble(),
-                color: context.primaryColor.withValues(alpha: 0.5),
-                strokeWidth: 1,
-                dashArray: [6, 4],
-                label: HorizontalLineLabel(
-                  show: true,
-                  alignment: Alignment.topRight,
-                  labelResolver: (_) => 'GOAL',
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: context.primaryColor.withValues(alpha: 0.8),
-                  ),
-                ),
-              ),
-          ],
         ),
         titlesData: FlTitlesData(
           show: true,
@@ -383,7 +362,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 color: metGoal
                     ? context.primaryColor
                     : context.primaryColor.withValues(alpha: 0.45),
-                width: size.width * 0.075,
+                width: size.width * 0.1,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
                 ),
