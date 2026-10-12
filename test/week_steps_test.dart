@@ -3,73 +3,75 @@ import 'package:build_up/features/insight/week_steps.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  // Sunday 18 Oct 2026, evening. Its week starts Monday 12 Oct.
-  final sunday = DateTime(2026, 10, 18, 20);
+  // Wednesday 14 Oct 2026, evening.
+  final wednesday = DateTime(2026, 10, 14, 20);
   String day(int month, int d) => dateKey(DateTime(2026, month, d));
 
-  test('mondayOf finds the Monday of the week', () {
-    expect(mondayOf(DateTime(2026, 10, 18)), DateTime(2026, 10, 12));
-    expect(mondayOf(DateTime(2026, 10, 12)), DateTime(2026, 10, 12));
-    expect(mondayOf(DateTime(2026, 1, 1)), DateTime(2025, 12, 29));
-  });
-
   group('buildWeeks', () {
-    test('covers every week in the 31 day window, oldest first', () {
+    test('pages are 7 day windows ending today, oldest first', () {
       final weeks = buildWeeks(
         history: const {},
-        weeklySteps: const [0, 0, 0, 0, 0, 0, 0],
         todaySteps: 0,
-        today: sunday,
+        today: wednesday,
       );
 
-      // Window starts Fri 18 Sep, which is in the week of Mon 14 Sep.
-      expect(weeks.first.start, DateTime(2026, 9, 14));
-      expect(weeks.last.start, DateTime(2026, 10, 12));
+      // The newest page is the last 7 days, whatever weekday today is.
+      expect(weeks.last.start, DateTime(2026, 10, 8));
+      expect(weeks.last.end, DateTime(2026, 10, 14));
+      expect(weeks[weeks.length - 2].start, DateTime(2026, 10, 1));
+      // 31 days of history need 5 pages of 7.
       expect(weeks, hasLength(5));
+      expect(weeks.first.start, DateTime(2026, 9, 10));
     });
 
-    test('reads steps from history and marks future days as null', () {
-      final wednesday = DateTime(2026, 10, 14, 9);
+    test('reads every day from history, today last', () {
       final weeks = buildWeeks(
-        history: {day(10, 12): 4000, day(10, 13): 12000},
-        weeklySteps: const [],
+        history: {day(10, 8): 4000, day(10, 12): 12000, day(10, 14): 300},
         todaySteps: 500,
         today: wednesday,
       );
 
-      expect(weeks.last.days, [4000, 12000, 500, null, null, null, null]);
+      expect(weeks.last.days, [4000, 0, 0, 0, 12000, 0, 500]);
     });
 
     test('live steps win over a lower stored count for today', () {
       final weeks = buildWeeks(
-        history: {day(10, 18): 100},
-        weeklySteps: const [],
-        todaySteps: 900,
-        today: sunday,
+        history: {day(10, 14): 900},
+        todaySteps: 100,
+        today: wednesday,
       );
 
       expect(weeks.last.days.last, 900);
     });
 
-    test('falls back to the weekly array only for missing recent days', () {
+    // The undated weekly array can hold another account's or an old
+    // week's numbers, so a day missing from history is 0, never a guess.
+    test('a day missing from history is 0', () {
       final weeks = buildWeeks(
         history: {day(10, 13): 3000},
-        weeklySteps: const [1111, 2222, 3333, 4444, 5555, 6666, 7777],
         todaySteps: 0,
-        today: sunday,
+        today: wednesday,
       );
 
-      // Tuesday comes from history, the rest from the weekly array.
-      expect(weeks.last.days, [1111, 3000, 3333, 4444, 5555, 6666, 7777]);
-      // Older weeks never use the weekly array.
-      expect(weeks[weeks.length - 2].days, everyElement(0));
+      expect(weeks.last.days, [0, 0, 0, 0, 0, 3000, 0]);
+    });
+
+    test('days older than the history window have no data', () {
+      final weeks = buildWeeks(
+        history: {day(9, 14): 5000},
+        todaySteps: 0,
+        today: wednesday,
+      );
+
+      // Window starts 14 Sep; the oldest page starts 10 Sep.
+      expect(weeks.first.days, [null, null, null, null, 5000, 0, 0]);
     });
   });
 
   group('WeekSteps', () {
-    final monday = DateTime(2026, 10, 5);
+    final start = DateTime(2026, 10, 5);
     final week = WeekSteps(
-      start: monday,
+      start: start,
       days: const [10000, 0, 6000, 12000, null, null, null],
     );
 
@@ -78,9 +80,14 @@ void main() {
       expect(week.bestDayIndex, 3);
     });
 
+    test('dayAt gives each day\'s date', () {
+      expect(week.dayAt(0), DateTime(2026, 10, 5));
+      expect(week.dayAt(6), DateTime(2026, 10, 11));
+    });
+
     test('an empty week has no best day', () {
       final empty = WeekSteps(
-        start: monday,
+        start: start,
         days: const [0, 0, null, null, null, null, null],
       );
 
@@ -92,7 +99,7 @@ void main() {
     WeekSteps from(DateTime start) => WeekSteps(start: start, days: const []);
 
     test('weekRangeLabel within a month, across months and years', () {
-      expect(weekRangeLabel(from(DateTime(2026, 10, 5))), 'Oct 5 – 11, 2026');
+      expect(weekRangeLabel(from(DateTime(2026, 10, 8))), 'Oct 8 – 14, 2026');
       expect(
         weekRangeLabel(from(DateTime(2026, 9, 28))),
         'Sep 28 – Oct 4, 2026',
@@ -104,8 +111,8 @@ void main() {
     });
 
     test('weekTitle', () {
-      expect(weekTitle(0), 'THIS WEEK');
-      expect(weekTitle(1), 'LAST WEEK');
+      expect(weekTitle(0), 'LAST 7 DAYS');
+      expect(weekTitle(1), 'PREVIOUS 7 DAYS');
       expect(weekTitle(3), '3 WEEKS AGO');
     });
   });
