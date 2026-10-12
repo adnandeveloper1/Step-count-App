@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:build_up/core/widgets/coin_icon.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -67,11 +68,7 @@ class StoreScreen extends ConsumerWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.monetization_on_outlined,
-                          color: context.primaryColor,
-                          size: 20,
-                        ),
+                        const CoinIcon(size: 20),
                         const SizedBox(width: 6),
                         Text(
                           '${stepState.coins} Coins',
@@ -395,11 +392,7 @@ class ThemeShopItemCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                   ] else if (!isOwned && theme.costCoins > 0) ...[
-                    Icon(
-                      Icons.monetization_on_outlined,
-                      color: context.primaryColor,
-                      size: 14,
-                    ),
+                    const CoinIcon(size: 14),
                     const SizedBox(width: 4),
                   ],
                   Text(
