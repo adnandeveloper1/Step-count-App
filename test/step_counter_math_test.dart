@@ -548,6 +548,39 @@ void main() {
       expect(r.appliedDriveIds, [1]);
     });
 
+    test('a long drive confirmed recently keeps hiding steps', () {
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [
+          Drive(
+            id: 1,
+            enterSteps: 28000,
+            enteredAt: now.subtract(const Duration(hours: 6)),
+            confirmedAt: now.subtract(const Duration(hours: 1)),
+          ),
+        ],
+      );
+      expect(r.todaySteps, 1000);
+      expect(r.appliedDriveIds, isEmpty);
+    });
+
+    test('a long drive, confirmed along the way, is removed in full', () {
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [
+          Drive(
+            id: 1,
+            enterSteps: 28000,
+            exitSteps: 29500,
+            enteredAt: now.subtract(const Duration(hours: 7)),
+            confirmedAt: now.subtract(const Duration(hours: 3)),
+            exitedAt: now.subtract(const Duration(hours: 1)),
+          ),
+        ],
+      );
+      expect((r.todaySteps, r.drivingSteps), (1500, 1500));
+    });
+
     test('an open drive within the timeout keeps hiding steps', () {
       final r = resolve(
         hardwareSteps: 30000,
@@ -563,6 +596,50 @@ void main() {
       );
       expect(r.todaySteps, 1000);
       expect(r.appliedDriveIds, isEmpty);
+    });
+  });
+
+  group('needsDriveCheck', () {
+    final now = DateTime(2026, 10, 12, 18);
+
+    Drive open({required Duration enteredAgo, Duration? confirmedAgo}) => Drive(
+      id: 1,
+      enterSteps: 28000,
+      enteredAt: now.subtract(enteredAgo),
+      confirmedAt: confirmedAgo == null ? null : now.subtract(confirmedAgo),
+    );
+
+    test('asks once an open drive has gone a while without a sign', () {
+      final drive = open(
+        enteredAgo: driveCheckInterval + const Duration(minutes: 1),
+      );
+      expect(needsDriveCheck([drive], now), isTrue);
+    });
+
+    test('does not ask for a drive that just started', () {
+      final drive = open(
+        enteredAgo: driveCheckInterval - const Duration(minutes: 1),
+      );
+      expect(needsDriveCheck([drive], now), isFalse);
+    });
+
+    test('a recent confirmation counts as a sign', () {
+      final drive = open(
+        enteredAgo: const Duration(hours: 3),
+        confirmedAgo: const Duration(minutes: 5),
+      );
+      expect(needsDriveCheck([drive], now), isFalse);
+    });
+
+    test('does not ask without an open drive', () {
+      final finished = Drive(
+        id: 1,
+        enterSteps: 28000,
+        exitSteps: 29000,
+        enteredAt: now.subtract(const Duration(hours: 3)),
+      );
+      expect(needsDriveCheck([finished], now), isFalse);
+      expect(needsDriveCheck([], now), isFalse);
     });
   });
 
@@ -596,11 +673,13 @@ void main() {
         'enterMs': 1791746148188,
         'exitSteps': 250,
         'exitMs': 1791746160119,
+        'confirmedMs': 1791746150000,
         'enterBeforeBoot': true,
         'exitBeforeBoot': false,
       });
       expect(d.enteredAt, DateTime.fromMillisecondsSinceEpoch(1791746148188));
       expect(d.exitedAt, DateTime.fromMillisecondsSinceEpoch(1791746160119));
+      expect(d.confirmedAt, DateTime.fromMillisecondsSinceEpoch(1791746150000));
       expect((d.enteredBeforeBoot, d.exitedBeforeBoot), (true, false));
     });
   });

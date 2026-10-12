@@ -34,6 +34,10 @@ class Drive {
   final DateTime? enteredAt;
   final DateTime? exitedAt;
 
+  /// The last time Activity Recognition said the user was still in a
+  /// vehicle (see [needsDriveCheck]); null if never asked.
+  final DateTime? confirmedAt;
+
   /// Whether a reading was taken before the phone last restarted, when the
   /// counter was counting from an earlier zero.
   final bool enteredBeforeBoot;
@@ -45,6 +49,7 @@ class Drive {
     this.exitSteps,
     this.enteredAt,
     this.exitedAt,
+    this.confirmedAt,
     this.enteredBeforeBoot = false,
     this.exitedBeforeBoot = false,
   });
@@ -61,12 +66,17 @@ class Drive {
       exitSteps: map['exitSteps'] as int?,
       enteredAt: time('enterMs'),
       exitedAt: time('exitMs'),
+      confirmedAt: time('confirmedMs'),
       enteredBeforeBoot: map['enterBeforeBoot'] as bool? ?? false,
       exitedBeforeBoot: map['exitBeforeBoot'] as bool? ?? false,
     );
   }
 
   bool get isOpen => exitSteps == null;
+
+  /// The last sign the user was in the vehicle: the enter, or a later
+  /// confirmation.
+  DateTime? get lastSeenDriving => confirmedAt ?? enteredAt;
 }
 
 /// Result of settling which steps still need to go to active challenges.
@@ -174,9 +184,24 @@ StepCounterResult? resolveTodaySteps({
   return _removeDrives(hardwareSteps, baseline, drives, now);
 }
 
-/// How long a drive may stay open. Activity Recognition can miss the exit;
+/// How long a drive may go without a sign the user is still in the vehicle.
+/// Activity Recognition can miss the exit, and checks may get no answer;
 /// after this the drive's steps count again instead of staying hidden.
 const openDriveTimeout = Duration(hours: 4);
+
+/// How often to ask Activity Recognition whether the user is still in the
+/// vehicle during a drive.
+const driveCheckInterval = Duration(minutes: 30);
+
+/// Whether to ask now if the user is still in a vehicle: an open drive has
+/// had no sign of driving for [driveCheckInterval]. The answer either
+/// confirms the drive or ends it.
+bool needsDriveCheck(List<Drive> drives, DateTime now) => drives.any((drive) {
+  final seen = drive.lastSeenDriving;
+  return drive.isOpen &&
+      seen != null &&
+      now.difference(seen) > driveCheckInterval;
+});
 
 StepCounterResult _removeDrives(
   int hardwareSteps,
@@ -206,10 +231,10 @@ StepCounterResult _removeDrives(
     // The counter restarts from zero at boot, so a drive that began before
     // the restart started, as far as today's count goes, at zero.
     final enter = drive.enteredBeforeBoot ? 0 : drive.enterSteps;
-    final enteredAt = drive.enteredAt;
+    final seen = drive.lastSeenDriving;
     final timedOut =
-        enteredAt != null &&
-        (drive.exitedAt ?? now).difference(enteredAt) > openDriveTimeout;
+        seen != null &&
+        (drive.exitedAt ?? now).difference(seen) > openDriveTimeout;
     if (timedOut) {
       // The exit never came in time: its steps count again (an exit that
       // comes later must not take them back), and it can be deleted.

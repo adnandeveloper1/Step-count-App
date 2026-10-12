@@ -20,6 +20,7 @@ class StepSensorPlugin : FlutterPlugin {
                 "getHardwareSteps" -> StepCounterReader.read(context, 30000) { result.success(it) }
                 "getAndroidApiLevel" -> result.success(android.os.Build.VERSION.SDK_INT)
                 "startDriveDetection" -> DriveDetector.start(context) { result.success(it) }
+                "checkStillDriving" -> DriveDetector.checkStillDriving(context) { result.success(it) }
                 "getDrives" -> result.success(DriveStore.all(context))
                 "removeDrives" -> {
                     DriveStore.remove(context, call.arguments<List<Int>>().orEmpty())

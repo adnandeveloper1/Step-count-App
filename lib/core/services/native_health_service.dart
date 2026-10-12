@@ -34,6 +34,19 @@ class NativeHealthService {
     }
   }
 
+  /// Asks Activity Recognition whether the user is still in a vehicle (see
+  /// needsDriveCheck). The answer confirms or ends the open drive natively
+  /// and shows up in a later [getDrives].
+  Future<void> checkStillDriving() async {
+    try {
+      await platform.invokeMethod('checkStillDriving');
+    } on PlatformException {
+      // No answer: the drive times out instead (see openDriveTimeout).
+    } on MissingPluginException {
+      // No plugin: there are no drives.
+    }
+  }
+
   /// Drives recorded natively and not yet applied to today's steps.
   Future<List<Drive>> getDrives() async {
     try {

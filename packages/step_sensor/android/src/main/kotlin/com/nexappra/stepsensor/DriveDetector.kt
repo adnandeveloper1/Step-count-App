@@ -14,6 +14,7 @@ import android.os.SystemClock
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.ActivityRecognitionResult
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionRequest
 import com.google.android.gms.location.ActivityTransitionResult
@@ -25,6 +26,19 @@ import com.google.android.gms.location.DetectedActivity
 object DriveDetector {
     // A receiver has about 10 s before the system may kill it.
     private const val SENSOR_TIMEOUT_MS = 8000L
+
+    // "Still driving?" checks: how often Play Services reports while one
+    // runs, how long one may run without a clear answer, and the shortest
+    // gap between two (the app asks every minute while it is open).
+    private const val CHECK_INTERVAL_MS = 10_000L
+    private const val CHECK_MAX_MS = 5 * 60 * 1000L
+    private const val CHECK_MIN_GAP_MS = 10 * 60 * 1000L
+    private const val PREFS = "step_sensor_drive_check"
+    private const val KEY_CHECK_STARTED = "startedMs"
+
+    // How sure Play Services must be (0-100) to confirm or end a drive.
+    private const val VEHICLE_CONFIDENCE = 50
+    private const val ON_FOOT_CONFIDENCE = 75
 
     // Registers for vehicle enter / exit transitions. Calls [onResult] with
     // false when Play Services or the Physical activity permission is missing.
@@ -52,6 +66,67 @@ object DriveDetector {
             .addOnFailureListener { onResult(false) }
     }
 
+    // Asks Play Services whether the user is still in a vehicle; the answer
+    // arrives at DriveTransitionReceiver (see onCheckResult). Calls
+    // [onResult] with false when it could not ask.
+    @SuppressLint("MissingPermission") // Checked in hasPermission.
+    fun checkStillDriving(context: Context, onResult: (Boolean) -> Unit) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (now - prefs.getLong(KEY_CHECK_STARTED, 0L) < CHECK_MIN_GAP_MS) {
+            onResult(true)
+            return
+        }
+        if (!DriveStore.hasOpenDrive(context) || !hasPermission(context)) {
+            onResult(false)
+            return
+        }
+        prefs.edit().putLong(KEY_CHECK_STARTED, now).commit()
+        ActivityRecognition.getClient(context)
+            .requestActivityUpdates(CHECK_INTERVAL_MS, checkPendingIntent(context))
+            .addOnSuccessListener { onResult(true) }
+            .addOnFailureListener { onResult(false) }
+    }
+
+    // One report during a check: confirm the drive if the user is in a
+    // vehicle, end it if they are clearly on foot, otherwise wait for the
+    // next report until the check runs out.
+    fun onCheckResult(context: Context, result: ActivityRecognitionResult, done: () -> Unit) {
+        val now = System.currentTimeMillis()
+        val onFoot = listOf(
+            DetectedActivity.ON_FOOT,
+            DetectedActivity.WALKING,
+            DetectedActivity.RUNNING,
+            DetectedActivity.ON_BICYCLE,
+        ).maxOf { result.getActivityConfidence(it) }
+        val started = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getLong(KEY_CHECK_STARTED, 0L)
+        when {
+            !DriveStore.hasOpenDrive(context) -> {
+                stopCheck(context)
+                done()
+            }
+            result.getActivityConfidence(DetectedActivity.IN_VEHICLE) >= VEHICLE_CONFIDENCE -> {
+                DriveStore.confirm(context, now)
+                stopCheck(context)
+                done()
+            }
+            onFoot >= ON_FOOT_CONFIDENCE -> {
+                stopCheck(context)
+                record(context, listOf(Transition(isEnter = false, atMs = now)), done)
+            }
+            else -> {
+                if (now - started > CHECK_MAX_MS) stopCheck(context)
+                done()
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission") // Removing updates needs no permission.
+    private fun stopCheck(context: Context) {
+        ActivityRecognition.getClient(context).removeActivityUpdates(checkPendingIntent(context))
+    }
+
     // An enter (true) or exit (false) and when it happened.
     data class Transition(val isEnter: Boolean, val atMs: Long)
 
@@ -71,17 +146,28 @@ object DriveDetector {
             context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) ==
             PackageManager.PERMISSION_GRANTED
 
-    private fun pendingIntent(context: Context): PendingIntent {
+    private fun pendingIntent(context: Context) = broadcast(context, requestCode = 0)
+
+    private fun checkPendingIntent(context: Context) = broadcast(context, requestCode = 1)
+
+    private fun broadcast(context: Context, requestCode: Int): PendingIntent {
         val intent = Intent(context, DriveTransitionReceiver::class.java)
-        // Mutable: Play Services adds the transition result to the intent.
+        // Mutable: Play Services adds its result to the intent.
         val mutable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-        return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or mutable)
+        return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or mutable)
     }
 }
 
-// Receives vehicle transitions from Play Services, also while the app is closed.
+// Receives vehicle transitions and "still driving?" check reports from Play
+// Services, also while the app is closed.
 class DriveTransitionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (ActivityRecognitionResult.hasResult(intent)) {
+            val result = ActivityRecognitionResult.extractResult(intent) ?: return
+            val pending = goAsync()
+            DriveDetector.onCheckResult(context.applicationContext, result) { pending.finish() }
+            return
+        }
         if (!ActivityTransitionResult.hasResult(intent)) return
         val events = ActivityTransitionResult.extractResult(intent)?.transitionEvents ?: return
         val nowMs = System.currentTimeMillis()

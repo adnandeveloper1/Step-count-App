@@ -279,6 +279,9 @@ class StepNotifier extends Notifier<StepState> {
     final drives = hardwareSteps > 0
         ? await nativeHealth.getDrives()
         : const <Drive>[];
+    if (needsDriveCheck(drives, DateTime.now())) {
+      unawaited(nativeHealth.checkStillDriving());
+    }
     // Signed out or reset while the sensor was read: this account's state
     // must not be written back.
     if (!ref.mounted || session != AccountSession.current) return;

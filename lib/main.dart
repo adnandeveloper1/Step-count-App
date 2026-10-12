@@ -36,6 +36,9 @@ void callbackDispatcher() {
     if (hardwareSteps <= 0) return Future.value(true);
     // Drives to remove from today's steps; empty without Play Services.
     final drives = await NativeHealthService().getDrives();
+    if (needsDriveCheck(drives, DateTime.now())) {
+      await NativeHealthService().checkStillDriving();
+    }
 
     // The account the saved data belongs to, read before saving so a switch
     // during the run can't send it to another account's document.

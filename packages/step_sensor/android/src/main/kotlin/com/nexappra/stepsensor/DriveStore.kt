@@ -27,7 +27,7 @@ object DriveStore {
         // Still in a vehicle: keep the first enter, unless that drive's exit
         // was missed (Dart stops applying it and deletes it).
         val last = drives.lastOrNull()
-        if (last != null && last.isNull("exitSteps") && atMs - last.getLong("enterMs") < OPEN_DRIVE_TIMEOUT_MS) return
+        if (last != null && last.isNull("exitSteps") && atMs - lastSeenDriving(last) < OPEN_DRIVE_TIMEOUT_MS) return
         val prefs = prefs(context)
         // Ids never repeat, so Dart can tell which drives it already applied.
         val id = prefs.getInt(KEY_NEXT_ID, 1)
@@ -55,6 +55,19 @@ object DriveStore {
             .put("exitBoot", bootCount(context))
         save(context, drives)
     }
+
+    // Activity Recognition says the user is still in the vehicle.
+    @Synchronized
+    fun confirm(context: Context, atMs: Long) {
+        val drives = load(context)
+        val open = drives.lastOrNull()?.takeIf { it.isNull("exitSteps") } ?: return
+        open.put("confirmedMs", atMs)
+        save(context, drives)
+    }
+
+    @Synchronized
+    fun hasOpenDrive(context: Context): Boolean =
+        load(context).lastOrNull()?.isNull("exitSteps") == true
 
     // At boot: the phone restarted mid-drive, and transition updates were
     // dropped, so the exit may never come. End the drive with an unknown exit
@@ -85,6 +98,7 @@ object DriveStore {
                 "enterBeforeBoot" to beforeBoot(drive, "enterBoot"),
                 "exitSteps" to if (drive.isNull("exitSteps")) null else drive.getInt("exitSteps"),
                 "exitMs" to if (drive.isNull("exitMs")) null else drive.getLong("exitMs"),
+                "confirmedMs" to if (drive.has("confirmedMs")) drive.getLong("confirmedMs") else null,
                 "exitBeforeBoot" to (!drive.isNull("exitSteps") && beforeBoot(drive, "exitBoot")),
             )
         }
@@ -99,6 +113,9 @@ object DriveStore {
     }
 
     private const val NO_BOOT_COUNT = -1
+
+    private fun lastSeenDriving(drive: JSONObject): Long =
+        maxOf(drive.getLong("enterMs"), drive.optLong("confirmedMs", 0L))
 
     // How many times the phone has started; tells readings from different
     // boots apart.
