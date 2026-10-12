@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart' as g_sign_in;
+import '../../../../core/services/account_session.dart';
 import '../../../../core/services/local_storage_service.dart';
+import '../../../social/presentation/providers/challenge_provider.dart';
 import '../../../step_tracking/presentation/providers/step_provider.dart';
 
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
@@ -12,7 +14,6 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
 final firestoreProvider = Provider<FirebaseFirestore>((ref) {
   return FirebaseFirestore.instance;
 });
-
 
 final googleSignInProvider = Provider<g_sign_in.GoogleSignIn>((ref) {
   return g_sign_in.GoogleSignIn.instance;
@@ -66,23 +67,23 @@ class AuthController {
           'name': 'Guest User',
           'displayName': 'Guest User',
           'totalSteps': 0,
+          'monthlyHighScore': 0,
           'avatarUrl': '👤',
           'isGuest': true,
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
+      await _ref.read(stepNotifierProvider.notifier).restoreDataFromFirebase();
     }
   }
 
   Future<void> signInWithGoogle() async {
     try {
+      final g_sign_in.GoogleSignInAccount googleUser = await _googleSignIn
+          .authenticate();
 
-      final g_sign_in.GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
-      if (googleUser == null) return;
-
-
-      final g_sign_in.GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
+      final g_sign_in.GoogleSignInAuthentication googleAuth =
+          googleUser.authentication;
 
       final AuthCredential credential = GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,
@@ -99,11 +100,14 @@ class AuthController {
             'name': user.displayName ?? 'Google User',
             'displayName': user.displayName ?? 'Google User',
             'totalSteps': 0,
+            'monthlyHighScore': 0,
             'avatarUrl': '🌟',
             'createdAt': FieldValue.serverTimestamp(),
           });
         }
-        await _ref.read(stepNotifierProvider.notifier).restoreDataFromFirebase();
+        await _ref
+            .read(stepNotifierProvider.notifier)
+            .restoreDataFromFirebase();
       }
     } catch (e) {
       rethrow;
@@ -122,6 +126,7 @@ class AuthController {
         'name': name,
         'displayName': name,
         'totalSteps': 0,
+        'monthlyHighScore': 0,
         'avatarUrl': '🙂',
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -132,10 +137,25 @@ class AuthController {
 
   Future<void> signOut() async {
     await _auth.signOut();
-    await _googleSignIn.signOut();
-    final storage = LocalStorageService();
-    await storage.init();
-    await storage.clearAllUserData();
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+    // Drop the signed-out account's in-memory steps, coins and challenges and
+    // stop the step poll first, so nothing writes them back after the clear.
+    AccountSession.end();
+    _resetUserState();
+    try {
+      final storage = LocalStorageService();
+      await storage.init();
+      await storage.clearAllUserData();
+    } catch (_) {}
+    // Anything rebuilt while clearing re-reads the now empty storage.
+    _resetUserState();
+  }
+
+  void _resetUserState() {
+    _ref.invalidate(stepNotifierProvider);
+    _ref.invalidate(challengeProvider);
   }
 
   Future<void> resetPassword(String email) async {

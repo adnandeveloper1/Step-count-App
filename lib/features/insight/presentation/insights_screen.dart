@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../../core/utils/number_format.dart';
 import '../../step_tracking/presentation/providers/step_provider.dart';
 import '../../step_tracking/presentation/widgets/glass_step_card.dart';
@@ -94,7 +94,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       style: GoogleFonts.sora(
                         fontSize: screenWidth * 0.06,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
+                        color: context.textPrimary,
                         letterSpacing: .1,
                       ),
                     ),
@@ -195,8 +195,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         key: Key(key),
         onPressed: enabled ? () => _goToWeek(target) : null,
         icon: Icon(icon),
-        color: AppColors.primaryEmerald,
-        disabledColor: AppColors.textSecondary.withValues(alpha: 0.3),
+        color: context.primaryColor,
+        disabledColor: context.textSecondary.withValues(alpha: 0.3),
         iconSize: 28,
       );
     }
@@ -220,7 +220,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   style: GoogleFonts.jetBrainsMono(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primaryEmerald,
+                    color: context.primaryColor,
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -231,7 +231,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   style: GoogleFonts.sora(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: context.textPrimary,
                   ),
                 ),
               ],
@@ -274,7 +274,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             style: GoogleFonts.jetBrainsMono(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+              color: context.textSecondary,
               letterSpacing: 1.5,
             ),
           ),
@@ -292,7 +292,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     style: GoogleFonts.sora(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: context.textPrimary,
                       height: 1.1,
                     ),
                   ),
@@ -306,7 +306,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   style: GoogleFonts.jetBrainsMono(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: context.textSecondary,
                   ),
                 ),
               ),
@@ -318,10 +318,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.primaryEmerald.withValues(alpha: 0.1),
+              color: context.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(40),
               border: Border.all(
-                color: AppColors.primaryEmerald.withValues(alpha: 0.3),
+                color: context.primaryColor.withValues(alpha: 0.3),
               ),
             ),
             child: Text(
@@ -330,7 +330,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               style: GoogleFonts.jetBrainsMono(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: AppColors.primaryEmerald,
+                color: context.primaryColor,
                 letterSpacing: 1,
               ),
             ),
@@ -358,7 +358,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
   Widget _buildTrend(double trend) {
     final isPositive = trend >= 0;
-    final color = isPositive ? AppColors.primaryEmerald : Colors.redAccent;
+    final color = isPositive ? context.primaryColor : Colors.redAccent;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -402,7 +402,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         barTouchData: BarTouchData(
           enabled: true,
           touchTooltipData: BarTouchTooltipData(
-            getTooltipColor: (group) => AppColors.backgroundDark,
+            getTooltipColor: (group) => context.backgroundColor,
             tooltipBorderRadius: BorderRadius.circular(20),
             tooltipPadding: const EdgeInsets.symmetric(
               horizontal: 12,
@@ -427,7 +427,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             if (goalSteps > 0)
               HorizontalLine(
                 y: goalSteps.toDouble(),
-                color: AppColors.primaryEmerald.withValues(alpha: 0.5),
+                color: context.primaryColor.withValues(alpha: 0.5),
                 strokeWidth: 1,
                 dashArray: [6, 4],
                 label: HorizontalLineLabel(
@@ -437,7 +437,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   style: GoogleFonts.jetBrainsMono(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primaryEmerald.withValues(alpha: 0.8),
+                    color: context.primaryColor.withValues(alpha: 0.8),
                   ),
                 ),
               ),
@@ -459,8 +459,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     dayNames[index],
                     style: GoogleFonts.jetBrainsMono(
                       color: isToday
-                          ? AppColors.primaryEmerald
-                          : AppColors.textSecondary,
+                          ? context.primaryColor
+                          : context.textSecondary,
                       fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
                       fontSize: size.width * 0.03,
                     ),
@@ -491,8 +491,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 toY: steps.toDouble(),
                 // Full lime when the goal was met, dimmer otherwise.
                 color: metGoal
-                    ? AppColors.primaryEmerald
-                    : AppColors.primaryEmerald.withValues(alpha: 0.45),
+                    ? context.primaryColor
+                    : context.primaryColor.withValues(alpha: 0.45),
                 width: size.width * 0.075,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
@@ -500,7 +500,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 backDrawRodData: BackgroundBarChartRodData(
                   show: true,
                   toY: maxY,
-                  color: AppColors.glassCardBackground.withValues(alpha: 0.05),
+                  color: context.cardColor.withValues(alpha: 0.05),
                 ),
               ),
             ],
@@ -523,7 +523,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: AppColors.primaryEmerald, size: 28),
+          Icon(icon, color: context.primaryColor, size: 28),
           const SizedBox(height: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,7 +540,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                         style: GoogleFonts.sora(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: context.textPrimary,
                         ),
                       ),
                     ),
@@ -553,7 +553,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        color: context.textSecondary,
                       ),
                     ),
                   ),
@@ -566,7 +566,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   style: GoogleFonts.sora(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primaryEmerald,
+                    color: context.primaryColor,
                   ),
                 ),
               ],
@@ -575,7 +575,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 label,
                 style: GoogleFonts.sora(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: context.textSecondary,
                 ),
               ),
             ],

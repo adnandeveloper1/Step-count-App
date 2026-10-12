@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../../../core/utils/number_format.dart';
 import '../../../../core/utils/step_history.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -166,7 +166,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
     final gaugeSize = math.min(screenWidth * 0.7, 280.0);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: context.backgroundColor,
       body: Stack(
         children: [
           // Ambient lime glow behind the gauge
@@ -182,7 +182,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryEmerald.withValues(alpha: 0.12),
+                      color: context.primaryColor.withValues(alpha: 0.12),
                       blurRadius: 120,
                       spreadRadius: 30,
                     ),
@@ -242,6 +242,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                   painter: _SparklePainter(
                     sparkles: _sparkles,
                     time: _sparkleController.value,
+                    palette: _sparklePalette(context),
                   ),
                 ),
               ),
@@ -263,7 +264,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             child: IconButton(
               key: const Key('goalCongrats.close'),
               onPressed: _close,
-              icon: const Icon(Icons.close, color: AppColors.textPrimary),
+              icon: Icon(Icons.close, color: context.textPrimary),
               tooltip: 'Close',
             ),
           ),
@@ -272,8 +273,8 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             width: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF1E293B),
-              border: Border.all(color: AppColors.glassCardBorder),
+              color: context.cardColor,
+              border: Border.all(color: context.cardBorderColor),
             ),
             child: Center(
               child: Text(widget.avatar, style: const TextStyle(fontSize: 22)),
@@ -309,6 +310,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                 painter: GoalArcPainter(
                   progress: sweep.value * goalFraction,
                   strokeWidth: gaugeSize * 0.05,
+                  color: context.primaryColor,
                 ),
               ),
               Column(
@@ -319,7 +321,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                      color: context.textSecondary,
                       letterSpacing: 3,
                     ),
                   ),
@@ -332,14 +334,12 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                       style: GoogleFonts.sora(
                         fontSize: gaugeSize * 0.2,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.primaryEmerald,
+                        color: context.primaryColor,
                         height: 1.1,
                         letterSpacing: -1.5,
                         shadows: [
                           Shadow(
-                            color: AppColors.primaryEmerald.withValues(
-                              alpha: 0.35,
-                            ),
+                            color: context.primaryColor.withValues(alpha: 0.35),
                             blurRadius: 24,
                           ),
                         ],
@@ -353,7 +353,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                      color: context.textSecondary,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -373,11 +373,9 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.primaryEmerald.withValues(alpha: 0.1),
+        color: context.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(
-          color: AppColors.primaryEmerald.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: context.primaryColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -390,9 +388,9 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             child: Container(
               width: 6,
               height: 6,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primaryEmerald,
+                color: context.primaryColor,
               ),
             ),
           ),
@@ -406,7 +404,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             style: GoogleFonts.jetBrainsMono(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: AppColors.primaryEmerald,
+              color: context.primaryColor,
               letterSpacing: 1.2,
             ),
           ),
@@ -420,11 +418,9 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.glassCardBackground,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(
-          color: AppColors.glassCardBorder.withValues(alpha: 0.5),
-        ),
+        border: Border.all(color: context.cardBorderColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -434,7 +430,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             style: GoogleFonts.jetBrainsMono(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: context.textPrimary,
               letterSpacing: 0.8,
             ),
           ),
@@ -452,7 +448,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
     final divider = Container(
       width: 1,
       height: 40,
-      color: AppColors.glassCardBorder.withValues(alpha: 0.5),
+      color: context.cardBorderColor,
     );
     return Row(
       children: [
@@ -483,7 +479,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
           style: GoogleFonts.jetBrainsMono(
             fontSize: 11,
             fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+            color: context.textSecondary,
             letterSpacing: 1.5,
           ),
         ),
@@ -496,7 +492,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
               style: GoogleFonts.jetBrainsMono(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: context.textPrimary,
               ),
               children: [
                 if (unit.isNotEmpty)
@@ -505,7 +501,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.primaryEmerald,
+                      color: context.primaryColor,
                     ),
                   ),
               ],
@@ -533,7 +529,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
               style: GoogleFonts.jetBrainsMono(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+                color: context.textSecondary,
                 letterSpacing: 1.5,
               ),
             ),
@@ -544,7 +540,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primaryEmerald,
+                  color: context.primaryColor,
                 ),
               ),
           ],
@@ -574,13 +570,13 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                   style: GoogleFonts.sora(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: context.textPrimary,
                   ),
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.monetization_on_outlined,
-                color: AppColors.primaryEmerald,
+                color: context.primaryColor,
                 size: 14,
               ),
               const SizedBox(width: 4),
@@ -589,7 +585,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primaryEmerald,
+                  color: context.primaryColor,
                 ),
               ),
             ],
@@ -600,10 +596,8 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             child: LinearProgressIndicator(
               value: challenge.progress,
               minHeight: 6,
-              backgroundColor: AppColors.primaryEmerald.withValues(alpha: 0.1),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                AppColors.primaryEmerald,
-              ),
+              backgroundColor: context.primaryColor.withValues(alpha: 0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(context.primaryColor),
             ),
           ),
           const SizedBox(height: 8),
@@ -613,7 +607,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             style: GoogleFonts.jetBrainsMono(
               fontSize: 10,
               fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              color: context.textSecondary,
               letterSpacing: 1,
             ),
           ),
@@ -632,7 +626,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             borderRadius: BorderRadius.circular(40),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryEmerald.withValues(alpha: 0.35),
+                color: context.primaryColor.withValues(alpha: 0.35),
                 blurRadius: 24,
               ),
             ],
@@ -641,8 +635,8 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
             key: const Key('goalCongrats.continue'),
             onPressed: _close,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryEmerald,
-              foregroundColor: Colors.black,
+              backgroundColor: context.primaryColor,
+              foregroundColor: context.theme.colorScheme.onPrimary,
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(40),
@@ -662,7 +656,7 @@ class _GoalCongratsViewState extends State<GoalCongratsView>
           key: const Key('goalCongrats.share'),
           onPressed: widget.onShare ?? _shareStory,
           style: TextButton.styleFrom(
-            foregroundColor: AppColors.textSecondary,
+            foregroundColor: context.textSecondary,
             minimumSize: const Size(double.infinity, 44),
           ),
           icon: const Icon(Icons.share_outlined, size: 18),
@@ -707,7 +701,8 @@ class _Sparkle {
   final double phase;
   final double spin;
   final double size;
-  final Color color;
+  // Index into the palette, so colours follow the theme at paint time.
+  final int colorIndex;
   final _SparkleShape shape;
 
   const _Sparkle({
@@ -719,17 +714,9 @@ class _Sparkle {
     required this.phase,
     required this.spin,
     required this.size,
-    required this.color,
+    required this.colorIndex,
     required this.shape,
   });
-
-  static const List<Color> _palette = [
-    AppColors.primaryEmerald,
-    AppColors.primaryEmerald,
-    AppColors.neonGreen,
-    Colors.white,
-    Color(0xFFFFD54F),
-  ];
 
   static List<_Sparkle> burst(math.Random random, int count) {
     return List.generate(count, (_) {
@@ -743,7 +730,7 @@ class _Sparkle {
         phase: random.nextDouble() * math.pi * 2,
         spin: (random.nextDouble() - 0.5) * 12,
         size: 3 + random.nextDouble() * 5,
-        color: _palette[random.nextInt(_palette.length)],
+        colorIndex: random.nextInt(_sparklePaletteSize),
         shape: roll < 0.45
             ? _SparkleShape.star
             : roll < 0.75
@@ -754,11 +741,28 @@ class _Sparkle {
   }
 }
 
+const int _sparklePaletteSize = 5;
+
+// Mostly the theme colour, plus a light accent and gold. In light themes
+// the accent is the dark text colour so it still shows on the background.
+List<Color> _sparklePalette(BuildContext context) => [
+  context.primaryColor,
+  context.primaryColor,
+  Color.lerp(context.primaryColor, context.textPrimary, 0.4)!,
+  context.isDarkMode ? Colors.white : context.textPrimary,
+  const Color(0xFFFFC107),
+];
+
 class _SparklePainter extends CustomPainter {
   final List<_Sparkle> sparkles;
   final double time;
+  final List<Color> palette;
 
-  _SparklePainter({required this.sparkles, required this.time});
+  _SparklePainter({
+    required this.sparkles,
+    required this.time,
+    required this.palette,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -779,7 +783,9 @@ class _SparklePainter extends CustomPainter {
       final twinkle = s.shape == _SparkleShape.star
           ? 0.6 + 0.4 * math.sin(t * math.pi * 8 + s.phase).abs()
           : 1.0;
-      paint.color = s.color.withValues(alpha: fadeIn * fadeOut * twinkle);
+      paint.color = palette[s.colorIndex].withValues(
+        alpha: fadeIn * fadeOut * twinkle,
+      );
 
       canvas.save();
       canvas.translate(x, y);

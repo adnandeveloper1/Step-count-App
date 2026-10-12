@@ -1,13 +1,18 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../../../app/theme/app_colors.dart';
 
 // 260 degree arc with a gap at the bottom, like a speedometer.
 class GoalArcPainter extends CustomPainter {
   final double progress;
   final double strokeWidth;
+  // The theme's primary colour; the track and glow are faded copies.
+  final Color color;
 
-  GoalArcPainter({required this.progress, required this.strokeWidth});
+  GoalArcPainter({
+    required this.progress,
+    required this.strokeWidth,
+    required this.color,
+  });
 
   static const double _startAngle = 140 * math.pi / 180;
   static const double _totalSweep = 260 * math.pi / 180;
@@ -23,7 +28,7 @@ class GoalArcPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
-      ..color = AppColors.primaryEmerald.withValues(alpha: 0.1);
+      ..color = color.withValues(alpha: 0.12);
     canvas.drawArc(rect, _startAngle, _totalSweep, false, trackPaint);
 
     if (progress <= 0) return;
@@ -33,7 +38,7 @@ class GoalArcPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
-      ..color = AppColors.primaryEmerald.withValues(alpha: 0.5)
+      ..color = color.withValues(alpha: 0.5)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
     canvas.drawArc(rect, _startAngle, sweep, false, glowPaint);
 
@@ -41,12 +46,13 @@ class GoalArcPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
-      ..color = AppColors.primaryEmerald;
+      ..color = color;
     canvas.drawArc(rect, _startAngle, sweep, false, arcPaint);
   }
 
   @override
   bool shouldRepaint(GoalArcPainter oldDelegate) =>
       oldDelegate.progress != progress ||
-      oldDelegate.strokeWidth != strokeWidth;
+      oldDelegate.strokeWidth != strokeWidth ||
+      oldDelegate.color != color;
 }

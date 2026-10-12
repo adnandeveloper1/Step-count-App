@@ -11,6 +11,9 @@ class LocalStorageService {
 
   Box get _box => Hive.box(_boxName);
 
+  /// Flushes pending writes and closes the box.
+  Future<void> close() => _box.close();
+
   void saveSteps(int steps) {
     _box.put('currentSteps', steps);
   }
@@ -34,6 +37,7 @@ class LocalStorageService {
   double getWeight() {
     return _box.get('weight', defaultValue: 70.0);
   }
+
   void saveCoins(int coins) {
     _box.put('coins', coins);
   }
@@ -75,7 +79,10 @@ class LocalStorageService {
   }
 
   List<String> getPurchasedThemes() {
-    final data = _box.get('purchasedThemes', defaultValue: ['default']);
+    final data = _box.get(
+      'purchasedThemes',
+      defaultValue: ['default_dark', 'default_light'],
+    );
     return List<String>.from(data);
   }
 
@@ -84,7 +91,9 @@ class LocalStorageService {
   }
 
   String getActiveTheme() {
-    return _box.get('activeTheme', defaultValue: 'default');
+    final val = _box.get('activeTheme', defaultValue: 'default_dark');
+    if (val == 'default') return 'default_dark';
+    return val;
   }
 
   void saveActiveTheme(String themeId) {
@@ -185,9 +194,24 @@ class LocalStorageService {
     _box.put('healthSupported', supported);
   }
 
+  // Steps of today already added to challenges, and steps from an earlier day
+  // still waiting to be added (see settleChallengeSteps).
+  int getChallengeCreditedSteps() =>
+      _box.get('challengeCreditedSteps', defaultValue: 0);
+
+  void saveChallengeCreditedSteps(int steps) =>
+      _box.put('challengeCreditedSteps', steps);
+
+  int getChallengePendingSteps() =>
+      _box.get('challengePendingSteps', defaultValue: 0);
+
+  void saveChallengePendingSteps(int steps) =>
+      _box.put('challengePendingSteps', steps);
+
   Future<void> clearAllUserData() async {
     await _box.clear();
   }
+
   String getChallengeData() {
     return _box.get('challenge_data', defaultValue: '{}');
   }

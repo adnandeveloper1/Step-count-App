@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../providers/streak_provider.dart';
 
@@ -27,7 +27,7 @@ class AchievementsScreen extends ConsumerWidget {
     final streakState = ref.watch(streakProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: context.backgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
@@ -38,15 +38,15 @@ class AchievementsScreen extends ConsumerWidget {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                    icon: Icon(Icons.arrow_back, color: context.textPrimary),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'STREAKS & BADGES',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: context.textPrimary,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -60,25 +60,25 @@ class AchievementsScreen extends ConsumerWidget {
                   children: [
                     Column(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.local_fire_department,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           size: 36,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '${streakState.currentStreak} Days',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Current Streak',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: context.textSecondary,
                           ),
                         ),
                       ],
@@ -86,29 +86,29 @@ class AchievementsScreen extends ConsumerWidget {
                     Container(
                       height: 50,
                       width: 1,
-                      color: AppColors.glassCardBorder,
+                      color: context.textSecondary.withValues(alpha: 0.3),
                     ),
                     Column(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.workspace_premium,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           size: 36,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '${streakState.bestStreak} Days',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Best Record',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: context.textSecondary,
                           ),
                         ),
                       ],
@@ -117,12 +117,12 @@ class AchievementsScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 28),
-              const Text(
+              Text(
                 'BADGES',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: context.textPrimary,
                   letterSpacing: 1.1,
                 ),
               ),
@@ -147,14 +147,14 @@ class AchievementsScreen extends ConsumerWidget {
                         CircleAvatar(
                           radius: 28,
                           backgroundColor: badge.isUnlocked
-                              ? AppColors.primaryEmerald.withOpacity(0.2)
-                              : AppColors.glassCardBorder,
+                              ? context.primaryColor.withValues(alpha: 0.2)
+                              : context.textSecondary.withValues(alpha: 0.2),
                           child: Icon(
                             _resolveIcon(badge.iconName),
                             size: 28,
                             color: badge.isUnlocked
-                                ? AppColors.primaryEmerald
-                                : AppColors.textSecondary,
+                                ? context.primaryColor
+                                : context.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -165,8 +165,8 @@ class AchievementsScreen extends ConsumerWidget {
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: badge.isUnlocked
-                                ? AppColors.textPrimary
-                                : AppColors.textSecondary,
+                                ? context.textPrimary
+                                : context.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -175,9 +175,9 @@ class AchievementsScreen extends ConsumerWidget {
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: context.textSecondary,
                           ),
                         ),
                       ],

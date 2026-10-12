@@ -1,50 +1,63 @@
-import 'dart:io';
 import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/gps_tracking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../app/theme/app_colors.dart';
+import 'package:in_app_update/in_app_update.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../../settings/presentation/setting_screen.dart';
 import '../../../social/presentation/screens/social_screen.dart';
 import '../../../step_tracking/presentation/screens/dashboard_screen.dart';
 import '../../../step_tracking/presentation/widgets/goal_celebration_listener.dart';
 
-
 class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
 
   @override
-  ConsumerState<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() =>
+      _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardView(),
-    InsightsScreen (),
-     ChallengeScreen(),
-    GpsTrackingScreen(),
-    SettingsScreen(),
-  ];
-
   @override
   void initState() {
     super.initState();
+    _checkForUpdates();
   }
 
+  Future<void> _checkForUpdates() async {
+    try {
+      AppUpdateInfo updateInfo = await InAppUpdate.checkForUpdate();
 
+      if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+        await InAppUpdate.performImmediateUpdate();
+
+        // FLEXIBLE UPDATE (Downloads in background, prompts user to restart when ready)
+        // await InAppUpdate.startFlexibleUpdate();
+        // await InAppUpdate.completeFlexibleUpdate();
+      }
+    } catch (e) {
+      debugPrint('In-App Update error: $e');
+    }
+  }
+
+  final List<Widget> _screens = [
+    const DashboardView(),
+    const InsightsScreen(),
+    const ChallengeScreen(),
+    const GpsTrackingScreen(),
+    const SettingsScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return GoalCelebrationListener(
-      child: _buildScaffold(),
-    );
+    return GoalCelebrationListener(child: _buildScaffold());
   }
 
   Widget _buildScaffold() {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: context.backgroundColor,
       extendBody: false,
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
@@ -52,15 +65,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF141618),
+            color: context.cardColor,
             borderRadius: BorderRadius.circular(40),
             border: Border.all(
-              color: Colors.white.withOpacity(0.08),
+              color: context.textSecondary.withValues(alpha: 0.2),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -89,15 +102,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
-        width: 50,
-        height: 50,
+        width: 45,
+        height: 45,
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryEmerald : Colors.transparent,
+          color: isSelected ? context.primaryColor : Colors.transparent,
           shape: BoxShape.circle,
         ),
         child: Icon(
           icon,
-          color: isSelected ? Colors.black : AppColors.textSecondary,
+          color: isSelected ? Colors.black : context.textSecondary,
           size: 24,
         ),
       ),

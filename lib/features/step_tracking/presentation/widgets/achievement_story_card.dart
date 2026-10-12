@@ -5,7 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/theme_extensions.dart';
 import '../../../../core/utils/number_format.dart';
 import '../../../../core/utils/step_history.dart';
 import 'goal_arc_painter.dart';
@@ -86,16 +86,24 @@ class AchievementStoryCard extends StatelessWidget {
       size: size,
       child: ClipRect(
         child: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: RadialGradient(
-              center: Alignment(0, -0.35),
+              center: const Alignment(0, -0.35),
               radius: 0.95,
-              colors: [Color(0xFF1F2A05), AppColors.backgroundDark],
+              // A soft wash of the theme colour behind the gauge.
+              colors: [
+                Color.lerp(
+                  context.backgroundColor,
+                  context.primaryColor,
+                  0.14,
+                )!,
+                context.backgroundColor,
+              ],
             ),
           ),
           child: Stack(
             children: [
-              ..._decorations(),
+              ..._decorations(context),
               Padding(
                 padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
                 child: Column(
@@ -108,7 +116,7 @@ class AchievementStoryCard extends StatelessWidget {
                           style: GoogleFonts.sora(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                           ),
                         ),
                         Text(
@@ -116,14 +124,14 @@ class AchievementStoryCard extends StatelessWidget {
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                            color: context.textSecondary,
                             letterSpacing: 1.2,
                           ),
                         ),
                       ],
                     ),
                     const Spacer(flex: 2),
-                    _buildGauge(a),
+                    _buildGauge(context, a),
                     const SizedBox(height: 18),
                     FittedBox(
                       fit: BoxFit.scaleDown,
@@ -132,7 +140,7 @@ class AchievementStoryCard extends StatelessWidget {
                         style: GoogleFonts.sora(
                           fontSize: 34,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.primaryEmerald,
+                          color: context.primaryColor,
                           letterSpacing: -1,
                           height: 1,
                         ),
@@ -148,7 +156,7 @@ class AchievementStoryCard extends StatelessWidget {
                         style: GoogleFonts.jetBrainsMono(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                          color: context.textSecondary,
                           letterSpacing: 1.5,
                         ),
                       ),
@@ -161,34 +169,30 @@ class AchievementStoryCard extends StatelessWidget {
                           vertical: 7,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.glassCardBackground,
+                          color: context.cardColor,
                           borderRadius: BorderRadius.circular(40),
-                          border: Border.all(
-                            color: AppColors.glassCardBorder.withValues(
-                              alpha: 0.5,
-                            ),
-                          ),
+                          border: Border.all(color: context.cardBorderColor),
                         ),
                         child: Text(
                           '$streak 🔥',
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            color: context.textPrimary,
                             letterSpacing: 0.8,
                           ),
                         ),
                       ),
                     ],
                     const Spacer(flex: 3),
-                    _buildStats(a),
+                    _buildStats(context, a),
                     const SizedBox(height: 22),
                     Text(
                       'TRACKED WITH BUILD UP',
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 9,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary.withValues(alpha: 0.6),
+                        color: context.textSecondary.withValues(alpha: 0.6),
                         letterSpacing: 2.5,
                       ),
                     ),
@@ -202,7 +206,7 @@ class AchievementStoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildGauge(GoalAchievement a) {
+  Widget _buildGauge(BuildContext context, GoalAchievement a) {
     const gaugeSize = 230.0;
     return SizedBox(
       width: gaugeSize,
@@ -212,7 +216,11 @@ class AchievementStoryCard extends StatelessWidget {
         children: [
           CustomPaint(
             size: const Size.square(gaugeSize),
-            painter: GoalArcPainter(progress: 1, strokeWidth: 13),
+            painter: GoalArcPainter(
+              progress: 1,
+              strokeWidth: 13,
+              color: context.primaryColor,
+            ),
           ),
           Column(
             mainAxisSize: MainAxisSize.min,
@@ -222,7 +230,7 @@ class AchievementStoryCard extends StatelessWidget {
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
+                  color: context.textSecondary,
                   letterSpacing: 3,
                 ),
               ),
@@ -234,7 +242,7 @@ class AchievementStoryCard extends StatelessWidget {
                   style: GoogleFonts.sora(
                     fontSize: 50,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                    color: context.textPrimary,
                     letterSpacing: -1.5,
                     height: 1.1,
                   ),
@@ -245,7 +253,7 @@ class AchievementStoryCard extends StatelessWidget {
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primaryEmerald,
+                  color: context.primaryColor,
                   letterSpacing: 1.2,
                 ),
               ),
@@ -256,7 +264,7 @@ class AchievementStoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStats(GoalAchievement a) {
+  Widget _buildStats(BuildContext context, GoalAchievement a) {
     Widget stat(String label, String value, String unit) => Expanded(
       child: Column(
         children: [
@@ -265,7 +273,7 @@ class AchievementStoryCard extends StatelessWidget {
             style: GoogleFonts.jetBrainsMono(
               fontSize: 9,
               fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              color: context.textSecondary,
               letterSpacing: 1.5,
             ),
           ),
@@ -276,7 +284,7 @@ class AchievementStoryCard extends StatelessWidget {
               style: GoogleFonts.jetBrainsMono(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: context.textPrimary,
               ),
               children: [
                 if (unit.isNotEmpty)
@@ -284,7 +292,7 @@ class AchievementStoryCard extends StatelessWidget {
                     text: ' $unit',
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 11,
-                      color: AppColors.primaryEmerald,
+                      color: context.primaryColor,
                     ),
                   ),
               ],
@@ -297,17 +305,15 @@ class AchievementStoryCard extends StatelessWidget {
     final divider = Container(
       width: 1,
       height: 32,
-      color: AppColors.glassCardBorder.withValues(alpha: 0.5),
+      color: context.cardBorderColor,
     );
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.glassCardBackground.withValues(alpha: 0.06),
+        color: context.cardColor.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: AppColors.glassCardBorder.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: context.cardBorderColor),
       ),
       child: Row(
         children: [
@@ -322,15 +328,17 @@ class AchievementStoryCard extends StatelessWidget {
   }
 
   // A few fixed sparkles so the story looks celebratory as a still image.
-  List<Widget> _decorations() {
-    const sparkles = [
-      (x: 40.0, y: 110.0, size: 10.0, color: AppColors.primaryEmerald),
-      (x: 300.0, y: 90.0, size: 14.0, color: Colors.white),
-      (x: 318.0, y: 220.0, size: 8.0, color: Color(0xFFFFD54F)),
-      (x: 26.0, y: 300.0, size: 12.0, color: Colors.white),
-      (x: 290.0, y: 380.0, size: 9.0, color: AppColors.primaryEmerald),
-      (x: 60.0, y: 420.0, size: 7.0, color: AppColors.neonGreen),
-      (x: 180.0, y: 70.0, size: 6.0, color: AppColors.primaryEmerald),
+  List<Widget> _decorations(BuildContext context) {
+    final accent = context.isDarkMode ? Colors.white : context.textPrimary;
+    const gold = Color(0xFFFFC107);
+    final sparkles = [
+      (x: 40.0, y: 110.0, size: 10.0, color: context.primaryColor),
+      (x: 300.0, y: 90.0, size: 14.0, color: accent),
+      (x: 318.0, y: 220.0, size: 8.0, color: gold),
+      (x: 26.0, y: 300.0, size: 12.0, color: accent),
+      (x: 290.0, y: 380.0, size: 9.0, color: context.primaryColor),
+      (x: 60.0, y: 420.0, size: 7.0, color: gold),
+      (x: 180.0, y: 70.0, size: 6.0, color: context.primaryColor),
     ];
     return [
       for (final s in sparkles)
@@ -355,7 +363,7 @@ Future<void> showAchievementShareSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.backgroundDark,
+    backgroundColor: context.backgroundColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
     ),
@@ -425,7 +433,7 @@ class _AchievementShareSheetState extends State<_AchievementShareSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.glassCardBorder,
+                color: context.cardBorderColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -435,7 +443,7 @@ class _AchievementShareSheetState extends State<_AchievementShareSheet> {
               style: GoogleFonts.jetBrainsMono(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
+                color: context.textSecondary,
                 letterSpacing: 2,
               ),
             ),
@@ -465,9 +473,9 @@ class _AchievementShareSheetState extends State<_AchievementShareSheet> {
                 key: const Key('goalStory.share'),
                 onPressed: _sharing ? null : _share,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryEmerald,
-                  foregroundColor: Colors.black,
-                  disabledBackgroundColor: AppColors.primaryEmerald.withValues(
+                  backgroundColor: context.primaryColor,
+                  foregroundColor: context.theme.colorScheme.onPrimary,
+                  disabledBackgroundColor: context.primaryColor.withValues(
                     alpha: 0.5,
                   ),
                   elevation: 0,
@@ -476,12 +484,12 @@ class _AchievementShareSheetState extends State<_AchievementShareSheet> {
                   ),
                 ),
                 icon: _sharing
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.black,
+                          color: context.theme.colorScheme.onPrimary,
                         ),
                       )
                     : const Icon(Icons.ios_share_rounded),

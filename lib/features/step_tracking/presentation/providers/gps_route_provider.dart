@@ -31,8 +31,9 @@ class GpsRouteState {
   }
 }
 
-final gpsRouteProvider =
-NotifierProvider<GpsRouteNotifier, GpsRouteState>(GpsRouteNotifier.new);
+final gpsRouteProvider = NotifierProvider<GpsRouteNotifier, GpsRouteState>(
+  GpsRouteNotifier.new,
+);
 
 class GpsRouteNotifier extends Notifier<GpsRouteState> {
   StreamSubscription<Position>? _positionStream;
@@ -70,28 +71,29 @@ class GpsRouteNotifier extends Notifier<GpsRouteState> {
       distanceFilter: 5,
     );
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      final newPoint = LatLng(position.latitude, position.longitude);
-      double addedDistance = 0.0;
+    _positionStream =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+          (Position position) {
+            final newPoint = LatLng(position.latitude, position.longitude);
+            double addedDistance = 0.0;
 
-      if (state.routePoints.isNotEmpty) {
-        final lastPoint = state.routePoints.last;
-        addedDistance = Geolocator.distanceBetween(
-          lastPoint.latitude,
-          lastPoint.longitude,
-          newPoint.latitude,
-          newPoint.longitude,
+            if (state.routePoints.isNotEmpty) {
+              final lastPoint = state.routePoints.last;
+              addedDistance = Geolocator.distanceBetween(
+                lastPoint.latitude,
+                lastPoint.longitude,
+                newPoint.latitude,
+                newPoint.longitude,
+              );
+            }
+
+            state = state.copyWith(
+              routePoints: [...state.routePoints, newPoint],
+              distanceMeters: state.distanceMeters + addedDistance,
+              currentSpeed: position.speed,
+            );
+          },
         );
-      }
-
-      state = state.copyWith(
-        routePoints: [...state.routePoints, newPoint],
-        distanceMeters: state.distanceMeters + addedDistance,
-        currentSpeed: position.speed,
-      );
-    });
   }
 
   void stopTracking() {

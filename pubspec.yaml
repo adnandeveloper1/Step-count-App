@@ -40,6 +40,10 @@ dependencies:
   package_info_plus: ^10.2.1
   change_app_package_name: ^1.5.0
   url_launcher: ^6.3.2
+  in_app_update: ^5.0.0
+  step_sensor:
+    path: packages/step_sensor
+
 
 flutter_launcher_icons:
   android: "ic_launcher"

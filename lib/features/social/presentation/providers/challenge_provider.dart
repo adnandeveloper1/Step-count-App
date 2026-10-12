@@ -184,9 +184,9 @@ final storageProvider = Provider<LocalStorageService>((ref) {
 });
 
 final challengeProvider =
-NotifierProvider<ChallengeNotifier, List<ChallengeItem>>(
-  ChallengeNotifier.new,
-);
+    NotifierProvider<ChallengeNotifier, List<ChallengeItem>>(
+      ChallengeNotifier.new,
+    );
 
 class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
   @override
@@ -205,8 +205,10 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
     final list = baseChallenges.map((item) {
       if (savedMap.containsKey(item.id)) {
         final data = savedMap[item.id] as Map<String, dynamic>;
-        
-        DateTime? startTime = data['startTime'] != null ? DateTime.parse(data['startTime']) : null;
+
+        DateTime? startTime = data['startTime'] != null
+            ? DateTime.parse(data['startTime'])
+            : null;
         bool isActive = data['isActive'] ?? false;
         bool isFailed = data['isFailed'] ?? false;
         bool isCompleted = data['isCompleted'] ?? false;
@@ -217,8 +219,9 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
             isActive = false;
             isFailed = true;
             anyFailure = true;
-            ref.read(notificationServiceProvider).showChallengeFailed(item.title);
-
+            ref
+                .read(notificationServiceProvider)
+                .showChallengeFailed(item.title);
           }
         }
 
@@ -259,11 +262,7 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
   void stopChallenge(String id) {
     state = state.map((item) {
       if (item.id == id && item.isActive) {
-        return item.copyWith(
-          isActive: false,
-          currentSteps: 0,
-          startTime: null,
-        );
+        return item.copyWith(isActive: false, currentSteps: 0, startTime: null);
       }
       return item;
     }).toList();
@@ -277,7 +276,9 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
 
     state = state.map((item) {
       if (item.isActive && item.startTime != null) {
-        final deadline = item.startTime!.add(Duration(hours: item.durationInHours));
+        final deadline = item.startTime!.add(
+          Duration(hours: item.durationInHours),
+        );
         if (now.isAfter(deadline)) {
           changed = true;
           ref.read(notificationServiceProvider).showChallengeFailed(item.title);
@@ -306,7 +307,9 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
 
       if (newSteps >= item.targetSteps) {
         earnedCoins += item.rewardCoins;
-        ref.read(notificationServiceProvider).showChallengeCompleted(item.title);
+        ref
+            .read(notificationServiceProvider)
+            .showChallengeCompleted(item.title);
         return item.copyWith(
           currentSteps: item.targetSteps,
           isActive: false,
@@ -321,7 +324,7 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
       state = updated;
       _persistState();
     }
-    
+
     return earnedCoins;
   }
 
@@ -343,15 +346,20 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
       }, SetOptions(merge: true));
     }
   }
+
   // Add this inside ChallengeNotifier class in challenge_provider.dart
   Future<void> syncWithFirestore() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (doc.exists && doc.data()!.containsKey('challengeProgress')) {
-        final cloudData = doc.data()!['challengeProgress'] as Map<String, dynamic>;
+        final cloudData =
+            doc.data()!['challengeProgress'] as Map<String, dynamic>;
 
         // Update local state
         state = baseChallenges.map((item) {
@@ -362,7 +370,9 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
               isActive: data['isActive'] ?? false,
               isCompleted: data['isCompleted'] ?? false,
               isFailed: data['isFailed'] ?? false,
-              startTime: data['startTime'] != null ? DateTime.parse(data['startTime']) : null,
+              startTime: data['startTime'] != null
+                  ? DateTime.parse(data['startTime'])
+                  : null,
             );
           }
           return item;

@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../step_tracking/presentation/providers/step_provider.dart';
 
-
 class LeagueTierBadge extends StatelessWidget {
   final LeagueTier tier;
   final String tierName;
@@ -41,12 +40,9 @@ class LeagueTierBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: tierColor.withOpacity(0.10),
+        color: tierColor.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: tierColor.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: tierColor.withValues(alpha: 0.3), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

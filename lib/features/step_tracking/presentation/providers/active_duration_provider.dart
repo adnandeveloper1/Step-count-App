@@ -18,10 +18,7 @@ class ActiveDurationState {
     return hours == '00' ? '$minutes:$seconds' : '$hours:$minutes:$seconds';
   }
 
-  ActiveDurationState copyWith({
-    int? activeSeconds,
-    bool? isTracking,
-  }) {
+  ActiveDurationState copyWith({int? activeSeconds, bool? isTracking}) {
     return ActiveDurationState(
       activeSeconds: activeSeconds ?? this.activeSeconds,
       isTracking: isTracking ?? this.isTracking,
@@ -30,8 +27,9 @@ class ActiveDurationState {
 }
 
 final activeDurationProvider =
-NotifierProvider<ActiveDurationNotifier, ActiveDurationState>(
-    ActiveDurationNotifier.new);
+    NotifierProvider<ActiveDurationNotifier, ActiveDurationState>(
+      ActiveDurationNotifier.new,
+    );
 
 class ActiveDurationNotifier extends Notifier<ActiveDurationState> {
   Timer? _timer;
