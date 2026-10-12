@@ -1,9 +1,14 @@
+import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
+
+import '../utils/step_counter_math.dart';
 
 class LocalStorageService {
   static const String _boxName = 'buildUpData';
 
   Future<void> init() async {
+    // Already open in this isolate (tests open it themselves).
+    if (Hive.isBoxOpen(_boxName)) return;
     await Hive.initFlutter();
     await Hive.openBox(_boxName);
   }
@@ -131,6 +136,15 @@ class LocalStorageService {
     _box.put('goalNotified', value);
   }
 
+  // Day (yyyy-MM-dd) the goal congrats screen was last shown.
+  String getGoalCelebratedDate() {
+    return _box.get('goalCelebratedDate', defaultValue: '');
+  }
+
+  void saveGoalCelebratedDate(String date) {
+    _box.put('goalCelebratedDate', date);
+  }
+
   bool getBatteryPromptShown() {
     return _box.get('batteryPromptShown', defaultValue: false);
   }
@@ -138,6 +152,14 @@ class LocalStorageService {
   void saveBatteryPromptShown(bool value) {
     _box.put('batteryPromptShown', value);
   }
+
+  // The one-time message about Restricted battery use (see
+  // showBackgroundAccessPromptIfNeeded).
+  bool getBackgroundAccessPromptShown() =>
+      _box.get('backgroundAccessPromptShown', defaultValue: false);
+
+  void saveBackgroundAccessPromptShown(bool value) =>
+      _box.put('backgroundAccessPromptShown', value);
 
   String getWeeklySteps() {
     final data = _box.get('weeklySteps');
@@ -149,6 +171,23 @@ class LocalStorageService {
 
   void saveWeeklySteps(String data) {
     _box.put('weeklySteps', data);
+  }
+
+  // Date (yyyy-MM-dd) to steps for the last 31 days, kept by step_history.dart.
+  Map<String, int> getDailyHistory() {
+    try {
+      final decoded = jsonDecode(_box.get('dailyHistory', defaultValue: '{}'));
+      return {
+        for (final entry in (decoded as Map<String, dynamic>).entries)
+          if (entry.value is num) entry.key: (entry.value as num).toInt(),
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  void saveDailyHistory(Map<String, int> history) {
+    _box.put('dailyHistory', jsonEncode(history));
   }
 
   void saveStepGoal(int goal) {
@@ -180,6 +219,47 @@ class LocalStorageService {
 
   void saveChallengePendingSteps(int steps) =>
       _box.put('challengePendingSteps', steps);
+
+  /// Resets today's counters for a new day [date] (yyyy-MM-dd) whose
+  /// weekday is [weekday] (1 = Monday). Both the app and the background task
+  /// call this.
+  void startNewDay(String date, int weekday) {
+    saveLastDate(date);
+    saveSteps(0);
+    saveLastCoinStep(0);
+    saveGoalNotified(false);
+    saveDrivingStepsToday(0);
+
+    List<int> weekly = getWeeklySteps()
+        .split(',')
+        .map((e) => int.tryParse(e) ?? 0)
+        .toList();
+    if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
+    weekly[weekday - 1] = 0;
+    saveWeeklySteps(weekly.join(','));
+  }
+
+  // Drives already folded into the hardware baseline, so a drive the native
+  // side has not deleted yet is not removed twice (see resolveTodaySteps).
+  List<int> getAppliedDriveIds() =>
+      List<int>.from(_box.get('appliedDriveIds', defaultValue: const <int>[]));
+
+  /// Records the drives [result] folded into the saved baseline and adds
+  /// their steps to today's driving steps. Call after any new-day reset and
+  /// after saving the baseline; delete the drives natively afterwards.
+  void markDrivesApplied(StepCounterResult result) {
+    if (result.appliedDriveIds.isEmpty) return;
+    _box.put(
+      'appliedDriveIds',
+      rememberAppliedDrives(getAppliedDriveIds(), result.appliedDriveIds),
+    );
+    saveDrivingStepsToday(getDrivingStepsToday() + result.drivingSteps);
+  }
+
+  /// Steps removed today because they were counted in a vehicle.
+  int getDrivingStepsToday() => _box.get('drivingStepsToday', defaultValue: 0);
+
+  void saveDrivingStepsToday(int steps) => _box.put('drivingStepsToday', steps);
 
   Future<void> clearAllUserData() async {
     await _box.clear();

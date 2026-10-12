@@ -14,7 +14,10 @@ class StepDetailsScreen extends ConsumerStatefulWidget {
 }
 
 class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
-  int _selectedDateIndex = 6;
+  /// Today's position in the week selector (the last of 7 days).
+  static const _todayIndex = 6;
+
+  int _selectedDateIndex = _todayIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +34,7 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
 
     final selectedDate = weekDays[_selectedDateIndex];
 
-    int displaySteps = (_selectedDateIndex == 6)
+    int displaySteps = (_selectedDateIndex == _todayIndex)
         ? stepState.currentSteps
         : stepState.weeklySteps[selectedDate.weekday - 1];
 
@@ -67,6 +70,11 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                 screenWidth,
                 screenHeight,
               ),
+              if (_selectedDateIndex == _todayIndex &&
+                  stepState.drivingSteps > 0) ...[
+                SizedBox(height: screenHeight * 0.02),
+                _buildDrivingNote(stepState.drivingSteps, screenWidth),
+              ],
               SizedBox(height: screenHeight * 0.03),
               _buildSummaryStats(displayDistance, displayCalories, screenWidth),
               SizedBox(height: screenHeight * 0.05),
@@ -74,6 +82,30 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDrivingNote(int drivingSteps, double screenWidth) {
+    return Row(
+      key: const Key('step_details_driving_steps'),
+      children: [
+        Icon(
+          Icons.directions_car_rounded,
+          color: context.textSecondary,
+          size: screenWidth * 0.045,
+        ),
+        SizedBox(width: screenWidth * 0.02),
+        Expanded(
+          child: Text(
+            'About $drivingSteps steps removed while driving. Approximate: '
+            'spotting a vehicle takes 1-3 minutes.',
+            style: GoogleFonts.inter(
+              color: context.textSecondary,
+              fontSize: screenWidth * 0.032,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -147,7 +179,7 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
     int currentHour = DateTime.now().hour;
     int activeIndex = -1;
 
-    if (_selectedDateIndex == 6) {
+    if (_selectedDateIndex == _todayIndex) {
       if (currentHour >= 22) {
         activeIndex = 4;
       } else if (currentHour >= 18) {
@@ -179,7 +211,9 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _selectedDateIndex == 6 ? 'Steps Today' : 'Daily Progress',
+                _selectedDateIndex == _todayIndex
+                    ? 'Steps Today'
+                    : 'Daily Progress',
                 style: GoogleFonts.inter(
                   color: context.textSecondary,
                   fontSize: screenWidth * 0.035,
@@ -204,7 +238,7 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                               fontSize: 10,
                             );
                             String text = '';
-                            if (_selectedDateIndex == 6) {
+                            if (_selectedDateIndex == _todayIndex) {
                               switch (value.toInt()) {
                                 case 0:
                                   text = '6AM';
@@ -266,14 +300,14 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                     barGroups: [
                       _buildBar(
                         0,
-                        (_selectedDateIndex == 6 && activeIndex == 0)
+                        (_selectedDateIndex == _todayIndex && activeIndex == 0)
                             ? steps
                             : 0,
                         screenWidth,
                       ),
                       _buildBar(
                         1,
-                        (_selectedDateIndex == 6 && activeIndex == 1)
+                        (_selectedDateIndex == _todayIndex && activeIndex == 1)
                             ? steps
                             : 0,
                         screenWidth,
@@ -287,14 +321,14 @@ class _StepDetailsScreenState extends ConsumerState<StepDetailsScreen> {
                       ),
                       _buildBar(
                         3,
-                        (_selectedDateIndex == 6 && activeIndex == 3)
+                        (_selectedDateIndex == _todayIndex && activeIndex == 3)
                             ? steps
                             : 0,
                         screenWidth,
                       ),
                       _buildBar(
                         4,
-                        (_selectedDateIndex == 6 && activeIndex == 4)
+                        (_selectedDateIndex == _todayIndex && activeIndex == 4)
                             ? steps
                             : 0,
                         screenWidth,

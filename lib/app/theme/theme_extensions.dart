@@ -11,6 +11,9 @@ extension ThemeContextExtension on BuildContext {
   Color get textPrimary => theme.colorScheme.onSurface;
   Color get textSecondary =>
       isDarkMode ? const Color(0xFF9CA3AF) : const Color(0xFF64748B);
+  // Hairline for chips, dividers and outlined cards in any theme.
+  Color get cardBorderColor =>
+      textPrimary.withValues(alpha: isDarkMode ? 0.2 : 0.12);
 
   void showAppSnackBar(
     String message, {

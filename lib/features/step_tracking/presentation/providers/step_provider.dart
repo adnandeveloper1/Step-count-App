@@ -10,6 +10,7 @@ import '../../../../core/services/local_storage_service.dart';
 import '../../../../core/services/native_health_service.dart';
 import '../../../../core/services/widget_service.dart';
 import '../../../../core/utils/step_counter_math.dart';
+import '../../../../core/utils/step_history.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
 
 // list of all  ranks users can reach based on their walking.
@@ -45,6 +46,9 @@ class StepState {
   final int coins;
   final List<int> weeklySteps;
 
+  /// Today's steps removed because they were counted in a vehicle.
+  final int drivingSteps;
+
   const StepState({
     required this.currentSteps,
     this.height = 170.0,
@@ -56,6 +60,7 @@ class StepState {
     this.pedestrianStatus = 'stopped',
     this.coins = 0,
     this.weeklySteps = const [0, 0, 0, 0, 0, 0, 0],
+    this.drivingSteps = 0,
   });
 
   // Converting steps into active Distance
@@ -80,6 +85,7 @@ class StepState {
     String? pedestrianStatus,
     int? coins,
     List<int>? weeklySteps,
+    int? drivingSteps,
   }) {
     return StepState(
       currentSteps: currentSteps ?? this.currentSteps,
@@ -92,6 +98,7 @@ class StepState {
       pedestrianStatus: pedestrianStatus ?? this.pedestrianStatus,
       coins: coins ?? this.coins,
       weeklySteps: weeklySteps ?? this.weeklySteps,
+      drivingSteps: drivingSteps ?? this.drivingSteps,
     );
   }
 
@@ -162,9 +169,8 @@ class StepNotifier extends Notifier<StepState> {
     _lastProcessedDate =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
-    final displaySteps = storage.getLastDate() == _lastProcessedDate
-        ? storage.getSteps()
-        : 0;
+    final isToday = storage.getLastDate() == _lastProcessedDate;
+    final displaySteps = isToday ? storage.getSteps() : 0;
     final savedCoins = storage.getCoins();
     final savedGoal = storage.getStepGoal();
     final savedHeight = storage.getHeight();
@@ -193,6 +199,7 @@ class StepNotifier extends Notifier<StepState> {
       isRestMode: false,
       coins: savedCoins,
       weeklySteps: loadedWeeklySteps,
+      drivingSteps: isToday ? storage.getDrivingStepsToday() : 0,
     );
   }
 
@@ -241,25 +248,6 @@ class StepNotifier extends Notifier<StepState> {
     }
   }
 
-  // Every morning resets everything back
-
-  void _resetDay(String dateStr, DateTime now) {
-    final storage = ref.read(storageProvider);
-    storage.saveLastDate(dateStr);
-    storage.saveSteps(0);
-    storage.saveLastCoinStep(0);
-    storage.saveGoalNotified(false);
-
-    String weeklyData = storage.getWeeklySteps();
-    List<int> weekly = weeklyData
-        .split(',')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
-    weekly[now.weekday - 1] = 0;
-    storage.saveWeeklySteps(weekly.join(','));
-  }
-
   Future initializeTracking() async {
     final activityStatus = await Permission.activityRecognition.request();
     if (!ref.mounted) return;
@@ -268,6 +256,10 @@ class StepNotifier extends Notifier<StepState> {
       state = state.copyWith(pedestrianStatus: 'Permission Denied');
       return;
     }
+
+    // Removes steps counted in a vehicle; does nothing without Play Services.
+    await ref.read(nativeHealthProvider).startDriveDetection();
+    if (!ref.mounted) return;
 
     await _setupFallbackTracking();
   }
@@ -285,6 +277,12 @@ class StepNotifier extends Notifier<StepState> {
     final nativeHealth = ref.read(nativeHealthProvider);
     final session = AccountSession.current;
     final hardwareSteps = await nativeHealth.getHardwareSteps();
+    final drives = hardwareSteps > 0
+        ? await nativeHealth.getDrives()
+        : const <Drive>[];
+    if (needsDriveCheck(drives, DateTime.now())) {
+      unawaited(nativeHealth.checkStillDriving());
+    }
     // Signed out or reset while the sensor was read: this account's state
     // must not be written back.
     if (!ref.mounted || session != AccountSession.current) return;
@@ -305,6 +303,8 @@ class StepNotifier extends Notifier<StepState> {
       baseline: storage.getHardwareBaseline(),
       savedToday: storage.getSteps(),
       isNewDay: isNewDay,
+      drives: drives,
+      appliedDriveIds: storage.getAppliedDriveIds(),
     );
     if (result == null) return;
 
@@ -321,14 +321,17 @@ class StepNotifier extends Notifier<StepState> {
     storage.saveChallengeCreditedSteps(credit.credited);
     storage.saveChallengePendingSteps(credit.pending);
 
-    if (isNewDay) _resetDay(dateStr, now);
+    if (isNewDay) storage.startNewDay(dateStr, now.weekday);
     storage.saveHardwareBaseline(result.baseline);
+    storage.markDrivesApplied(result);
 
     _processSteps(
       result.todaySteps,
       'fallback',
       challengeSteps: credit.stepsToCredit,
     );
+    // The baseline now includes these drives, and their ids are stored.
+    await nativeHealth.removeDrives(result.appliedDriveIds);
   }
 
   /// Syncs on behalf of the background task while the app is running (see
@@ -389,7 +392,11 @@ class StepNotifier extends Notifier<StepState> {
       _syncCoinsToFirestore(currentCoins);
     }
 
-    if (todaySteps >= state.goalSteps && !storage.getGoalNotified()) {
+    if (shouldNotifyGoal(
+      todaySteps: todaySteps,
+      goal: state.goalSteps,
+      alreadyNotified: storage.getGoalNotified(),
+    )) {
       ref.read(notificationServiceProvider).showGoalReached(todaySteps);
       storage.saveGoalNotified(true);
     }
@@ -404,6 +411,9 @@ class StepNotifier extends Notifier<StepState> {
     if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
     weekly[now.weekday - 1] = todaySteps;
     storage.saveWeeklySteps(weekly.join(','));
+    storage.saveDailyHistory(
+      recordDay(storage.getDailyHistory(), now, todaySteps),
+    );
 
     if (todaySteps - _lastSyncedSteps >= 500) _forceCloudSync();
 
@@ -422,6 +432,7 @@ class StepNotifier extends Notifier<StepState> {
       coins: currentCoins,
       pedestrianStatus: trackingStatus,
       weeklySteps: weekly,
+      drivingSteps: storage.getDrivingStepsToday(),
     );
     storage.saveSteps(todaySteps);
     ref
@@ -483,7 +494,12 @@ class StepNotifier extends Notifier<StepState> {
         'weeklySteps': weekly,
         'currentLeague': state.currentLeague.name,
         'lastUpdated': FieldValue.serverTimestamp(),
-        'dailyHistory': {dateStr: todaySteps},
+        'dailyHistory': {
+          dateStr: todaySteps,
+          // Keep only the last 31 days in the cloud too.
+          for (final key in expiredDayKeys(DateTime.now()))
+            key: FieldValue.delete(),
+        },
       }, SetOptions(merge: true));
     }
   }
@@ -571,6 +587,7 @@ class StepNotifier extends Notifier<StepState> {
 
       final dateStr =
           '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+      _restoreDailyHistory(user.uid, data['dailyHistory']);
       int restoredSteps = 0;
       if (data.containsKey('dailyHistory') &&
           data['dailyHistory'][dateStr] != null) {
@@ -605,5 +622,32 @@ class StepNotifier extends Notifier<StepState> {
     } catch (e) {
       debugPrint('Firebase restore failed: $e');
     }
+  }
+
+  // Copies the cloud history onto the phone and deletes cloud days older
+  // than the 31 day window (users who skipped the per-sync cleanup).
+  void _restoreDailyHistory(String uid, Object? cloudHistory) {
+    if (cloudHistory is! Map) return;
+    final today = DateTime.now();
+    final cloud = <String, int>{
+      for (final entry in cloudHistory.entries)
+        if (entry.key is String && entry.value is num)
+          entry.key as String: (entry.value as num).toInt(),
+    };
+    final storage = ref.read(storageProvider);
+    storage.saveDailyHistory(
+      mergeHistories(storage.getDailyHistory(), cloud, today),
+    );
+
+    final stale = staleKeys(cloud.keys, today);
+    if (stale.isEmpty) return;
+    FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .update({
+          for (final key in stale)
+            FieldPath(['dailyHistory', key]): FieldValue.delete(),
+        })
+        .catchError((e) => debugPrint('History cleanup failed: $e'));
   }
 }

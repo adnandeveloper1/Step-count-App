@@ -4,12 +4,15 @@ import 'package:build_up/features/shop/presentation/screens/store_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/step_details_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:build_up/core/widgets/coin_icon.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/widgets/pro_avatar.dart';
+import '../../../../core/services/native_health_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/step_provider.dart';
 import '../providers/active_duration_provider.dart';
+import '../widgets/background_access_prompt.dart';
 import '../widgets/glass_step_card.dart';
 import '../widgets/metric_glass_card.dart';
 import '../widgets/step_gauge.dart';
@@ -37,9 +40,17 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
-      ref.read(stepNotifierProvider.notifier).initializeTracking();
+    Future.microtask(() async {
       ref.read(activeDurationProvider.notifier).startTracking();
+      // After the Physical activity permission request, so the two dialogs
+      // don't overlap.
+      await ref.read(stepNotifierProvider.notifier).initializeTracking();
+      if (!mounted) return;
+      await showBackgroundAccessPromptIfNeeded(
+        context,
+        health: ref.read(nativeHealthProvider),
+        storage: ref.read(storageProvider),
+      );
     });
   }
 
@@ -138,11 +149,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.monetization_on_outlined,
-                                  color: context.primaryColor,
-                                  size: 20,
-                                ),
+                                const CoinIcon(size: 20),
                                 const SizedBox(width: 6),
                                 Text(
                                   key: const Key('dashboard_coins'),
