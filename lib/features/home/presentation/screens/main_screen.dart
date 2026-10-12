@@ -7,6 +7,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../settings/presentation/setting_screen.dart';
 import '../../../social/presentation/screens/social_screen.dart';
 import '../../../step_tracking/presentation/screens/dashboard_screen.dart';
+import '../../../step_tracking/presentation/widgets/goal_celebration_listener.dart';
 
 
 class MainNavigationScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return GoalCelebrationListener(
+      child: _buildScaffold(),
+    );
+  }
+
+  Widget _buildScaffold() {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       extendBody: false,

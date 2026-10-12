@@ -8,6 +8,7 @@ import '../../../../core/notification_provider/notification_provider.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../../core/services/native_health_service.dart';
 import '../../../../core/services/widget_service.dart';
+import '../../../../core/utils/step_history.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
 
 // list of all  ranks users can reach based on their walking.
@@ -384,6 +385,9 @@ class StepNotifier extends Notifier<StepState> {
     if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
     weekly[now.weekday - 1] = todaySteps;
     storage.saveWeeklySteps(weekly.join(','));
+    storage.saveDailyHistory(
+      recordDay(storage.getDailyHistory(), now, todaySteps),
+    );
 
     if (todaySteps - _lastSyncedSteps >= 500) _forceCloudSync();
 
@@ -455,7 +459,12 @@ class StepNotifier extends Notifier<StepState> {
         'weeklySteps': weekly,
         'currentLeague': state.currentLeague.name,
         'lastUpdated': FieldValue.serverTimestamp(),
-        'dailyHistory': {dateStr: todaySteps}
+        'dailyHistory': {
+          dateStr: todaySteps,
+          // Keep only the last 31 days in the cloud too.
+          for (final key in expiredDayKeys(DateTime.now()))
+            key: FieldValue.delete(),
+        }
       }, SetOptions(merge: true));
     }
   }
@@ -520,6 +529,7 @@ class StepNotifier extends Notifier<StepState> {
       }
 
       final dateStr = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+      _restoreDailyHistory(user.uid, data['dailyHistory']);
       int restoredSteps = 0;
       if (data.containsKey('dailyHistory') && data['dailyHistory'][dateStr] != null) {
         restoredSteps = data['dailyHistory'][dateStr] as int;
@@ -546,5 +556,27 @@ class StepNotifier extends Notifier<StepState> {
       );
       await ref.read(challengeProvider.notifier).syncWithFirestore();
     } catch (e) { debugPrint('Firebase restore failed: $e'); }
+  }
+
+  // Copies the cloud history onto the phone and deletes cloud days older
+  // than the 31 day window (users who skipped the per-sync cleanup).
+  void _restoreDailyHistory(String uid, Object? cloudHistory) {
+    if (cloudHistory is! Map) return;
+    final today = DateTime.now();
+    final cloud = <String, int>{
+      for (final entry in cloudHistory.entries)
+        if (entry.key is String && entry.value is num)
+          entry.key as String: (entry.value as num).toInt(),
+    };
+    final storage = ref.read(storageProvider);
+    storage.saveDailyHistory(
+      mergeHistories(storage.getDailyHistory(), cloud, today),
+    );
+
+    final stale = staleKeys(cloud.keys, today);
+    if (stale.isEmpty) return;
+    FirebaseFirestore.instance.collection('users').doc(uid).update({
+      for (final key in stale) FieldPath(['dailyHistory', key]): FieldValue.delete(),
+    }).catchError((e) => debugPrint('History cleanup failed: $e'));
   }
 }

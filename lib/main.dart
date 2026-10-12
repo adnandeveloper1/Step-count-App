@@ -10,6 +10,7 @@ import 'core/services/local_storage_service.dart';
 import 'core/services/native_health_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/widget_service.dart';
+import 'core/utils/step_history.dart';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -88,6 +89,9 @@ void callbackDispatcher() {
       weekly[now.weekday - 1] = todaySteps;
       storage.saveWeeklySteps(weekly.join(','));
     }
+    storage.saveDailyHistory(
+      recordDay(storage.getDailyHistory(), now, todaySteps),
+    );
     final double height = storage.getHeight();
     final double weight = storage.getWeight();
     final double strideLengthMeters = (height * 0.413) / 100;
@@ -118,6 +122,8 @@ void callbackDispatcher() {
         'lastUpdated': FieldValue.serverTimestamp(),
         'dailyHistory': {
           firebaseDateStr: todaySteps,
+          // Keep only the last 31 days in the cloud too.
+          for (final key in expiredDayKeys(now)) key: FieldValue.delete(),
         }
       }, SetOptions(merge: true));
     }

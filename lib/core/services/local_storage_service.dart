@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class LocalStorageService {
@@ -122,6 +123,15 @@ class LocalStorageService {
     _box.put('goalNotified', value);
   }
 
+  // Day (yyyy-MM-dd) the goal congrats screen was last shown.
+  String getGoalCelebratedDate() {
+    return _box.get('goalCelebratedDate', defaultValue: '');
+  }
+
+  void saveGoalCelebratedDate(String date) {
+    _box.put('goalCelebratedDate', date);
+  }
+
   bool getBatteryPromptShown() {
     return _box.get('batteryPromptShown', defaultValue: false);
   }
@@ -140,6 +150,23 @@ class LocalStorageService {
 
   void saveWeeklySteps(String data) {
     _box.put('weeklySteps', data);
+  }
+
+  // Date (yyyy-MM-dd) to steps for the last 31 days, kept by step_history.dart.
+  Map<String, int> getDailyHistory() {
+    try {
+      final decoded = jsonDecode(_box.get('dailyHistory', defaultValue: '{}'));
+      return {
+        for (final entry in (decoded as Map<String, dynamic>).entries)
+          if (entry.value is num) entry.key: (entry.value as num).toInt(),
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  void saveDailyHistory(Map<String, int> history) {
+    _box.put('dailyHistory', jsonEncode(history));
   }
 
   void saveStepGoal(int goal) {
