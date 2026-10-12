@@ -38,8 +38,6 @@ class _BackgroundAccessDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = TextStyle(color: context.textPrimary, fontSize: 14);
-    final hint = TextStyle(color: context.textSecondary, fontSize: 12);
     return AlertDialog(
       key: const Key('background_access_dialog'),
       backgroundColor: context.backgroundColor,
@@ -48,43 +46,27 @@ class _BackgroundAccessDialog extends StatelessWidget {
         side: BorderSide(color: context.textSecondary.withValues(alpha: 0.2)),
       ),
       title: Text(
-        'Allow background activity',
+        'Allow background use',
         style: TextStyle(
           color: context.textPrimary,
           fontWeight: FontWeight.bold,
         ),
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Your phone has Build Up's battery use set to Restricted, so "
-              "steps and car rides aren't counted while the app is closed.",
-              style: body,
-            ),
-            const SizedBox(height: 12),
-            Text('To change it:', style: body),
-            const SizedBox(height: 4),
-            Text('1. Tap Open settings.', style: body),
-            Text(
-              '2. Tap App battery usage (on some phones: Battery).',
-              style: body,
-            ),
-            Text(
-              '3. Turn on Allow background usage, or choose Optimized or '
-              'Unrestricted.',
-              style: body,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'You can change it anytime in Settings > Apps > Build Up > '
-              'App battery usage.',
-              style: hint,
-            ),
-          ],
-        ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Battery use is Restricted, so steps aren't counted while the "
+            'app is closed.',
+            style: TextStyle(color: context.textPrimary, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'App battery usage > Allow background usage',
+            style: TextStyle(color: context.textSecondary, fontSize: 12),
+          ),
+        ],
       ),
       actions: [
         TextButton(
