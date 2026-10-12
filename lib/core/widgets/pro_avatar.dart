@@ -1,7 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
+import '../../app/theme/theme_extensions.dart';
+
+/// Avatar for users who own the Pro Avatar Frame: a solid polished-gold ring
+/// with a gold gem at the top. Static, so it costs nothing after first paint.
+///
+/// The gap between the ring and the avatar is transparent, so the frame sits
+/// on any surface (scaffold, card, list row) without a mismatched fill.
 class ProAvatar extends StatelessWidget {
-  // Changed to StatelessWidget
   final String emojiAvatar;
   final double radius;
   final bool isPro;
@@ -23,120 +31,126 @@ class ProAvatar extends StatelessWidget {
       );
     }
 
-    final double size = radius * 2;
-    // Proportional sizing for the badge based on overall frame size
-    final double badgeSize = size * 0.35;
+    final size = radius * 2;
+    final inner = ProFramePainter.avatarRadius(size);
 
     return SizedBox(
       width: size,
       height: size,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          // 1. The Main Gold Ring with Avatar inside
-          Container(
-            width: size,
-            height: size,
+      child: CustomPaint(
+        foregroundPainter: const ProFramePainter(),
+        child: Center(
+          child: Container(
+            width: inner * 2,
+            height: inner * 2,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFFFD700), // Bright Gold
-                width: size * 0.08, // Scales border thickness with size
-              ),
-              color: Theme.of(context).scaffoldBackgroundColor,
+              color: context.cardColor,
             ),
-            child: Center(
-              child: Text(
-                emojiAvatar,
-                style: TextStyle(
-                  fontSize: radius,
-                ), // Restored to normal emoji size
-              ),
+            child: Text(
+              emojiAvatar,
+              style: TextStyle(fontSize: inner, height: 1.15),
             ),
           ),
-
-          // 2. The Hexagon Star Badge (Bottom Right)
-          Positioned(
-            bottom:
-                -badgeSize *
-                0.1, // Adjusted so it overlaps nicely on the bottom right corner
-            right: -badgeSize * 0.1,
-            child: SizedBox(
-              width: badgeSize,
-              height: badgeSize,
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  CustomPaint(
-                    size: Size(badgeSize, badgeSize),
-                    painter: HexagonPainter(),
-                  ),
-                  Icon(
-                    Icons.star_rounded,
-                    color: const Color(0xFFF57F17), // Deep orange-gold
-                    size: badgeSize * 0.6,
-                  ),
-                  // Decorative Sparkles
-                  Positioned(
-                    top: 0,
-                    right: -4,
-                    child: Icon(
-                      Icons.auto_awesome,
-                      color: Colors.white,
-                      size: badgeSize * 0.3,
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 2,
-                    left: -4,
-                    child: Icon(
-                      Icons.auto_awesome,
-                      color: Colors.white,
-                      size: badgeSize * 0.25,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// Draws a perfect hexagon for the badge base
-class HexagonPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFFFF176), Color(0xFFFFB300)], // Light to dark gold
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.fill;
+/// Paints the Pro frame: a gold ring shaded like polished metal and a gem
+/// at 12 o'clock that overhangs the top edge.
+class ProFramePainter extends CustomPainter {
+  const ProFramePainter();
 
-    final w = size.width;
-    final h = size.height;
+  static const _gold = Color(0xFFC9A227);
+  static const _goldLight = Color(0xFFFFF6D0);
+  static const _goldMid = Color(0xFFE9C866);
+  static const _goldDeep = Color(0xFF7A5A12);
+  static const _goldDark = Color(0xFFA87C14);
 
-    // Map out the 6 points of a pointy-topped hexagon
-    final path = Path()
-      ..moveTo(w / 2, 0)
-      ..lineTo(w, h * 0.25)
-      ..lineTo(w, h * 0.75)
-      ..lineTo(w / 2, h)
-      ..lineTo(0, h * 0.75)
-      ..lineTo(0, h * 0.25)
-      ..close();
+  /// Ring, gap and gem sizes for a frame [size] wide. Each scales with the
+  /// frame but keeps a floor so the 44px dashboard avatar stays crisp.
+  static ({double stroke, double gap, double gem}) geometry(double size) => (
+    stroke: math.max(3.0, size * 0.055),
+    gap: math.max(2.0, size * 0.035),
+    gem: math.max(8.0, size * 0.14),
+  );
 
-    // Adds a slight drop shadow behind the hexagon to separate it from the ring
-    canvas.drawShadow(path, Colors.black.withValues(alpha: 0.3), 4, false);
-    canvas.drawPath(path, paint);
+  /// Radius left for the avatar inside the ring and gap.
+  static double avatarRadius(double size) {
+    final g = geometry(size);
+    return size / 2 - g.stroke - g.gap;
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  void paint(Canvas canvas, Size size) {
+    final g = geometry(size.width);
+    final center = size.center(Offset.zero);
+    final ringRadius = size.width / 2 - g.stroke / 2;
+    final ringRect = Rect.fromCircle(center: center, radius: ringRadius);
+
+    canvas.drawCircle(
+      center,
+      ringRadius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = g.stroke
+        ..shader = const SweepGradient(
+          colors: [
+            _goldDark,
+            _goldLight,
+            _gold,
+            _goldMid,
+            _goldDeep,
+            _gold,
+            _goldDark,
+          ],
+          stops: [0, 0.15, 0.35, 0.55, 0.7, 0.85, 1],
+          transform: GradientRotation(-math.pi / 2),
+        ).createShader(ringRect),
+    );
+
+    _paintGem(canvas, Offset(center.dx, g.gem * 0.15), g.gem);
+  }
+
+  void _paintGem(Canvas canvas, Offset gemCenter, double gem) {
+    final half = gem / 2;
+    final square = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset.zero, width: gem, height: gem),
+      Radius.circular(gem * 0.15),
+    );
+
+    canvas.save();
+    canvas.translate(gemCenter.dx, gemCenter.dy);
+    canvas.rotate(math.pi / 4);
+    canvas.drawShadow(
+      Path()..addRRect(square),
+      Colors.black.withValues(alpha: 0.4),
+      1.5,
+      false,
+    );
+    canvas.drawRRect(
+      square,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_goldLight, _goldMid, _goldDark],
+          stops: [0, 0.45, 1],
+        ).createShader(Rect.fromLTWH(-half, -half, gem, gem)),
+    );
+    canvas.drawRRect(
+      square,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = _goldDeep,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant ProFramePainter oldDelegate) => false;
 }
