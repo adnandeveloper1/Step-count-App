@@ -78,11 +78,6 @@ void main() {
       expect(week.bestDayIndex, 3);
     });
 
-    test('goalDays counts days at or above the goal', () {
-      expect(week.goalDays(10000), 2);
-      expect(week.goalDays(0), 0);
-    });
-
     test('an empty week has no best day', () {
       final empty = WeekSteps(
         start: monday,

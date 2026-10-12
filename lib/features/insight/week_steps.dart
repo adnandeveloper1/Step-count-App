@@ -23,10 +23,6 @@ class WeekSteps {
     }
     return best;
   }
-
-  int goalDays(int goalSteps) => goalSteps <= 0
-      ? 0
-      : days.where((steps) => (steps ?? 0) >= goalSteps).length;
 }
 
 DateTime mondayOf(DateTime day) =>

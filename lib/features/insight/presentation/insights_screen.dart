@@ -122,6 +122,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                             child: _buildInsightCard(
                               label: 'Total Steps',
                               value: formatThousands(totalSteps),
+                              valueKey: const Key('insights.totalSteps'),
                               unit: 'steps',
                               icon: Icons.directions_walk,
                             ),
@@ -250,34 +251,11 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     DateTime today,
     Size size,
   ) {
-    final elapsedDays = week.days.where((steps) => steps != null).length;
-
     return GlassCard(
       padding: EdgeInsets.all(size.width * 0.05),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: context.primaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(40),
-              border: Border.all(
-                color: context.primaryColor.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Text(
-              'GOAL MET ${week.goalDays(goalSteps)} OF $elapsedDays DAYS',
-              key: const Key('insights.goalDays'),
-              style: GoogleFonts.jetBrainsMono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: context.primaryColor,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
-          SizedBox(height: size.height * 0.025),
           SizedBox(
             height: size.height * 0.24,
             child: PageView.builder(
@@ -428,6 +406,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     required String unit,
     required IconData icon,
     String? subtitle,
+    Key? valueKey,
   }) {
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -449,6 +428,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         value,
+                        key: valueKey,
                         style: GoogleFonts.sora(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,

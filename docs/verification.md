@@ -20,7 +20,7 @@ Stable widget keys for driving the app in integration tests and Flutter Driver.
 | `goalStory.share` | Story share sheet | Shares the story PNG |
 | `insights.olderWeek` / `insights.newerWeek` | Insights week selector | Previous / next week |
 | `insights.weekTitle` / `insights.weekRange` | Insights week selector | `THIS WEEK`, `LAST WEEK`, `N WEEKS AGO` / date range |
-| `insights.goalDays` | Insights chart card | `GOAL MET x OF y DAYS` |
+| `insights.totalSteps` | Insights Total Steps card | Steps for the selected week |
 
 ## Background step sync on a device
 
