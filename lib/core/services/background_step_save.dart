@@ -12,13 +12,15 @@ typedef BackgroundSyncResult = ({
   double calories,
   List<int> weekly,
   bool notifyGoal,
+  List<int> appliedDriveIds,
 });
 
-/// Saves [hardwareSteps] to storage. Call only while holding storage (see
-/// StepSyncCoordinator.runAsStorageOwner). Returns null when the reading is
-/// not usable. [now] is for tests.
+/// Saves [hardwareSteps], less the steps counted during [drives], to storage.
+/// Call only while holding storage (see StepSyncCoordinator.runInBackground).
+/// Returns null when the reading is not usable. [now] is for tests.
 Future<BackgroundSyncResult?> saveStepsInBackground(
   int hardwareSteps, {
+  List<Drive> drives = const [],
   DateTime? now,
 }) async {
   final storage = LocalStorageService();
@@ -34,6 +36,9 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
       baseline: storage.getHardwareBaseline(),
       savedToday: storage.getSteps(),
       isNewDay: isNewDay,
+      drives: drives,
+      appliedDriveIds: storage.getAppliedDriveIds(),
+      now: now,
     );
     if (result == null) return null;
 
@@ -50,23 +55,10 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
     storage.saveChallengePendingSteps(credit.pending);
 
     // 1. Process Daily and Weekly Resets
-    if (isNewDay) {
-      storage.saveLastDate(dateStr);
-      storage.saveSteps(0);
-      storage.saveLastCoinStep(0);
-      storage.saveGoalNotified(false);
-
-      String weeklyData = storage.getWeeklySteps();
-      List<int> weekly = weeklyData
-          .split(',')
-          .map((e) => int.tryParse(e) ?? 0)
-          .toList();
-      if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
-      weekly[now.weekday - 1] = 0;
-      storage.saveWeeklySteps(weekly.join(','));
-    }
+    if (isNewDay) storage.startNewDay(dateStr, now.weekday);
 
     storage.saveHardwareBaseline(result.baseline);
+    storage.markDrivesApplied(result);
     final int todaySteps = result.todaySteps;
 
     // 3. Process Coins
@@ -117,6 +109,7 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
       calories: calories,
       weekly: weekly,
       notifyGoal: notifyGoal,
+      appliedDriveIds: result.appliedDriveIds,
     );
   } finally {
     // Flushes the writes above before another isolate may open the box.

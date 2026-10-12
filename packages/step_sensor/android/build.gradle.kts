@@ -51,3 +51,8 @@ android {
         minSdk = 21
     }
 }
+
+dependencies {
+    // Activity Recognition transitions, for removing steps counted in a vehicle.
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+}

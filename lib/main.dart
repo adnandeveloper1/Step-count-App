@@ -13,6 +13,7 @@ import 'core/services/native_health_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/step_sync_coordinator.dart';
 import 'core/services/widget_service.dart';
+import 'core/utils/step_counter_math.dart';
 import 'core/utils/step_history.dart';
 import 'features/step_tracking/presentation/providers/step_provider.dart';
 import 'firebase_options.dart';
@@ -35,6 +36,11 @@ void callbackDispatcher() {
     final int hardwareSteps = await NativeHealthService().getHardwareSteps();
     // No sensor or no reading in time: keep what is stored and try next run.
     if (hardwareSteps <= 0) return Future.value(true);
+    // Drives to remove from today's steps; empty without Play Services.
+    final drives = await NativeHealthService().getDrives();
+    if (needsDriveCheck(drives, DateTime.now())) {
+      await NativeHealthService().checkStillDriving();
+    }
 
     // The account the saved data belongs to, read before saving so a switch
     // during the run can't send it to another account's document.
@@ -43,11 +49,14 @@ void callbackDispatcher() {
     // Checks again: the app may have started during the sensor read.
     BackgroundSyncResult? synced;
     final outcome = await StepSyncCoordinator.runInBackground(() async {
-      synced = await saveStepsInBackground(hardwareSteps);
+      synced = await saveStepsInBackground(hardwareSteps, drives: drives);
     });
     if (outcome != BackgroundSyncOutcome.ranHere) return Future.value(true);
     final result = synced;
     if (result == null) return Future.value(true);
+
+    // The baseline now includes these drives, and their ids are stored.
+    await NativeHealthService().removeDrives(result.appliedDriveIds);
 
     await WidgetService().updateWidgetData(
       steps: result.todaySteps,
@@ -64,6 +73,11 @@ void callbackDispatcher() {
         await notifications.showGoalReached(result.todaySteps);
       } catch (_) {}
     }
+
+    // Keeps vehicle detection registered even if the restart receiver
+    // missed (e.g. the app was force-stopped before a reboot). After the
+    // sensor read, so Play Services can't delay it.
+    await NativeHealthService().startDriveDetection();
 
     // 5. Silent Firebase Sync
     if (uid != null) {

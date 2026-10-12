@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:build_up/core/services/background_step_save.dart';
+import 'package:build_up/core/utils/step_counter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 
@@ -123,5 +124,23 @@ void main() {
 
     expect(await run(0), isNull);
     expect(await goalNotified(), isFalse);
+  });
+
+  test('removes steps counted during a drive and stores the drive', () async {
+    await seed(steps: 100, baseline: 1000, goal: 10000);
+    await openBox();
+
+    final result = await saveStepsInBackground(
+      1500,
+      drives: [const Drive(id: 7, enterSteps: 1200, exitSteps: 1450)],
+      now: today,
+    );
+
+    // 500 counted, 250 of them in a vehicle.
+    expect(result!.todaySteps, 250);
+    expect(result.appliedDriveIds, [7]);
+    final box = await openBox();
+    expect(box.get('drivingStepsToday'), 250);
+    expect(box.get('appliedDriveIds'), [7]);
   });
 }
