@@ -1,16 +1,21 @@
 import '../../core/utils/step_history.dart';
 
-// Calendar weeks (Monday to Sunday) for the insights week selector,
-// built from the 31 day step history.
+// Rolling 7 day pages for the insights screen, built from the 31 day
+// step history. The newest page is the last 7 days ending today, the one
+// before it the 7 days before that, and so on.
 
 class WeekSteps {
   final DateTime start;
-  // Steps per day, Monday first. null means the day hasn't happened yet.
+  // Steps per day, oldest first, today last on the newest page. null means
+  // the day is older than the history window.
   final List<int?> days;
 
   const WeekSteps({required this.start, required this.days});
 
-  DateTime get end => DateTime(start.year, start.month, start.day + 6);
+  DateTime get end => dayAt(6);
+
+  DateTime dayAt(int index) =>
+      DateTime(start.year, start.month, start.day + index);
 
   int get total => days.fold(0, (sum, steps) => sum + (steps ?? 0));
 
@@ -25,63 +30,40 @@ class WeekSteps {
   }
 }
 
-DateTime mondayOf(DateTime day) =>
-    DateTime(day.year, day.month, day.day - (day.weekday - 1));
-
-// Every week that overlaps the history window, oldest first, ending with
-// the current week.
+// Every 7 day page that overlaps the history window, oldest first, ending
+// with the last 7 days.
 //
-// [weeklySteps] is the app's older Monday-first array. It still holds the
-// last 7 days, so it fills gaps for users who updated before the history
-// had built up. [todaySteps] is the live count, which can be ahead of
-// storage.
+// Steps come only from the dated [history]. The older undated weekly array
+// is not used: it is restored from the signed-in account's cloud document
+// and can hold an old week's or another account's numbers. [todaySteps] is
+// the live count, which can be behind or ahead of storage.
 List<WeekSteps> buildWeeks({
   required Map<String, int> history,
-  required List<int> weeklySteps,
   required int todaySteps,
   required DateTime today,
 }) {
   final todayDate = DateTime(today.year, today.month, today.day);
-  final oldestDay = DateTime(
-    today.year,
-    today.month,
-    today.day - (stepHistoryDays - 1),
-  );
+  final pageCount = (stepHistoryDays + 6) ~/ 7;
 
-  int? stepsFor(DateTime day) {
-    if (day.isAfter(todayDate)) return null;
-    // UTC dates so a DST change can't make a day 23 hours long.
-    final daysAgo = DateTime.utc(
-      today.year,
-      today.month,
-      today.day,
-    ).difference(DateTime.utc(day.year, day.month, day.day)).inDays;
-    var steps = history[dateKey(day)];
-    if (steps == null && daysAgo < 7 && weeklySteps.length == 7) {
-      steps = weeklySteps[day.weekday - 1];
-    }
-    steps ??= 0;
+  int? stepsFor(int daysAgo) {
+    if (daysAgo >= stepHistoryDays) return null;
+    final day = DateTime(today.year, today.month, today.day - daysAgo);
+    var steps = history[dateKey(day)] ?? 0;
     if (daysAgo == 0 && todaySteps > steps) steps = todaySteps;
     return steps;
   }
 
-  final weeks = <WeekSteps>[];
-  for (
-    var start = mondayOf(oldestDay);
-    !start.isAfter(todayDate);
-    start = DateTime(start.year, start.month, start.day + 7)
-  ) {
-    weeks.add(
+  return [
+    for (int page = pageCount - 1; page >= 0; page--)
       WeekSteps(
-        start: start,
-        days: [
-          for (int i = 0; i < 7; i++)
-            stepsFor(DateTime(start.year, start.month, start.day + i)),
-        ],
+        start: DateTime(
+          todayDate.year,
+          todayDate.month,
+          todayDate.day - page * 7 - 6,
+        ),
+        days: [for (int i = 6; i >= 0; i--) stepsFor(page * 7 + i)],
       ),
-    );
-  }
-  return weeks;
+  ];
 }
 
 const _months = [
@@ -99,7 +81,7 @@ const _months = [
   'Dec',
 ];
 
-// "Oct 6 – 12, 2026", "Sep 29 – Oct 5, 2026" or
+// "Oct 8 – 14, 2026", "Sep 29 – Oct 5, 2026" or
 // "Dec 29, 2025 – Jan 4, 2026".
 String weekRangeLabel(WeekSteps week) {
   final s = week.start;
@@ -115,9 +97,9 @@ String weekRangeLabel(WeekSteps week) {
   return '$startMonth ${s.day} – ${e.day}, ${e.year}';
 }
 
-// "THIS WEEK", "LAST WEEK" or "3 WEEKS AGO".
+// "LAST 7 DAYS", "PREVIOUS 7 DAYS" or "3 WEEKS AGO".
 String weekTitle(int weeksAgo) => switch (weeksAgo) {
-  0 => 'THIS WEEK',
-  1 => 'LAST WEEK',
+  0 => 'LAST 7 DAYS',
+  1 => 'PREVIOUS 7 DAYS',
   _ => '$weeksAgo WEEKS AGO',
 };

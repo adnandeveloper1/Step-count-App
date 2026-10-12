@@ -27,7 +27,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     'Sunday',
   ];
 
-  // Page 0 is this week. The PageView is reversed so swiping right goes
+  // Page 0 is the last 7 days. The PageView is reversed so swiping right goes
   // back in time, like Apple Health.
   final PageController _pageController = PageController();
   int _weeksAgo = 0;
@@ -55,7 +55,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
     final weeks = buildWeeks(
       history: ref.watch(storageProvider).getDailyHistory(),
-      weeklySteps: stepState.weeklySteps,
       todaySteps: stepState.currentSteps,
       today: today,
     );
@@ -163,7 +162,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                               unit: 'steps',
                               subtitle: bestIndex == null
                                   ? 'None'
-                                  : fullDayNames[bestIndex],
+                                  : fullDayNames[week.dayAt(bestIndex).weekday -
+                                        1],
                               icon: Icons.star,
                             ),
                           ),
@@ -181,7 +181,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     );
   }
 
-  // "< THIS WEEK / Oct 6 – 12, 2026 >" with arrows to step through weeks.
+  // "< LAST 7 DAYS / Oct 8 – 14, 2026 >" with arrows to step through weeks.
   Widget _buildWeekSelector(WeekSteps week, int weeksAgo, int weekCount) {
     final canGoBack = weeksAgo < weekCount - 1;
     final canGoForward = weeksAgo > 0;
@@ -283,7 +283,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     );
     final top = [maxStep, goalSteps, 10000].reduce((a, b) => a > b ? a : b);
     final maxY = top * 1.2;
-    final todayIndex = mondayOf(today) == week.start ? today.weekday - 1 : -1;
+    // Only the newest page ends with today.
+    final todayIndex = DateUtils.isSameDay(week.end, today) ? 6 : -1;
 
     return BarChart(
       BarChartData(
@@ -329,7 +330,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 return Padding(
                   padding: EdgeInsets.only(top: size.height * 0.008),
                   child: Text(
-                    dayNames[index],
+                    dayNames[week.dayAt(index).weekday - 1],
                     style: GoogleFonts.jetBrainsMono(
                       color: isToday
                           ? context.primaryColor
@@ -356,16 +357,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         borderData: FlBorderData(show: false),
         barGroups: List.generate(7, (index) {
           final steps = week.days[index] ?? 0;
-          final metGoal = goalSteps > 0 && steps >= goalSteps;
           return BarChartGroupData(
             x: index,
             barRods: [
               BarChartRodData(
                 toY: steps.toDouble(),
-                // Full lime when the goal was met, dimmer otherwise.
-                color: metGoal
-                    ? context.primaryColor
-                    : context.primaryColor.withValues(alpha: 0.45),
+                color: context.primaryColor,
                 width: size.width * 0.1,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),

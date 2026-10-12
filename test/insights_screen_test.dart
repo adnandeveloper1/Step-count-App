@@ -24,29 +24,48 @@ class _FakeStorage extends LocalStorageService {
   }
 }
 
-class _FakeStepNotifier extends StepNotifier {
+// A new account with no history yet, whose undated weekly array still
+// holds another account's numbers.
+class _EmptyStorage extends LocalStorageService {
   @override
-  StepState build() => const StepState(
-    currentSteps: 7000,
+  Map<String, int> getDailyHistory() => {};
+}
+
+class _FakeStepNotifier extends StepNotifier {
+  _FakeStepNotifier({this.currentSteps = 7000, this.weeklySteps = const []});
+
+  final int currentSteps;
+  final List<int> weeklySteps;
+
+  @override
+  StepState build() => StepState(
+    currentSteps: currentSteps,
     goalSteps: 10000,
     calories: 0,
     distanceKm: 0,
     isRestMode: false,
+    weeklySteps: weeklySteps,
   );
 }
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-  Future<void> pumpInsights(WidgetTester tester) async {
+  Future<void> pumpInsights(
+    WidgetTester tester, {
+    LocalStorageService? storage,
+    _FakeStepNotifier Function()? notifier,
+  }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.6;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          storageProvider.overrideWithValue(_FakeStorage()),
-          stepNotifierProvider.overrideWith(_FakeStepNotifier.new),
+          storageProvider.overrideWithValue(storage ?? _FakeStorage()),
+          stepNotifierProvider.overrideWith(
+            notifier ?? () => _FakeStepNotifier(),
+          ),
         ],
         child: const MaterialApp(home: InsightsScreen()),
       ),
@@ -57,18 +76,14 @@ void main() {
   String text(WidgetTester tester, String key) =>
       tester.widget<Text>(find.byKey(Key(key))).data!;
 
-  testWidgets('opens on this week with the forward arrow disabled', (
+  testWidgets('opens on the last 7 days with the forward arrow disabled', (
     tester,
   ) async {
     await pumpInsights(tester);
 
-    expect(text(tester, 'insights.weekTitle'), 'THIS WEEK');
-    // Every day so far this week walked 7,000.
-    final daysSoFar = DateTime.now().weekday;
-    expect(
-      text(tester, 'insights.totalSteps'),
-      formatThousands(7000 * daysSoFar),
-    );
+    expect(text(tester, 'insights.weekTitle'), 'LAST 7 DAYS');
+    // All 7 days walked 7,000, whatever weekday today is.
+    expect(text(tester, 'insights.totalSteps'), formatThousands(7000 * 7));
     final newer = tester.widget<IconButton>(
       find.byKey(const Key('insights.newerWeek')),
     );
@@ -83,7 +98,7 @@ void main() {
     await tester.tap(find.byKey(const Key('insights.olderWeek')));
     await tester.pumpAndSettle();
 
-    expect(text(tester, 'insights.weekTitle'), 'LAST WEEK');
+    expect(text(tester, 'insights.weekTitle'), 'PREVIOUS 7 DAYS');
     // 6 days at 7,000 and one at 12,000.
     expect(text(tester, 'insights.totalSteps'), '54,000');
   });
@@ -119,11 +134,11 @@ void main() {
 
     await tester.drag(find.byType(PageView), const Offset(250, 0));
     await tester.pumpAndSettle();
-    expect(text(tester, 'insights.weekTitle'), 'LAST WEEK');
+    expect(text(tester, 'insights.weekTitle'), 'PREVIOUS 7 DAYS');
 
     await tester.tap(find.byKey(const Key('insights.newerWeek')));
     await tester.pumpAndSettle();
-    expect(text(tester, 'insights.weekTitle'), 'THIS WEEK');
+    expect(text(tester, 'insights.weekTitle'), 'LAST 7 DAYS');
   });
 
   testWidgets('back arrow stops at the oldest week in the history', (
@@ -138,10 +153,36 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    // 31 days always span 5 or 6 calendar weeks.
-    expect(
-      text(tester, 'insights.weekTitle'),
-      anyOf('4 WEEKS AGO', '5 WEEKS AGO'),
+    // 31 days fill 5 pages of 7.
+    expect(text(tester, 'insights.weekTitle'), '4 WEEKS AGO');
+  });
+
+  testWidgets('every bar is drawn at full brightness', (tester) async {
+    await pumpInsights(tester);
+
+    final context = tester.element(find.byType(InsightsScreen));
+    final primary = Theme.of(context).primaryColor;
+    final rods = tester
+        .widget<BarChart>(find.byType(BarChart).first)
+        .data
+        .barGroups
+        .expand((group) => group.barRods);
+    // 7,000 is under the 10,000 goal, so these used to be dimmed.
+    expect(rods.map((rod) => rod.color), everyElement(primary));
+  });
+
+  // The weekly array has no dates and is restored from the signed-in
+  // account's cloud document, so it once showed another account's steps.
+  testWidgets('a new account never shows the old weekly array', (tester) async {
+    await pumpInsights(
+      tester,
+      storage: _EmptyStorage(),
+      notifier: () => _FakeStepNotifier(
+        currentSteps: 0,
+        weeklySteps: const [9000, 9000, 9000, 9000, 9000, 9000, 9000],
+      ),
     );
+
+    expect(text(tester, 'insights.totalSteps'), '0');
   });
 }
