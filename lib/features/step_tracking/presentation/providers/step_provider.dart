@@ -390,7 +390,11 @@ class StepNotifier extends Notifier<StepState> {
       _syncCoinsToFirestore(currentCoins);
     }
 
-    if (todaySteps >= state.goalSteps && !storage.getGoalNotified()) {
+    if (shouldNotifyGoal(
+      todaySteps: todaySteps,
+      goal: state.goalSteps,
+      alreadyNotified: storage.getGoalNotified(),
+    )) {
       ref.read(notificationServiceProvider).showGoalReached(todaySteps);
       storage.saveGoalNotified(true);
     }

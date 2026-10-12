@@ -5,6 +5,8 @@ class LocalStorageService {
   static const String _boxName = 'buildUpData';
 
   Future<void> init() async {
+    // Already open in this isolate (tests open it themselves).
+    if (Hive.isBoxOpen(_boxName)) return;
     await Hive.initFlutter();
     await Hive.openBox(_boxName);
   }

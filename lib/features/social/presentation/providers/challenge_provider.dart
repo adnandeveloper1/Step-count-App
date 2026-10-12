@@ -221,7 +221,7 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
             anyFailure = true;
             ref
                 .read(notificationServiceProvider)
-                .showChallengeFailed(item.title);
+                .showChallengeFailed(item.id, item.title);
           }
         }
 
@@ -281,7 +281,9 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
         );
         if (now.isAfter(deadline)) {
           changed = true;
-          ref.read(notificationServiceProvider).showChallengeFailed(item.title);
+          ref
+              .read(notificationServiceProvider)
+              .showChallengeFailed(item.id, item.title);
 
           return item.copyWith(isActive: false, isFailed: true);
         }
@@ -309,7 +311,7 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
         earnedCoins += item.rewardCoins;
         ref
             .read(notificationServiceProvider)
-            .showChallengeCompleted(item.title);
+            .showChallengeCompleted(item.id, item.title);
         return item.copyWith(
           currentSteps: item.targetSteps,
           isActive: false,
