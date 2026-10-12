@@ -183,6 +183,25 @@ class LocalStorageService {
   void saveChallengePendingSteps(int steps) =>
       _box.put('challengePendingSteps', steps);
 
+  /// Resets today's counters for a new day [date] (yyyy-MM-dd) whose
+  /// weekday is [weekday] (1 = Monday). Both the app and the background task
+  /// call this.
+  void startNewDay(String date, int weekday) {
+    saveLastDate(date);
+    saveSteps(0);
+    saveLastCoinStep(0);
+    saveGoalNotified(false);
+    saveDrivingStepsToday(0);
+
+    List<int> weekly = getWeeklySteps()
+        .split(',')
+        .map((e) => int.tryParse(e) ?? 0)
+        .toList();
+    if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
+    weekly[weekday - 1] = 0;
+    saveWeeklySteps(weekly.join(','));
+  }
+
   // Drives already folded into the hardware baseline, so a drive the native
   // side has not deleted yet is not removed twice (see resolveTodaySteps).
   List<int> getAppliedDriveIds() =>

@@ -30,10 +30,6 @@ void callbackDispatcher() {
       return Future.value(true);
     }
 
-    // Keeps vehicle detection registered even if the restart receiver
-    // missed (e.g. the app was force-stopped before a reboot).
-    await NativeHealthService().startDriveDetection();
-
     // Read the sensor before taking storage: it can take up to 30 s.
     final int hardwareSteps = await NativeHealthService().getHardwareSteps();
     // No sensor or no reading in time: keep what is stored and try next run.
@@ -63,6 +59,11 @@ void callbackDispatcher() {
       distance: result.distanceKm,
       calories: result.calories,
     );
+
+    // Keeps vehicle detection registered even if the restart receiver
+    // missed (e.g. the app was force-stopped before a reboot). After the
+    // sensor read, so Play Services can't delay it.
+    await NativeHealthService().startDriveDetection();
 
     // 5. Silent Firebase Sync
     if (uid != null) {
@@ -137,22 +138,7 @@ Future<_BackgroundSyncResult?> _saveStepsInBackground(
     storage.saveChallengePendingSteps(credit.pending);
 
     // 1. Process Daily and Weekly Resets
-    if (isNewDay) {
-      storage.saveLastDate(dateStr);
-      storage.saveSteps(0);
-      storage.saveLastCoinStep(0);
-      storage.saveGoalNotified(false);
-      storage.saveDrivingStepsToday(0);
-
-      String weeklyData = storage.getWeeklySteps();
-      List<int> weekly = weeklyData
-          .split(',')
-          .map((e) => int.tryParse(e) ?? 0)
-          .toList();
-      if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
-      weekly[now.weekday - 1] = 0;
-      storage.saveWeeklySteps(weekly.join(','));
-    }
+    if (isNewDay) storage.startNewDay(dateStr, now.weekday);
 
     storage.saveHardwareBaseline(result.baseline);
     storage.markDrivesApplied(result);

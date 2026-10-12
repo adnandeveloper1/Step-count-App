@@ -247,26 +247,6 @@ class StepNotifier extends Notifier<StepState> {
     }
   }
 
-  // Every morning resets everything back
-
-  void _resetDay(String dateStr, DateTime now) {
-    final storage = ref.read(storageProvider);
-    storage.saveLastDate(dateStr);
-    storage.saveSteps(0);
-    storage.saveLastCoinStep(0);
-    storage.saveGoalNotified(false);
-    storage.saveDrivingStepsToday(0);
-
-    String weeklyData = storage.getWeeklySteps();
-    List<int> weekly = weeklyData
-        .split(',')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
-    weekly[now.weekday - 1] = 0;
-    storage.saveWeeklySteps(weekly.join(','));
-  }
-
   Future initializeTracking() async {
     final activityStatus = await Permission.activityRecognition.request();
     if (!ref.mounted) return;
@@ -337,7 +317,7 @@ class StepNotifier extends Notifier<StepState> {
     storage.saveChallengeCreditedSteps(credit.credited);
     storage.saveChallengePendingSteps(credit.pending);
 
-    if (isNewDay) _resetDay(dateStr, now);
+    if (isNewDay) storage.startNewDay(dateStr, now.weekday);
     storage.saveHardwareBaseline(result.baseline);
     storage.markDrivesApplied(result);
 

@@ -530,6 +530,24 @@ void main() {
       expect(r.appliedDriveIds, [1]);
     });
 
+    test('an exit that comes after the timeout removes nothing', () {
+      // The steps were already counted again once the drive timed out.
+      final r = resolve(
+        hardwareSteps: 30000,
+        drives: [
+          Drive(
+            id: 1,
+            enterSteps: 28000,
+            exitSteps: 29500,
+            enteredAt: now.subtract(const Duration(hours: 6)),
+            exitedAt: now.subtract(const Duration(hours: 1)),
+          ),
+        ],
+      );
+      expect((r.todaySteps, r.drivingSteps), (3000, 0));
+      expect(r.appliedDriveIds, [1]);
+    });
+
     test('an open drive within the timeout keeps hiding steps', () {
       final r = resolve(
         hardwareSteps: 30000,
@@ -577,10 +595,12 @@ void main() {
         'enterSteps': 100,
         'enterMs': 1791746148188,
         'exitSteps': 250,
+        'exitMs': 1791746160119,
         'enterBeforeBoot': true,
         'exitBeforeBoot': false,
       });
       expect(d.enteredAt, DateTime.fromMillisecondsSinceEpoch(1791746148188));
+      expect(d.exitedAt, DateTime.fromMillisecondsSinceEpoch(1791746160119));
       expect((d.enteredBeforeBoot, d.exitedBeforeBoot), (true, false));
     });
   });

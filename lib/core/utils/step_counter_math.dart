@@ -29,8 +29,10 @@ class Drive {
   /// Null while the user is still in the vehicle.
   final int? exitSteps;
 
-  /// When the user got in; null if unknown (the drive then never times out).
+  /// When the user got in and out; null if unknown (the drive then never
+  /// times out).
   final DateTime? enteredAt;
+  final DateTime? exitedAt;
 
   /// Whether a reading was taken before the phone last restarted, when the
   /// counter was counting from an earlier zero.
@@ -42,20 +44,23 @@ class Drive {
     required this.enterSteps,
     this.exitSteps,
     this.enteredAt,
+    this.exitedAt,
     this.enteredBeforeBoot = false,
     this.exitedBeforeBoot = false,
   });
 
   /// Reads a drive sent over the step sensor platform channel.
   factory Drive.fromMap(Map<Object?, Object?> map) {
-    final enterMs = map['enterMs'] as int?;
+    DateTime? time(String key) => switch (map[key]) {
+      final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+      _ => null,
+    };
     return Drive(
       id: map['id'] as int,
       enterSteps: map['enterSteps'] as int,
       exitSteps: map['exitSteps'] as int?,
-      enteredAt: enterMs == null
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(enterMs),
+      enteredAt: time('enterMs'),
+      exitedAt: time('exitMs'),
       enteredBeforeBoot: map['enterBeforeBoot'] as bool? ?? false,
       exitedBeforeBoot: map['exitBeforeBoot'] as bool? ?? false,
     );
@@ -202,10 +207,12 @@ StepCounterResult _removeDrives(
     // the restart started, as far as today's count goes, at zero.
     final enter = drive.enteredBeforeBoot ? 0 : drive.enterSteps;
     final enteredAt = drive.enteredAt;
-    if (drive.isOpen &&
+    final timedOut =
         enteredAt != null &&
-        now.difference(enteredAt) > openDriveTimeout) {
-      // The exit never came: stop hiding its steps, and let it be deleted.
+        (drive.exitedAt ?? now).difference(enteredAt) > openDriveTimeout;
+    if (timedOut) {
+      // The exit never came in time: its steps count again (an exit that
+      // comes later must not take them back), and it can be deleted.
       applied.add(drive.id);
     } else if (drive.isOpen) {
       // Left out of today until the exit arrives; the baseline stays put.

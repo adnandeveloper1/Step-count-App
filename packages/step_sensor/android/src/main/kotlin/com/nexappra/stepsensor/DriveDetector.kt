@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
@@ -105,11 +107,25 @@ class DriveTransitionReceiver : BroadcastReceiver() {
 // register on every start.
 class DriveRestartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val app = context.applicationContext
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
-                val pending = goAsync()
-                DriveDetector.start(context.applicationContext) { pending.finish() }
+            Intent.ACTION_BOOT_COMPLETED -> DriveStore.endOpenDriveAtBoot(app)
+            Intent.ACTION_MY_PACKAGE_REPLACED -> {}
+            else -> return
+        }
+        val pending = goAsync()
+        // Finish once: when Play Services answers, or before the receiver's
+        // ~10 s limit if it does not.
+        val handler = Handler(Looper.getMainLooper())
+        var finished = false
+        val finish = {
+            if (!finished) {
+                finished = true
+                handler.removeCallbacksAndMessages(null)
+                pending.finish()
             }
         }
+        handler.postDelayed(finish, 8000)
+        DriveDetector.start(app) { handler.post(finish) }
     }
 }

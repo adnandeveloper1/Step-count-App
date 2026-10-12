@@ -56,6 +56,20 @@ object DriveStore {
         save(context, drives)
     }
 
+    // At boot: the phone restarted mid-drive, and transition updates were
+    // dropped, so the exit may never come. End the drive with an unknown exit
+    // so the walking after the restart counts; if the user is still in the
+    // vehicle, the next enter starts a new drive.
+    @Synchronized
+    fun endOpenDriveAtBoot(context: Context) {
+        val drives = load(context)
+        val open = drives.lastOrNull()?.takeIf { it.isNull("exitSteps") } ?: return
+        open.put("exitSteps", UNKNOWN_STEPS)
+            .put("exitMs", System.currentTimeMillis())
+            .put("exitBoot", bootCount(context))
+        save(context, drives)
+    }
+
     // The drives for Dart. A reading from before the phone last restarted is
     // flagged, because the step counter has since restarted from zero.
     @Synchronized
