@@ -98,3 +98,12 @@ StepCounterResult? resolveTodaySteps({
     baseline: baseline,
   );
 }
+
+/// Whether to show the goal reached notification: the goal is met and it
+/// was not shown yet today. Shared by the app and the background task, which
+/// both mark it shown in storage, so only one of them shows it.
+bool shouldNotifyGoal({
+  required int todaySteps,
+  required int goal,
+  required bool alreadyNotified,
+}) => goal > 0 && todaySteps >= goal && !alreadyNotified;
