@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart' as g_sign_in;
 import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
+import 'core/services/background_step_save.dart';
 import 'core/services/local_storage_service.dart';
 import 'core/services/native_health_service.dart';
 import 'core/services/notification_service.dart';
@@ -45,9 +46,9 @@ void callbackDispatcher() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     // Checks again: the app may have started during the sensor read.
-    _BackgroundSyncResult? synced;
+    BackgroundSyncResult? synced;
     final outcome = await StepSyncCoordinator.runInBackground(() async {
-      synced = await _saveStepsInBackground(hardwareSteps, drives);
+      synced = await saveStepsInBackground(hardwareSteps, drives: drives);
     });
     if (outcome != BackgroundSyncOutcome.ranHere) return Future.value(true);
     final result = synced;
@@ -62,6 +63,15 @@ void callbackDispatcher() {
       distance: result.distanceKm,
       calories: result.calories,
     );
+
+    if (result.notifyGoal) {
+      // A failed notification must not stop the Firestore sync below.
+      try {
+        final notifications = NotificationService();
+        await notifications.init(requestPermission: false);
+        await notifications.showGoalReached(result.todaySteps);
+      } catch (_) {}
+    }
 
     // Keeps vehicle detection registered even if the restart receiver
     // missed (e.g. the app was force-stopped before a reboot). After the
@@ -89,105 +99,6 @@ void callbackDispatcher() {
 
     return Future.value(true);
   });
-}
-
-/// What the background task saved, for the widget and Firestore updates
-/// that run after it releases storage.
-typedef _BackgroundSyncResult = ({
-  int todaySteps,
-  int goal,
-  int coins,
-  double distanceKm,
-  double calories,
-  List<int> weekly,
-  List<int> appliedDriveIds,
-});
-
-/// Saves [hardwareSteps], less the steps counted during [drives], to storage.
-/// Call only while holding storage (see StepSyncCoordinator.runInBackground).
-/// Returns null when the reading is not usable.
-Future<_BackgroundSyncResult?> _saveStepsInBackground(
-  int hardwareSteps,
-  List<Drive> drives,
-) async {
-  final storage = LocalStorageService();
-  await storage.init();
-  try {
-    final now = DateTime.now();
-    final dateStr =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final isNewDay = storage.getLastDate() != dateStr;
-
-    final result = resolveTodaySteps(
-      hardwareSteps: hardwareSteps,
-      baseline: storage.getHardwareBaseline(),
-      savedToday: storage.getSteps(),
-      isNewDay: isNewDay,
-      drives: drives,
-      appliedDriveIds: storage.getAppliedDriveIds(),
-    );
-    if (result == null) return null;
-
-    // Only the app credits challenges; keep yesterday's uncredited steps for it.
-    final credit = settleChallengeSteps(
-      todaySteps: result.todaySteps,
-      previousSavedSteps: storage.getSteps(),
-      credited: storage.getChallengeCreditedSteps(),
-      pending: storage.getChallengePendingSteps(),
-      isNewDay: isNewDay,
-      canCredit: false,
-    );
-    storage.saveChallengeCreditedSteps(credit.credited);
-    storage.saveChallengePendingSteps(credit.pending);
-
-    // 1. Process Daily and Weekly Resets
-    if (isNewDay) storage.startNewDay(dateStr, now.weekday);
-
-    storage.saveHardwareBaseline(result.baseline);
-    storage.markDrivesApplied(result);
-    final int todaySteps = result.todaySteps;
-
-    // 3. Process Coins
-    int lastCoinStep = storage.getLastCoinStep();
-    int currentCoins = storage.getCoins();
-
-    if (todaySteps >= lastCoinStep + 100) {
-      int newCoins = (todaySteps - lastCoinStep) ~/ 100;
-      currentCoins += newCoins;
-      storage.saveCoins(currentCoins);
-      storage.saveLastCoinStep(lastCoinStep + (newCoins * 100));
-    }
-
-    // 4. Update Hive
-    storage.saveSteps(todaySteps);
-    String weeklyData = storage.getWeeklySteps();
-    List<int> weekly = weeklyData
-        .split(',')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    if (weekly.length == 7) {
-      weekly[now.weekday - 1] = todaySteps;
-      storage.saveWeeklySteps(weekly.join(','));
-    }
-    final double height = storage.getHeight();
-    final double weight = storage.getWeight();
-    final double strideLengthMeters = (height * 0.413) / 100;
-    final double distanceKm = (todaySteps * strideLengthMeters) / 1000;
-    final double calories = distanceKm * weight * 1.036;
-
-    return (
-      todaySteps: todaySteps,
-      goal: storage.getStepGoal(),
-      coins: currentCoins,
-      distanceKm: distanceKm,
-      calories: calories,
-      weekly: weekly,
-      appliedDriveIds: result.appliedDriveIds,
-    );
-  } finally {
-    // Flushes the writes above before another isolate may open the box.
-    await storage.close();
-  }
 }
 
 void main() async {
@@ -221,6 +132,10 @@ Future<void> _startApp(
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await NotificationService().init();
+  // Housekeeping only: a failure here must not stop the app starting.
+  try {
+    await NotificationService().syncWalkReminder();
+  } catch (_) {}
 
   await g_sign_in.GoogleSignIn.instance.initialize(
     serverClientId:

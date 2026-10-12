@@ -683,4 +683,38 @@ void main() {
       expect((d.enteredBeforeBoot, d.exitedBeforeBoot), (true, false));
     });
   });
+
+  group('shouldNotifyGoal', () {
+    test('notifies once the goal is reached', () {
+      expect(
+        shouldNotifyGoal(
+          todaySteps: 10000,
+          goal: 10000,
+          alreadyNotified: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not notify below the goal', () {
+      expect(
+        shouldNotifyGoal(todaySteps: 9999, goal: 10000, alreadyNotified: false),
+        isFalse,
+      );
+    });
+
+    test('does not notify again after the app or background task did', () {
+      expect(
+        shouldNotifyGoal(todaySteps: 12000, goal: 10000, alreadyNotified: true),
+        isFalse,
+      );
+    });
+
+    test('does not notify for a zero goal', () {
+      expect(
+        shouldNotifyGoal(todaySteps: 0, goal: 0, alreadyNotified: false),
+        isFalse,
+      );
+    });
+  });
 }

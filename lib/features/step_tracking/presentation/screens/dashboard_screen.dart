@@ -4,6 +4,7 @@ import 'package:build_up/features/shop/presentation/screens/store_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/step_details_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:build_up/core/widgets/coin_icon.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/widgets/pro_avatar.dart';
@@ -148,11 +149,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.monetization_on_outlined,
-                                  color: context.primaryColor,
-                                  size: 20,
-                                ),
+                                const CoinIcon(size: 20),
                                 const SizedBox(width: 6),
                                 Text(
                                   key: const Key('dashboard_coins'),
