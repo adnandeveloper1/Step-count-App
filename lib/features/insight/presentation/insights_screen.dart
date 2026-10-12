@@ -30,7 +30,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   // Page 0 is this week. The PageView is reversed so swiping right goes
   // back in time, like Apple Health.
   final PageController _pageController = PageController();
-  static const int _minDaysForTrend = 3;
   int _weeksAgo = 0;
 
   @override
@@ -62,9 +61,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     );
     final weeksAgo = _weeksAgo.clamp(0, weeks.length - 1);
     final week = weeks[weeks.length - 1 - weeksAgo];
-    final previousWeek = weeksAgo + 1 < weeks.length
-        ? weeks[weeks.length - 2 - weeksAgo]
-        : null;
 
     final totalSteps = week.total;
     final totalCalories = totalSteps * 0.04;
@@ -113,7 +109,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     _buildGraphCard(
                       weeks,
                       week,
-                      previousWeek,
                       stepState.goalSteps,
                       today,
                       size,
@@ -127,6 +122,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                             child: _buildInsightCard(
                               label: 'Total Steps',
                               value: formatThousands(totalSteps),
+                              valueKey: const Key('insights.totalSteps'),
                               unit: 'steps',
                               icon: Icons.directions_walk,
                             ),
@@ -251,91 +247,15 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   Widget _buildGraphCard(
     List<WeekSteps> weeks,
     WeekSteps week,
-    WeekSteps? previousWeek,
     int goalSteps,
     DateTime today,
     Size size,
   ) {
-    final average = week.dailyAverage;
-    final previousAverage = previousWeek?.dailyAverage ?? 0;
-    final elapsedDays = week.days.where((steps) => steps != null).length;
-    // A day or two into a week the comparison is just noise.
-    final trend = previousAverage > 0 && elapsedDays >= _minDaysForTrend
-        ? (average - previousAverage) / previousAverage * 100
-        : null;
-
     return GlassCard(
       padding: EdgeInsets.all(size.width * 0.05),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'DAILY AVERAGE',
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: context.textSecondary,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    formatThousands(average),
-                    key: const Key('insights.average'),
-                    style: GoogleFonts.sora(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      color: context.textPrimary,
-                      height: 1.1,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  'steps',
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: context.textSecondary,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              if (trend != null) Flexible(child: _buildTrend(trend)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: context.primaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(40),
-              border: Border.all(
-                color: context.primaryColor.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Text(
-              'GOAL MET ${week.goalDays(goalSteps)} OF $elapsedDays DAYS',
-              key: const Key('insights.goalDays'),
-              style: GoogleFonts.jetBrainsMono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: context.primaryColor,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
-          SizedBox(height: size.height * 0.025),
           SizedBox(
             height: size.height * 0.24,
             child: PageView.builder(
@@ -356,36 +276,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     );
   }
 
-  Widget _buildTrend(double trend) {
-    final isPositive = trend >= 0;
-    final color = isPositive ? context.primaryColor : Colors.redAccent;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isPositive ? Icons.arrow_upward : Icons.arrow_downward,
-            color: color,
-            size: 14,
-          ),
-          Flexible(
-            child: Text(
-              '${trend.abs().round()}% vs prev',
-              key: const Key('insights.trend'),
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.jetBrainsMono(
-                color: color,
-                fontWeight: FontWeight.w700,
-                fontSize: 11,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildChart(WeekSteps week, int goalSteps, DateTime today, Size size) {
     final maxStep = week.days.fold<int>(
       0,
@@ -397,7 +287,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
     return BarChart(
       BarChartData(
-        alignment: BarChartAlignment.spaceAround,
+        alignment: BarChartAlignment.spaceBetween,
         maxY: maxY,
         barTouchData: BarTouchData(
           enabled: true,
@@ -409,6 +299,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               vertical: 8,
             ),
             tooltipMargin: 8,
+            // Keep the count inside the chart: above the tallest bar there
+            // is no room, and the first/last bars sit at the card edges.
+            fitInsideVertically: true,
+            fitInsideHorizontally: true,
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               if (week.days[group.x] == null) return null;
               return BarTooltipItem(
@@ -421,27 +315,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               );
             },
           ),
-        ),
-        extraLinesData: ExtraLinesData(
-          horizontalLines: [
-            if (goalSteps > 0)
-              HorizontalLine(
-                y: goalSteps.toDouble(),
-                color: context.primaryColor.withValues(alpha: 0.5),
-                strokeWidth: 1,
-                dashArray: [6, 4],
-                label: HorizontalLineLabel(
-                  show: true,
-                  alignment: Alignment.topRight,
-                  labelResolver: (_) => 'GOAL',
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: context.primaryColor.withValues(alpha: 0.8),
-                  ),
-                ),
-              ),
-          ],
         ),
         titlesData: FlTitlesData(
           show: true,
@@ -493,7 +366,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 color: metGoal
                     ? context.primaryColor
                     : context.primaryColor.withValues(alpha: 0.45),
-                width: size.width * 0.075,
+                width: size.width * 0.1,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
                 ),
@@ -516,6 +389,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     required String unit,
     required IconData icon,
     String? subtitle,
+    Key? valueKey,
   }) {
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -537,6 +411,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         value,
+                        key: valueKey,
                         style: GoogleFonts.sora(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,

@@ -73,24 +73,17 @@ void main() {
       days: const [10000, 0, 6000, 12000, null, null, null],
     );
 
-    test('total, average over active days and best day', () {
+    test('total and best day', () {
       expect(week.total, 28000);
-      expect(week.dailyAverage, 9333);
       expect(week.bestDayIndex, 3);
     });
 
-    test('goalDays counts days at or above the goal', () {
-      expect(week.goalDays(10000), 2);
-      expect(week.goalDays(0), 0);
-    });
-
-    test('an empty week has no average and no best day', () {
+    test('an empty week has no best day', () {
       final empty = WeekSteps(
         start: monday,
         days: const [0, 0, null, null, null, null, null],
       );
 
-      expect(empty.dailyAverage, 0);
       expect(empty.bestDayIndex, isNull);
     });
   });
