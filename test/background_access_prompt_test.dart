@@ -93,7 +93,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(dialogKey), findsOneWidget);
-    expect(find.textContaining('Restricted'), findsWidgets);
+    expect(find.textContaining('keeps counting your steps'), findsOne);
     expect(find.textContaining('App battery usage'), findsWidgets);
     expect(storage.shown, isTrue);
   });

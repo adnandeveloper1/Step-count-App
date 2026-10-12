@@ -46,7 +46,7 @@ class _BackgroundAccessDialog extends StatelessWidget {
         side: BorderSide(color: context.textSecondary.withValues(alpha: 0.2)),
       ),
       title: Text(
-        'Allow background use',
+        'Keep counting your steps',
         style: TextStyle(
           color: context.textPrimary,
           fontWeight: FontWeight.bold,
@@ -57,8 +57,8 @@ class _BackgroundAccessDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Battery use is Restricted, so steps aren't counted while the "
-            'app is closed.',
+            'Allow background use so Build Up keeps counting your steps '
+            'when the app is closed.',
             style: TextStyle(color: context.textPrimary, fontSize: 14),
           ),
           const SizedBox(height: 8),
