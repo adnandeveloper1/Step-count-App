@@ -14,12 +14,6 @@ class WeekSteps {
 
   int get total => days.fold(0, (sum, steps) => sum + (steps ?? 0));
 
-  // Averaged over days that have steps, like the old weekly insights.
-  int get dailyAverage {
-    final active = days.where((steps) => (steps ?? 0) > 0).length;
-    return active == 0 ? 0 : total ~/ active;
-  }
-
   // Index of the day with the most steps, or null if every day is empty.
   int? get bestDayIndex {
     int? best;

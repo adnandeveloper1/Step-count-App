@@ -62,7 +62,9 @@ void main() {
     await pumpInsights(tester);
 
     expect(text(tester, 'insights.weekTitle'), 'THIS WEEK');
-    expect(text(tester, 'insights.average'), '7,000');
+    // Every day so far this week walked 7,000, under the 10,000 goal.
+    final daysSoFar = DateTime.now().weekday;
+    expect(text(tester, 'insights.goalDays'), 'GOAL MET 0 OF $daysSoFar DAYS');
     final newer = tester.widget<IconButton>(
       find.byKey(const Key('insights.newerWeek')),
     );
@@ -79,30 +81,15 @@ void main() {
 
     expect(text(tester, 'insights.weekTitle'), 'LAST WEEK');
     // 6 days at 7,000 and one at 12,000.
-    expect(text(tester, 'insights.average'), formatThousands(54000 ~/ 7));
     expect(text(tester, 'insights.goalDays'), 'GOAL MET 1 OF 7 DAYS');
+    expect(find.text(formatThousands(54000)), findsOneWidget);
   });
 
-  testWidgets('compares a full week with the week before', (tester) async {
+  testWidgets('chart card has no daily average or trend', (tester) async {
     await pumpInsights(tester);
 
-    await tester.tap(find.byKey(const Key('insights.olderWeek')));
-    await tester.pumpAndSettle();
-
-    // Last week averaged 7,714 against 7,000 the week before.
-    expect(text(tester, 'insights.trend'), '10% vs prev');
-  });
-
-  testWidgets('hides the comparison in the first days of a week', (
-    tester,
-  ) async {
-    await pumpInsights(tester);
-
-    final daysIn = DateTime.now().weekday;
-    expect(
-      find.byKey(const Key('insights.trend')),
-      daysIn < 3 ? findsNothing : findsOneWidget,
-    );
+    expect(find.text('DAILY AVERAGE'), findsNothing);
+    expect(find.textContaining('vs prev'), findsNothing);
   });
 
   testWidgets('swiping right goes back a week and forward arrow returns', (
