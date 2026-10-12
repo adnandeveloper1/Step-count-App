@@ -148,26 +148,6 @@ class SettingsScreen extends ConsumerWidget {
                     children: [
                       ListTile(
                         leading: Icon(
-                          Icons.notifications,
-                          color: context.primaryColor,
-                          size: screenWidth * 0.06,
-                        ),
-                        title: Text(
-                          'Stand Alerts',
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: screenWidth * 0.04,
-                          ),
-                        ),
-                        trailing: Switch(
-                          value: true,
-                          onChanged: (bool value) {},
-                          activeTrackColor: context.primaryColor,
-                        ),
-                      ),
-                      const Divider(color: Colors.white24),
-                      ListTile(
-                        leading: Icon(
                           Icons.storefront,
                           color: context.primaryColor,
                           size: screenWidth * 0.06,
