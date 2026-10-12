@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:build_up/core/services/background_step_save.dart';
+import 'package:build_up/core/utils/activity_log.dart';
 import 'package:build_up/core/utils/step_counter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
@@ -142,5 +143,23 @@ void main() {
     final box = await openBox();
     expect(box.get('drivingStepsToday'), 250);
     expect(box.get('appliedDriveIds'), [7]);
+  });
+
+  test('logs the sync and the ride for the activity screen', () async {
+    await seed(steps: 100, baseline: 1000, goal: 10000);
+    await openBox();
+
+    await saveStepsInBackground(
+      1500,
+      drives: [const Drive(id: 7, enterSteps: 1200, exitSteps: 1450)],
+      now: today,
+    );
+
+    final box = await openBox();
+    final day = ActivityLog.fromJson(box.get('activityLog')).day(today);
+    expect(day.checks.map((c) => (c.at, c.steps, c.source)), [
+      (today, 250, CheckSource.background),
+    ]);
+    expect(day.rides.map((r) => (r.id, r.steps)), [(7, 250)]);
   });
 }

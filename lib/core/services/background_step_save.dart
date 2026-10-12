@@ -1,3 +1,4 @@
+import '../utils/activity_log.dart';
 import '../utils/step_counter_math.dart';
 import '../utils/step_history.dart';
 import 'local_storage_service.dart';
@@ -74,6 +75,7 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
 
     // 4. Update Hive
     storage.saveSteps(todaySteps);
+    storage.logStepSync(result, todaySteps, now, CheckSource.background);
     String weeklyData = storage.getWeeklySteps();
     List<int> weekly = weeklyData
         .split(',')

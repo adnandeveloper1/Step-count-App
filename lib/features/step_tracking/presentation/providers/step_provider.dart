@@ -9,6 +9,7 @@ import '../../../../core/services/account_session.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../../core/services/native_health_service.dart';
 import '../../../../core/services/widget_service.dart';
+import '../../../../core/utils/activity_log.dart';
 import '../../../../core/utils/step_counter_math.dart';
 import '../../../../core/utils/step_history.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
@@ -330,6 +331,7 @@ class StepNotifier extends Notifier<StepState> {
       'fallback',
       challengeSteps: credit.stepsToCredit,
     );
+    storage.logStepSync(result, state.currentSteps, now, CheckSource.app);
     // The baseline now includes these drives, and their ids are stored.
     await nativeHealth.removeDrives(result.appliedDriveIds);
   }

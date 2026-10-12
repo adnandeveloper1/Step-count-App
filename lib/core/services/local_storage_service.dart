@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../utils/activity_log.dart';
 import '../utils/step_counter_math.dart';
 
 class LocalStorageService {
@@ -260,6 +261,26 @@ class LocalStorageService {
   int getDrivingStepsToday() => _box.get('drivingStepsToday', defaultValue: 0);
 
   void saveDrivingStepsToday(int steps) => _box.put('drivingStepsToday', steps);
+
+  ActivityLog getActivityLog() =>
+      ActivityLog.fromJson(_box.get('activityLog', defaultValue: '{}'));
+
+  /// Adds a sync that saved [todaySteps] to the activity log, with the rides
+  /// [result] looked at. Both the app and the background task call this.
+  void logStepSync(
+    StepCounterResult result,
+    int todaySteps,
+    DateTime now,
+    CheckSource source,
+  ) {
+    final log = getActivityLog().record(
+      now: now,
+      todaySteps: todaySteps,
+      source: source,
+      rides: result.rides,
+    );
+    _box.put('activityLog', log.toJson());
+  }
 
   Future<void> clearAllUserData() async {
     await _box.clear();

@@ -9,12 +9,38 @@ class StepCounterResult {
   /// Finished drives folded into [baseline]; delete them once it is saved.
   final List<int> appliedDriveIds;
 
+  /// Every drive this reading looked at, with the steps it left out, for the
+  /// activity log.
+  final List<RideSteps> rides;
+
   const StepCounterResult({
     required this.todaySteps,
     required this.baseline,
     this.drivingSteps = 0,
     this.appliedDriveIds = const [],
+    this.rides = const [],
   });
+}
+
+/// Where a drive stands after a reading.
+enum RideStatus {
+  /// Still in the vehicle; its steps are held out of today.
+  ongoing,
+
+  /// Got out; its steps were removed for good.
+  ended,
+
+  /// No sign of the vehicle for [openDriveTimeout]; its steps count again.
+  timedOut,
+}
+
+/// A drive and the steps it left out of today (0 once timed out).
+class RideSteps {
+  final Drive drive;
+  final int steps;
+  final RideStatus status;
+
+  const RideSteps(this.drive, this.steps, this.status);
 }
 
 /// A vehicle ride recorded natively from Activity Recognition transitions,
@@ -215,6 +241,7 @@ StepCounterResult _removeDrives(
   var remaining = hardwareSteps - baseline;
   var driving = 0;
   final applied = <int>[];
+  final rides = <RideSteps>[];
 
   // Steps between [from] and [to], or 0 when a reading is unknown or from
   // before a reboot (above the current counter).
@@ -239,17 +266,22 @@ StepCounterResult _removeDrives(
       // The exit never came in time: its steps count again (an exit that
       // comes later must not take them back), and it can be deleted.
       applied.add(drive.id);
+      rides.add(RideSteps(drive, 0, RideStatus.timedOut));
     } else if (drive.isOpen) {
       // Left out of today until the exit arrives; the baseline stays put.
-      remaining -= stepsBetween(enter, hardwareSteps);
+      final steps = stepsBetween(enter, hardwareSteps);
+      remaining -= steps;
+      rides.add(RideSteps(drive, steps, RideStatus.ongoing));
     } else if (drive.exitedBeforeBoot) {
       // Ended before the restart: today's count lost those steps already.
       applied.add(drive.id);
+      rides.add(RideSteps(drive, 0, RideStatus.ended));
     } else {
       final steps = stepsBetween(enter, drive.exitSteps!);
       driving += steps;
       remaining -= steps;
       applied.add(drive.id);
+      rides.add(RideSteps(drive, steps, RideStatus.ended));
     }
   }
 
@@ -258,6 +290,7 @@ StepCounterResult _removeDrives(
     baseline: baseline + driving,
     drivingSteps: driving,
     appliedDriveIds: applied,
+    rides: rides,
   );
 }
 

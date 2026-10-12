@@ -1,6 +1,7 @@
 import 'package:build_up/app/theme/theme_extensions.dart';
 import 'package:build_up/features/settings/presentation/setting_screen.dart';
 import 'package:build_up/features/shop/presentation/screens/store_screen.dart';
+import 'package:build_up/features/step_tracking/presentation/screens/activity_log_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:build_up/core/widgets/coin_icon.dart';
@@ -268,6 +269,73 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                               ),
                             ),
                           ],
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        GestureDetector(
+                          key: const Key('dashboard_activity_card'),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ActivityLogScreen(),
+                              ),
+                            );
+                          },
+                          child: GlassCard(
+                            padding: EdgeInsets.all(screenWidth * 0.06),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(screenWidth * 0.03),
+                                  decoration: BoxDecoration(
+                                    color: context.primaryColor.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      screenWidth * 0.04,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.timeline_rounded,
+                                    color: context.primaryColor,
+                                    size: screenWidth * 0.07,
+                                  ),
+                                ),
+                                SizedBox(width: screenWidth * 0.04),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Activity',
+                                        style: GoogleFonts.sora(
+                                          fontSize: screenWidth * 0.045,
+                                          fontWeight: FontWeight.w600,
+                                          color: context.textPrimary,
+                                          letterSpacing: .8,
+                                        ),
+                                      ),
+                                      SizedBox(height: screenHeight * 0.005),
+                                      Text(
+                                        'Steps by hour, walks and rides',
+                                        style: GoogleFonts.sora(
+                                          fontSize: screenWidth * 0.03,
+                                          fontWeight: FontWeight.w600,
+                                          color: context.textSecondary,
+                                          letterSpacing: .8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right,
+                                  color: context.textSecondary,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
