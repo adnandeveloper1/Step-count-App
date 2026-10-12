@@ -1,4 +1,5 @@
 import '../utils/step_counter_math.dart';
+import '../utils/step_history.dart';
 import 'local_storage_service.dart';
 
 /// What the background task saved, for the widget and Firestore updates
@@ -90,6 +91,9 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
       weekly[now.weekday - 1] = todaySteps;
       storage.saveWeeklySteps(weekly.join(','));
     }
+    storage.saveDailyHistory(
+      recordDay(storage.getDailyHistory(), now, todaySteps),
+    );
     // Marked now, while holding storage, so the app won't show it again.
     final goal = storage.getStepGoal();
     final notifyGoal = shouldNotifyGoal(
