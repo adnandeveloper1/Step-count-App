@@ -299,6 +299,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               vertical: 8,
             ),
             tooltipMargin: 8,
+            // Keep the count inside the chart: above the tallest bar there
+            // is no room, and the first/last bars sit at the card edges.
+            fitInsideVertically: true,
+            fitInsideHorizontally: true,
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               if (week.days[group.x] == null) return null;
               return BarTooltipItem(

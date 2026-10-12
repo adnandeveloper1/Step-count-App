@@ -3,6 +3,7 @@ import 'package:build_up/core/utils/number_format.dart';
 import 'package:build_up/core/utils/step_history.dart';
 import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/providers/step_provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' hide StepState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -95,6 +96,20 @@ void main() {
     expect(find.text('DAILY AVERAGE'), findsNothing);
     expect(find.textContaining('vs prev'), findsNothing);
     expect(find.textContaining('GOAL MET'), findsNothing);
+  });
+
+  // The step count shown when a bar is held was drawn above the bar, so the
+  // tallest bar's count was cut off at the top of the chart card.
+  testWidgets('bar tooltip stays inside the chart', (tester) async {
+    await pumpInsights(tester);
+
+    final tooltip = tester
+        .widget<BarChart>(find.byType(BarChart).first)
+        .data
+        .barTouchData
+        .touchTooltipData;
+    expect(tooltip.fitInsideVertically, isTrue);
+    expect(tooltip.fitInsideHorizontally, isTrue);
   });
 
   testWidgets('swiping right goes back a week and forward arrow returns', (
