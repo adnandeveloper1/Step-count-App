@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
+/// Every paid theme costs the same. The two default themes stay free.
+const themePrice = 500;
+
 class AppThemeModel {
   final String id;
   final String name;
@@ -60,7 +63,7 @@ class AppThemeCatalog {
   static AppThemeModel get oceanWave => AppThemeModel(
     id: 'ocean_wave',
     name: 'Ocean Wave',
-    costCoins: 0,
+    costCoins: themePrice,
     brightness: Brightness.dark,
     primaryColor: AppColors.oceanPrimary,
     backgroundColor: AppColors.oceanBackground,
@@ -73,7 +76,7 @@ class AppThemeCatalog {
   static AppThemeModel get sunsetGlow => AppThemeModel(
     id: 'sunset_glow',
     name: 'Sunset Glow',
-    costCoins: 0,
+    costCoins: themePrice,
     brightness: Brightness.dark,
     primaryColor: AppColors.sunsetPrimary,
     backgroundColor: AppColors.sunsetBackground,
@@ -86,7 +89,7 @@ class AppThemeCatalog {
   static AppThemeModel get cyberpunkNeon => AppThemeModel(
     id: 'cyberpunk_neon',
     name: 'Cyberpunk Neon',
-    costCoins: 0,
+    costCoins: themePrice,
     brightness: Brightness.dark,
     primaryColor: AppColors.cyberpunkPrimary,
     backgroundColor: AppColors.cyberpunkBackground,
@@ -99,7 +102,7 @@ class AppThemeCatalog {
   static AppThemeModel get amethystPurple => AppThemeModel(
     id: 'amethyst_purple',
     name: 'Amethyst Purple',
-    costCoins: 0,
+    costCoins: themePrice,
     brightness: Brightness.dark,
     primaryColor: AppColors.amethystPrimary,
     backgroundColor: AppColors.amethystBackground,
@@ -112,7 +115,7 @@ class AppThemeCatalog {
   static AppThemeModel get midnightGold => AppThemeModel(
     id: 'midnight_gold',
     name: 'Midnight Gold',
-    costCoins: 0,
+    costCoins: themePrice,
     brightness: Brightness.dark,
     primaryColor: AppColors.goldPrimary,
     backgroundColor: AppColors.goldBackground,

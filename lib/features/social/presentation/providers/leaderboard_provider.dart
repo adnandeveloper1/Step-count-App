@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shop/models/pro_avatar_item.dart' as pro_avatar;
+
 class LeaderboardUser {
   final String id;
   final String name;
@@ -9,6 +11,7 @@ class LeaderboardUser {
   final String avatarUrl;
   final String? currentLeague; // New field
   final List<String> unlockedItems;
+  final bool showsProAvatar;
 
   LeaderboardUser({
     required this.id,
@@ -18,6 +21,7 @@ class LeaderboardUser {
     required this.avatarUrl,
     this.currentLeague,
     this.unlockedItems = const [],
+    this.showsProAvatar = false,
   });
 
   factory LeaderboardUser.fromDocument(DocumentSnapshot doc) {
@@ -31,6 +35,7 @@ class LeaderboardUser {
       avatarUrl: data['avatarUrl'] ?? data['photoUrl'] ?? '',
       currentLeague: data['currentLeague'], // Read from Firestore
       unlockedItems: items?.map((e) => e.toString()).toList() ?? [],
+      showsProAvatar: pro_avatar.showsProAvatar(data),
     );
   }
 }

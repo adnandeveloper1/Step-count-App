@@ -184,9 +184,7 @@ class ChallengeScreen extends ConsumerWidget {
                               );
                               final double avatarSize = size.width * 0.12;
                               final userTierColor = _getUserTierColor(user);
-                              final isPro = user.unlockedItems.contains(
-                                'avatar_pro',
-                              );
+                              final isPro = user.showsProAvatar;
 
                               return Container(
                                 margin: EdgeInsets.only(

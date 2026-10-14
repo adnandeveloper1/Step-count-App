@@ -7,6 +7,7 @@ import '../../../app/theme/theme_extensions.dart';
 import '../../step_tracking/presentation/providers/step_provider.dart';
 import '../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../../../core/widgets/pro_avatar.dart';
+import '../../shop/models/pro_avatar_item.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -94,13 +95,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           if (data?['bodyFat'] != null) {
             bodyFatController.text = data!['bodyFat'].toString();
           }
-          if (data?['unlockedItems'] != null) {
-            List<dynamic> items = data!['unlockedItems'];
-            if (items.contains('avatar_pro')) {
-              setState(() {
-                isProAvatarUnlocked = true;
-              });
-            }
+          if (showsProAvatar(data)) {
+            setState(() {
+              isProAvatarUnlocked = true;
+            });
           }
         }
       } catch (e) {
