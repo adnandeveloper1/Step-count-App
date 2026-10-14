@@ -145,10 +145,22 @@ void main() {
       expect(day.hourly.reduce((a, b) => a + b), 600);
     });
 
-    test('the first sync of the day counts from midnight', () {
-      final day = summarize([(at(2), 200)]);
-      expect(day.hourly.sublist(0, 3), [100, 100, 0]);
+    test('an early first sync of the day counts from midnight', () {
+      final day = summarize([(at(0, 50), 200)]);
+      expect(day.hourly.sublist(0, 2), [200, 0]);
       expect(day.walks.single.start, at(0));
+      expect(day.walks.single.timeUnknown, isFalse);
+    });
+
+    test('a late first sync leaves its steps off the chart', () {
+      // Installed at 10:35 with 908 steps already taken: when is unknown.
+      final day = summarize([(at(10, 35), 908), (at(10, 50), 1000)]);
+      expect(day.hourly.reduce((a, b) => a + b), 92);
+      expect(day.hourly[10], 92);
+      expect(day.walks.map((w) => (w.end, w.steps, w.timeUnknown)), [
+        (at(10, 35), 908, true),
+        (at(10, 50), 92, false),
+      ]);
     });
 
     test('joins back-to-back syncs with steps into one walk', () {

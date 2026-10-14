@@ -188,7 +188,16 @@ class WalkPeriod {
   final DateTime end;
   final int steps;
 
-  const WalkPeriod(this.start, this.end, this.steps);
+  /// The day's first sync came too late to place these steps (see
+  /// [lateFirstSync]): they were taken some time before [end].
+  final bool timeUnknown;
+
+  const WalkPeriod(
+    this.start,
+    this.end,
+    this.steps, {
+    this.timeUnknown = false,
+  });
 }
 
 /// One sync as the details list shows it: [added] is the change since the
@@ -233,13 +242,18 @@ const rideMergeGap = Duration(minutes: 15);
 /// in the hourly chart).
 const minWalkSteps = 20;
 
+/// A day's first sync later than this after midnight (the app was just
+/// installed, or had not run) can't say when its steps were taken.
+const lateFirstSync = Duration(hours: 1);
+
 /// Works out [day]'s hourly steps and walks from [log].
 ///
 /// The sensor is read about every 15 minutes with the app closed (every
 /// minute while open), so steps between two syncs are spread evenly over
 /// the time between them, less any ride time at either end. Syncs with steps
-/// join into one walk only while no still sync or ride comes between. A drop in the total (an open ride taking out steps
-/// already counted) comes off the most recent hours.
+/// join into one walk only while no still sync or ride comes between. Steps
+/// in a [lateFirstSync] stay off the chart. A drop in the total (an open ride
+/// taking out steps already counted) comes off the most recent hours.
 DayActivity summarizeDay(DayLog log, DateTime day) {
   final midnight = DateTime(day.year, day.month, day.day);
   final hourly = List<int>.filled(24, 0);
@@ -258,7 +272,12 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
   for (final check in log.checks) {
     final added = check.steps - prevSteps;
     rows.add(CheckRow(check, added));
-    if (added > 0) {
+    if (added > 0 &&
+        prevAt == midnight &&
+        check.at.difference(midnight) > lateFirstSync) {
+      walks.add(WalkPeriod(midnight, check.at, added, timeUnknown: true));
+      lastOpen = false;
+    } else if (added > 0) {
       final (from, to, rideAfter) = _outsideRides(prevAt, check.at, rideTimes);
       _spread(hourly, midnight, from, to, added);
       final last = walks.lastOrNull;
@@ -278,7 +297,12 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
       final last = walks.lastOrNull;
       if (last != null) {
         final left = last.steps + added;
-        walks.last = WalkPeriod(last.start, last.end, left < 0 ? 0 : left);
+        walks.last = WalkPeriod(
+          last.start,
+          last.end,
+          left < 0 ? 0 : left,
+          timeUnknown: last.timeUnknown,
+        );
       }
       lastOpen = false;
     } else {

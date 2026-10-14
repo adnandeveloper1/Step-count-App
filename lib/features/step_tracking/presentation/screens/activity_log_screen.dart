@@ -360,7 +360,9 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       icon: Icons.directions_walk_rounded,
       iconColor: context.primaryColor,
       title: '${formatThousands(walk.steps)} steps',
-      subtitle: fromMidnight
+      subtitle: walk.timeUnknown
+          ? 'Before ${_time(walk.end)} · time not recorded'
+          : fromMidnight
           ? 'Until ${_time(walk.end)}'
           : '${_time(walk.start)} – ${_time(walk.end)}',
     );

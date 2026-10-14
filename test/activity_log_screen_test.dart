@@ -52,6 +52,19 @@ class _FakeStorage extends LocalStorageService {
   Map<String, int> getDailyHistory() => {};
 }
 
+/// Today: the app's first sync at 10:35 already had 908 steps.
+class _LateFirstSyncStorage extends LocalStorageService {
+  @override
+  ActivityLog getActivityLog() => const ActivityLog().record(
+    now: _today(10, 35),
+    todaySteps: 908,
+    source: CheckSource.app,
+  );
+
+  @override
+  Map<String, int> getDailyHistory() => {};
+}
+
 class _FakeStepNotifier extends StepNotifier {
   @override
   StepState build() => const StepState(
@@ -66,14 +79,17 @@ class _FakeStepNotifier extends StepNotifier {
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-  Future<void> pumpScreen(WidgetTester tester) async {
+  Future<void> pumpScreen(
+    WidgetTester tester, {
+    LocalStorageService? storage,
+  }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.6;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          storageProvider.overrideWithValue(_FakeStorage()),
+          storageProvider.overrideWithValue(storage ?? _FakeStorage()),
           stepNotifierProvider.overrideWith(_FakeStepNotifier.new),
         ],
         child: const MaterialApp(home: ActivityLogScreen()),
@@ -140,6 +156,15 @@ void main() {
     expect(rideBox, isNot(heightBefore));
     expect(rideBox, moreOrLessEquals(content, epsilon: 0.01));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('steps from before the first sync say their time is unknown', (
+    tester,
+  ) async {
+    await pumpScreen(tester, storage: _LateFirstSyncStorage());
+
+    expect(find.text('908 steps'), findsOneWidget);
+    expect(find.text('Before 10:35 AM · time not recorded'), findsOneWidget);
   });
 
   testWidgets('the hour labels stay inside the chart', (tester) async {
