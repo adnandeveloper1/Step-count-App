@@ -1,56 +1,71 @@
-import 'package:build_up/features/social/presentation/screens/all_challenges_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/theme_extensions.dart';
-import '../../../shop/presentation/providers/theme_provider.dart';
-import '../../../step_tracking/presentation/providers/step_provider.dart';
-import '../providers/challenge_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/leaderboard_provider.dart';
-import 'challenge_card.dart';
-import '../../../../core/widgets/pro_avatar.dart';
+import '../widgets/leaderboard_widgets.dart';
 
-class ChallengeScreen extends ConsumerWidget {
+/// Social tab: the Step Race leaderboard.
+class ChallengeScreen extends ConsumerStatefulWidget {
   const ChallengeScreen({super.key});
 
-  Color _getUserTierColor(LeaderboardUser user) {
-    final league = user.currentLeague?.toLowerCase();
-    if (league == 'diamond') return LeagueTier.diamond.color;
-    if (league == 'gold') return LeagueTier.gold.color;
-    if (league == 'silver') return LeagueTier.silver.color;
-    if (league == 'bronze') return LeagueTier.bronze.color;
+  @override
+  ConsumerState<ChallengeScreen> createState() => _ChallengeScreenState();
+}
 
-    if (user.monthlyHighScore >= 12000) return LeagueTier.diamond.color;
-    if (user.monthlyHighScore >= 8000) return LeagueTier.gold.color;
-    if (user.monthlyHighScore >= 5000) return LeagueTier.silver.color;
-    return LeagueTier.bronze.color;
+class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
+  final _scrollController = ScrollController();
+  final _viewportKey = GlobalKey();
+  final _myRowKey = GlobalKey();
+
+  LeaderboardPeriod _period = LeaderboardPeriod.month;
+
+  /// Whether the signed-in user's own row (or podium spot) is on screen.
+  /// Starts true so the pinned bar doesn't flash before the first layout.
+  bool _myRowVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_checkMyRowVisible);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final themeState = ref.watch(themeProvider);
-    final leaderboardAsync = ref.watch(leaderboardProvider);
-    final size = MediaQuery.of(context).size;
-    final screenWidth = size.width;
-    final challenges = ref.watch(challengeProvider);
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
-    final double horizontalPadding = size.width * 0.05;
-    final double verticalSpacing = size.height * 0.02;
-    final double titleFontSize = size.width * 0.06;
-
-    final activeList = challenges
-        .where((c) => c.isActive && !c.isCompleted)
-        .toList();
-    final displayList = [...activeList.take(2)];
-
-    if (displayList.length < 2) {
-      final fallbackList = challenges
-          .where(
-            (c) => !c.isActive && !c.isCompleted && !displayList.contains(c),
-          )
-          .toList();
-      displayList.addAll(fallbackList.take(2 - displayList.length));
+  void _checkMyRowVisible() {
+    final row = _myRowKey.currentContext?.findRenderObject() as RenderBox?;
+    final viewport =
+        _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    var visible = false;
+    if (row != null && row.attached && viewport != null) {
+      final top = row.localToGlobal(Offset.zero, ancestor: viewport).dy;
+      // Count the row as visible while at least half of it shows.
+      final mid = top + row.size.height / 2;
+      visible = mid >= 0 && mid <= viewport.size.height;
     }
+    if (visible != _myRowVisible) setState(() => _myRowVisible = visible);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final horizontalPadding = size.width * 0.05;
+    final myId = ref.watch(authStateProvider).value?.uid;
+    final leaderboardAsync = ref.watch(leaderboardProvider(_period));
+
+    // Re-check after every layout: the list can change under a still scroll.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkMyRowVisible();
+    });
+
+    final users = leaderboardAsync.value ?? const <LeaderboardUser>[];
+    final ranks = leaderboardRanks(users, _period);
+    final myIndex = users.indexWhere((u) => u.id == myId);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -64,264 +79,148 @@ class ChallengeScreen extends ConsumerWidget {
               ),
               child: SizedBox(
                 height: 50,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Expanded(child: SizedBox.shrink()),
-                    Text(
-                      'CHALLENGES',
-                      style: GoogleFonts.sora(
-                        fontSize: screenWidth * 0.06,
-                        fontWeight: FontWeight.w900,
-                        color: context.textPrimary,
-                        letterSpacing: .1,
-                      ),
+                child: Center(
+                  child: Text(
+                    'STEP RACE',
+                    style: GoogleFonts.sora(
+                      fontSize: size.width * 0.06,
+                      fontWeight: FontWeight.w900,
+                      color: context.textPrimary,
+                      letterSpacing: .1,
                     ),
-                    const Expanded(child: SizedBox.shrink()),
-                  ],
+                  ),
                 ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: PeriodTabs(
+                selected: _period,
+                onChanged: (period) => setState(() => _period = period),
+              ),
+            ),
+            SizedBox(height: size.height * 0.012),
+            Text(
+              _period == LeaderboardPeriod.month
+                  ? 'Best day this month · Resets in '
+                        '${_daysLabel(daysUntilMonthlyReset(DateTime.now()))}'
+                  : 'Steps so far today · Resets at midnight',
+              key: const Key('leaderboard-reset'),
+              style: GoogleFonts.inter(
+                color: context.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: size.width * 0.031,
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: verticalSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding * 1.5,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Active',
-                            style: GoogleFonts.sora(
-                              fontSize: titleFontSize,
-                              fontWeight: FontWeight.w700,
-                              color: context.textPrimary,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const AllChallengesScreen(),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              'VIEW ALL',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: titleFontSize / 2,
-                                fontWeight: FontWeight.w700,
-                                color: context.textSecondary,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+              child: Container(
+                key: _viewportKey,
+                child: leaderboardAsync.when(
+                  skipLoadingOnReload: true,
+                  data: (_) => _buildBoard(context, users, ranks, myId),
+                  loading: () => Center(
+                    child: CircularProgressIndicator(
+                      color: context.primaryColor,
                     ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      child: Column(
-                        children: displayList.map((c) {
-                          return Padding(
-                            padding: EdgeInsets.only(bottom: verticalSpacing),
-                            child: ChallengeCard(challenge: c),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    SizedBox(height: verticalSpacing / 2),
-                    Center(
+                  ),
+                  error: (error, stack) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
                       child: Text(
-                        'STEP RACE',
-                        style: GoogleFonts.inter(
-                          fontSize: titleFontSize,
-                          fontWeight: FontWeight.w900,
-                          color: context.textPrimary,
-                          letterSpacing: 1.2,
-                        ),
+                        'Error loading leaderboard',
+                        style: TextStyle(color: context.primaryColor),
                       ),
                     ),
-                    SizedBox(height: verticalSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      child: leaderboardAsync.when(
-                        data: (users) {
-                          if (users.isEmpty) {
-                            return Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(20.0),
-                                child: Text(
-                                  'No data available',
-                                  style: TextStyle(
-                                    color: context.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-
-                          return ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: users.length,
-                            itemBuilder: (context, index) {
-                              final user = users[index];
-                              final bool isImageUrl = user.avatarUrl.startsWith(
-                                'http',
-                              );
-                              final double avatarSize = size.width * 0.12;
-                              final userTierColor = _getUserTierColor(user);
-                              final isPro = user.unlockedItems.contains(
-                                'avatar_pro',
-                              );
-
-                              return Container(
-                                margin: EdgeInsets.only(
-                                  bottom: size.height * 0.015,
-                                ),
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: size.width * 0.05,
-                                  vertical: size.height * 0.02,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: context.cardColor,
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: Row(
-                                  children: [
-                                    isPro && !isImageUrl
-                                        ? ProAvatar(
-                                            emojiAvatar:
-                                                user.avatarUrl.isNotEmpty
-                                                ? user.avatarUrl
-                                                : '👤',
-                                            radius: avatarSize / 2,
-                                            isPro: true,
-                                          )
-                                        : Container(
-                                            width: avatarSize,
-                                            height: avatarSize,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: userTierColor,
-                                                width: 2,
-                                              ),
-                                            ),
-                                            child: CircleAvatar(
-                                              backgroundColor: const Color(
-                                                0xFF1E293B,
-                                              ),
-                                              backgroundImage: isImageUrl
-                                                  ? NetworkImage(user.avatarUrl)
-                                                  : null,
-                                              child:
-                                                  !isImageUrl &&
-                                                      user.avatarUrl.isNotEmpty
-                                                  ? Text(
-                                                      user.avatarUrl,
-                                                      style: TextStyle(
-                                                        fontSize:
-                                                            size.width * 0.06,
-                                                      ),
-                                                    )
-                                                  : (user.avatarUrl.isEmpty
-                                                        ? Icon(
-                                                            Icons.person,
-                                                            color: context
-                                                                .primaryColor,
-                                                            size:
-                                                                size.width *
-                                                                0.06,
-                                                          )
-                                                        : null),
-                                            ),
-                                          ),
-                                    SizedBox(width: size.width * 0.04),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            user.name,
-                                            style: GoogleFonts.inter(
-                                              color: context.textPrimary,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: size.width * 0.04,
-                                            ),
-                                          ),
-                                          SizedBox(height: size.height * 0.005),
-                                          Text(
-                                            'HIGH SCORE',
-                                            style: GoogleFonts.inter(
-                                              color: context.textSecondary,
-                                              fontSize: size.width * 0.028,
-                                              letterSpacing: 1.2,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Text(
-                                      '${user.monthlyHighScore}',
-                                      style: GoogleFonts.inter(
-                                        color: userTierColor,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: size.width * 0.05,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          );
-                        },
-                        loading: () => Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20.0),
-                            child: CircularProgressIndicator(
-                              color: themeState.activeTheme.primaryColor,
-                            ),
-                          ),
-                        ),
-                        error: (error, stack) => Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20.0),
-                            child: Text(
-                              'Error loading leaderboard',
-                              style: TextStyle(
-                                color: themeState.activeTheme.primaryColor,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: size.height * 0.05),
-                  ],
+                  ),
                 ),
               ),
             ),
+            if (myIndex >= 0 && !_myRowVisible)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  size.height * 0.008,
+                  horizontalPadding,
+                  size.height * 0.012,
+                ),
+                child: MyPositionBar(
+                  user: users[myIndex],
+                  rank: ranks[myIndex],
+                  score: users[myIndex].scoreFor(_period),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildBoard(
+    BuildContext context,
+    List<LeaderboardUser> users,
+    List<int> ranks,
+    String? myId,
+  ) {
+    final size = MediaQuery.of(context).size;
+    final horizontalPadding = size.width * 0.05;
+    final podiumCount = users.length < 3 ? users.length : 3;
+    final meOnPodium =
+        myId != null && users.take(podiumCount).any((u) => u.id == myId);
+
+    return SingleChildScrollView(
+      controller: _scrollController,
+      padding: EdgeInsets.fromLTRB(
+        horizontalPadding,
+        size.height * 0.02,
+        horizontalPadding,
+        size.height * 0.03,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (users.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: size.height * 0.04),
+              child: Text(
+                _period == LeaderboardPeriod.today
+                    ? 'No steps synced today yet.'
+                    : 'No scores this month yet.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: context.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: size.width * 0.036,
+                ),
+              ),
+            )
+          else
+            KeyedSubtree(
+              key: meOnPodium ? _myRowKey : null,
+              child: Podium(
+                users: users.take(podiumCount).toList(),
+                ranks: ranks.take(podiumCount).toList(),
+                period: _period,
+                myId: myId,
+              ),
+            ),
+          SizedBox(height: size.height * 0.02),
+          for (var i = podiumCount; i < users.length; i++)
+            Padding(
+              key: users[i].id == myId ? _myRowKey : null,
+              padding: EdgeInsets.only(bottom: size.height * 0.012),
+              child: LeaderboardRow(
+                user: users[i],
+                rank: ranks[i],
+                score: users[i].scoreFor(_period),
+                isMe: users[i].id == myId,
+              ),
+            ),
+          SizedBox(height: size.height * 0.01),
+          const InviteFriendsCard(),
+        ],
+      ),
+    );
+  }
+
+  static String _daysLabel(int days) => days == 1 ? '1 day' : '$days days';
 }
