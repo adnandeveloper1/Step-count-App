@@ -268,8 +268,12 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
                       getTitlesWidget: (value, meta) {
                         final hour = value.toInt();
                         if (hour % 6 != 0) return const SizedBox.shrink();
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 6),
+                        // Centred under its bar, but nudged in at the edges so
+                        // "12:00 AM" under the first bar is not cut off.
+                        return SideTitleWidget(
+                          meta: meta,
+                          space: 6,
+                          fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                           child: Text(
                             _hourLabel(hour),
                             style: GoogleFonts.jetBrainsMono(
@@ -470,6 +474,10 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
 }
 
 /// A dot on the timeline line with [child] beside it.
+///
+/// The line is positioned against [child]'s own height. Avoid IntrinsicHeight
+/// here: text intrinsics are cached per font, so on a first open (Google Fonts
+/// still loading) rows kept the fallback font's height and overflowed.
 class _TimelineTile extends StatelessWidget {
   final bool isLast;
   final Widget child;
@@ -478,37 +486,29 @@ class _TimelineTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 20,
-            child: Column(
-              children: [
-                const SizedBox(height: 14),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: context.primaryColor,
-                  ),
-                ),
-                if (!isLast)
-                  Expanded(
-                    child: Container(
-                      width: 1.5,
-                      color: context.cardBorderColor,
-                    ),
-                  ),
-              ],
+    return Stack(
+      children: [
+        if (!isLast)
+          Positioned(
+            left: 9.25,
+            top: 22,
+            bottom: 0,
+            child: Container(width: 1.5, color: context.cardBorderColor),
+          ),
+        Positioned(
+          left: 6,
+          top: 14,
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: context.primaryColor,
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(child: child),
-        ],
-      ),
+        ),
+        Padding(padding: const EdgeInsets.only(left: 28), child: child),
+      ],
     );
   }
 }

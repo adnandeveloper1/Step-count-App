@@ -180,8 +180,9 @@ class ActivityLog {
 String dayKey(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-/// Steps counted between two syncs. [start] is the sync before, or midnight
-/// for the day's first.
+/// Steps counted over one or more back-to-back syncs. [start] is the sync
+/// before, or midnight for the day's first, and either end is pulled in to
+/// where a ride began or ended.
 class WalkPeriod {
   final DateTime start;
   final DateTime end;
@@ -224,8 +225,9 @@ class DayActivity {
   int get rideSteps => rides.fold(0, (sum, r) => sum + r.steps);
 }
 
-/// Walk periods closer than this are shown as one.
-const walkMergeGap = Duration(minutes: 10);
+/// Rides closer than this (a stop at the lights, a quick errand) are shown as
+/// one. Only the timeline joins them; the log keeps each ride.
+const rideMergeGap = Duration(minutes: 15);
 
 /// Walk periods with fewer steps are left off the timeline (they still count
 /// in the hourly chart).
@@ -235,7 +237,8 @@ const minWalkSteps = 20;
 ///
 /// The sensor is read about every 15 minutes with the app closed (every
 /// minute while open), so steps between two syncs are spread evenly over
-/// the time between them. A drop in the total (an open ride taking out steps
+/// the time between them, less any ride time at either end. Syncs with steps
+/// join into one walk only while no still sync or ride comes between. A drop in the total (an open ride taking out steps
 /// already counted) comes off the most recent hours.
 DayActivity summarizeDay(DayLog log, DateTime day) {
   final midnight = DateTime(day.year, day.month, day.day);
@@ -243,19 +246,28 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
   final walks = <WalkPeriod>[];
   final rows = <CheckRow>[];
 
+  final rideTimes = [
+    for (final r in log.rides)
+      if (r.start case final start?) (start: start, end: r.end),
+  ];
+
   var prevAt = midnight;
   var prevSteps = 0;
+  // Whether the last walk can run on into the next sync's steps.
+  var lastOpen = false;
   for (final check in log.checks) {
     final added = check.steps - prevSteps;
     rows.add(CheckRow(check, added));
     if (added > 0) {
-      _spread(hourly, midnight, prevAt, check.at, added);
+      final (from, to, rideAfter) = _outsideRides(prevAt, check.at, rideTimes);
+      _spread(hourly, midnight, from, to, added);
       final last = walks.lastOrNull;
-      if (last != null && prevAt.difference(last.end) <= walkMergeGap) {
-        walks.last = WalkPeriod(last.start, check.at, last.steps + added);
+      if (last != null && lastOpen && from == last.end) {
+        walks.last = WalkPeriod(last.start, to, last.steps + added);
       } else {
-        walks.add(WalkPeriod(prevAt, check.at, added));
+        walks.add(WalkPeriod(from, to, added));
       }
+      lastOpen = !rideAfter;
     } else if (added < 0) {
       var removed = -added;
       for (var h = _hourOf(check.at, midnight); h >= 0 && removed > 0; h--) {
@@ -268,6 +280,9 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
         final left = last.steps + added;
         walks.last = WalkPeriod(last.start, last.end, left < 0 ? 0 : left);
       }
+      lastOpen = false;
+    } else {
+      lastOpen = false;
     }
     prevAt = check.at;
     prevSteps = check.steps;
@@ -279,14 +294,84 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
       for (final w in walks)
         if (w.steps >= minWalkSteps) w,
     ],
-    rides: [...log.rides]
-      ..sort(
+    rides: _joinRides(
+      [...log.rides]..sort(
         (a, b) => (a.start ?? a.end ?? midnight).compareTo(
           b.start ?? b.end ?? midnight,
         ),
       ),
+      walks,
+    ),
     checks: rows,
   );
+}
+
+/// Joins each ended ride with the next when it starts within [rideMergeGap]
+/// and none of [walks] falls between them. Timed-out rides (their steps were
+/// kept) and rides without times stay apart.
+List<LoggedRide> _joinRides(List<LoggedRide> sorted, List<WalkPeriod> walks) {
+  final joined = <LoggedRide>[];
+  for (final ride in sorted) {
+    final last = joined.lastOrNull;
+    final lastEnd = last?.end;
+    final start = ride.start;
+    if (last != null &&
+        last.status == RideStatus.ended &&
+        ride.status != RideStatus.timedOut &&
+        lastEnd != null &&
+        start != null &&
+        start.difference(lastEnd) <= rideMergeGap &&
+        !walks.any(
+          (w) =>
+              w.steps > 0 &&
+              w.start.isBefore(start) &&
+              w.end.isAfter(lastEnd) &&
+              // A window around a whole ride can't say its steps fell in
+              // the gap.
+              !_spans(w, last.start ?? lastEnd, lastEnd) &&
+              !_spans(w, start, ride.end ?? start),
+        )) {
+      joined.last = LoggedRide(
+        id: last.id,
+        start: last.start,
+        end: ride.end,
+        steps: last.steps + ride.steps,
+        status: ride.status,
+      );
+    } else {
+      joined.add(ride);
+    }
+  }
+  return joined;
+}
+
+bool _spans(WalkPeriod walk, DateTime from, DateTime to) =>
+    !walk.start.isAfter(from) && !walk.end.isBefore(to);
+
+/// Cuts the ride time off the ends of [from]–[to]: steps counted then were
+/// taken on foot before getting in or after getting out. A ride wholly
+/// inside the window leaves it as is, since the steps could be on either
+/// side. [rideAfter] is true when a ride falls after the window's first
+/// steps, so the next sync's steps must not join them.
+(DateTime from, DateTime to, bool rideAfter) _outsideRides(
+  DateTime from,
+  DateTime to,
+  List<({DateTime start, DateTime? end})> rides,
+) {
+  var rideAfter = false;
+  for (final ride in rides) {
+    final rideEnd = ride.end ?? to;
+    if (!ride.start.isBefore(to) || !rideEnd.isAfter(from)) continue;
+    final coversStart = !ride.start.isAfter(from);
+    final coversEnd = !rideEnd.isBefore(to);
+    if (coversStart && !coversEnd) {
+      from = rideEnd;
+    } else {
+      rideAfter = true;
+      if (coversEnd && !coversStart) to = ride.start;
+    }
+  }
+  return (from, to, rideAfter);
 }
 
 int _hourOf(DateTime at, DateTime midnight) {
