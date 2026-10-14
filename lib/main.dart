@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:google_sign_in/google_sign_in.dart' as g_sign_in;
 import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
@@ -135,6 +136,8 @@ Future<void> _startApp(
   Completer<void> storageReady,
 ) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Not awaited: ads load once it is ready and must not delay the app start.
+  unawaited(MobileAds.instance.initialize());
 
   await NotificationService().init();
   // Housekeeping only: a failure here must not stop the app starting.

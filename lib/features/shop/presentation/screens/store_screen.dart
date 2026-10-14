@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../app/theme/app_theme_model.dart';
 import '../../../../app/theme/theme_extensions.dart';
 import '../providers/theme_provider.dart';
+import '../widgets/rewarded_ads_section.dart';
 import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../../../step_tracking/presentation/providers/step_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -118,6 +119,8 @@ class StoreScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const RewardedAdsSection(),
+                      const SizedBox(height: 24),
                       Text(
                         'THEMES',
                         style: GoogleFonts.inter(

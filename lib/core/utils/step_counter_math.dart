@@ -315,3 +315,45 @@ bool shouldNotifyGoal({
   required int goal,
   required bool alreadyNotified,
 }) => goal > 0 && todaySteps >= goal && !alreadyNotified;
+
+/// What filling today's steps up to the goal changes (the rewarded "complete
+/// today's goal" ad). See [fillToGoal].
+class GoalFill {
+  final int addedSteps;
+  final int todaySteps;
+  final int baseline;
+  final int lastCoinStep;
+  final int challengeCredited;
+
+  const GoalFill({
+    required this.addedSteps,
+    required this.todaySteps,
+    required this.baseline,
+    required this.lastCoinStep,
+    required this.challengeCredited,
+  });
+}
+
+/// Raises today's [todaySteps] to [goal]. The baseline is lowered by the
+/// added steps, so later sensor reads (app or background task, reboot
+/// included) keep counting from the filled total. The added steps are only
+/// steps: they are marked as already paid in coins and already credited to
+/// challenges. Returns null when there is no goal or it is already reached.
+GoalFill? fillToGoal({
+  required int todaySteps,
+  required int goal,
+  required int baseline,
+  required int lastCoinStep,
+  required int challengeCredited,
+}) {
+  if (goal <= 0 || todaySteps >= goal) return null;
+  final added = goal - todaySteps;
+  return GoalFill(
+    addedSteps: added,
+    todaySteps: goal,
+    // 0 means unset: the next read anchors to the saved (filled) steps.
+    baseline: baseline == 0 ? 0 : baseline - added,
+    lastCoinStep: lastCoinStep + added,
+    challengeCredited: challengeCredited + added,
+  );
+}
