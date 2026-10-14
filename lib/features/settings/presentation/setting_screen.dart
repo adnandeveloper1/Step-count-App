@@ -13,6 +13,7 @@ import '../../step_tracking/presentation/widgets/glass_step_card.dart';
 import 'scheduler_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../../core/widgets/pro_avatar.dart';
+import '../../shop/models/pro_avatar_item.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -29,8 +30,7 @@ class SettingsScreen extends ConsumerWidget {
     final displayName =
         profile?['name'] ?? profile?['displayName'] ?? 'Build Up User';
     final avatar = profile?['avatarUrl'] ?? '👦';
-    final isProAvatarUnlocked =
-        (profile?['unlockedItems'] as List?)?.contains('avatar_pro') ?? false;
+    final isProAvatarUnlocked = showsProAvatar(profile);
 
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;

@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../app/theme/app_theme_model.dart';
 import '../../../../app/theme/theme_extensions.dart';
+import '../../models/pro_avatar_item.dart';
 import '../providers/theme_provider.dart';
 import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../../../step_tracking/presentation/providers/step_provider.dart';
@@ -22,7 +23,7 @@ class StoreScreen extends ConsumerWidget {
 
     final otherShopItems = [
       {
-        'id': 'avatar_pro',
+        'id': proAvatarItemId,
         'title': 'Pro Avatar Frame',
         'icon': Icons.account_circle,
       },
@@ -40,6 +41,7 @@ class StoreScreen extends ConsumerWidget {
             ?.map((e) => e.toString())
             .toList() ??
         [];
+    final isProAvatarEquipped = showsProAvatar(profile);
 
     return Scaffold(
       backgroundColor: context.backgroundColor,
@@ -202,28 +204,59 @@ class StoreScreen extends ConsumerWidget {
                           final item = otherShopItems[index];
                           final id = item['id'] as String;
                           final isOwned = unlockedItems.contains(id);
+                          final title = item['title'] as String;
 
                           return ShopItemCard(
                             id: id,
-                            title: item['title'] as String,
+                            title: title,
                             icon: item['icon'] as IconData,
+                            price: proAvatarPrice,
                             isOwned: isOwned,
+                            isEquipped: isOwned && isProAvatarEquipped,
                             onPurchase: () async {
                               final user = FirebaseAuth.instance.currentUser;
-                              if (user != null) {
-                                await FirebaseFirestore.instance
-                                    .collection('users')
-                                    .doc(user.uid)
-                                    .set({
-                                      'unlockedItems': FieldValue.arrayUnion([
-                                        id,
-                                      ]),
-                                    }, SetOptions(merge: true));
-                                if (context.mounted) {
-                                  context.showAppSnackBar(
-                                    'Purchased ${item['title']}!',
-                                  );
-                                }
+                              if (user == null) return;
+                              final paid = ref
+                                  .read(stepNotifierProvider.notifier)
+                                  .deductCoins(proAvatarPrice);
+                              if (!paid) {
+                                context.showAppSnackBar(
+                                  'Not enough coins! Need $proAvatarPrice coins.',
+                                  isError: true,
+                                );
+                                return;
+                              }
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .set({
+                                    'unlockedItems': FieldValue.arrayUnion([
+                                      id,
+                                    ]),
+                                    proAvatarEquippedField: true,
+                                  }, SetOptions(merge: true));
+                              if (context.mounted) {
+                                context.showAppSnackBar(
+                                  'Purchased and equipped $title!',
+                                );
+                              }
+                            },
+                            onToggleEquip: () async {
+                              final user = FirebaseAuth.instance.currentUser;
+                              if (user == null) return;
+                              final equip = !isProAvatarEquipped;
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .set({
+                                    proAvatarEquippedField: equip,
+                                  }, SetOptions(merge: true));
+                              if (context.mounted) {
+                                context.showAppSnackBar(
+                                  equip
+                                      ? 'Equipped $title!'
+                                      : 'Unequipped $title',
+                                );
                               }
                             },
                           );
@@ -427,21 +460,27 @@ class ShopItemCard extends StatelessWidget {
   final String id;
   final String title;
   final IconData icon;
+  final int price;
   final bool isOwned;
+  final bool isEquipped;
   final VoidCallback onPurchase;
+  final VoidCallback? onToggleEquip;
 
   const ShopItemCard({
     super.key,
     required this.id,
     required this.title,
     required this.icon,
+    this.price = 0,
     this.isOwned = false,
+    this.isEquipped = false,
     required this.onPurchase,
+    this.onToggleEquip,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isComingSoon = id != 'avatar_pro';
+    final isComingSoon = id != proAvatarItemId;
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -463,22 +502,26 @@ class ShopItemCard extends StatelessWidget {
               ),
             ),
             GestureDetector(
-              onTap: (isComingSoon || isOwned) ? null : onPurchase,
+              onTap: isComingSoon
+                  ? null
+                  : (isOwned ? onToggleEquip : onPurchase),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: isOwned
+                  color: isEquipped
                       ? context.primaryColor.withValues(alpha: 0.2)
                       : (isComingSoon
                             ? Colors.transparent
-                            : context.primaryColor),
+                            : (isOwned
+                                  ? context.primaryColor
+                                  : context.primaryColor.withValues(
+                                      alpha: 0.15,
+                                    ))),
                   border: Border.all(
-                    color: isOwned
-                        ? context.primaryColor
-                        : (isComingSoon
-                              ? context.textSecondary.withValues(alpha: 0.3)
-                              : context.primaryColor),
+                    color: isComingSoon
+                        ? context.textSecondary.withValues(alpha: 0.3)
+                        : context.primaryColor,
                     width: 1.5,
                   ),
                   borderRadius: BorderRadius.circular(16),
@@ -486,29 +529,33 @@ class ShopItemCard extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      isOwned
-                          ? Icons.check_circle
-                          : (isComingSoon ? Icons.lock : Icons.shopping_cart),
-                      color: isOwned
-                          ? context.primaryColor
-                          : (isComingSoon
-                                ? context.textSecondary
-                                : Colors.black),
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
+                    if (isComingSoon)
+                      Icon(Icons.lock, color: context.textSecondary, size: 14)
+                    else if (isEquipped)
+                      Icon(
+                        Icons.check_circle,
+                        color: context.primaryColor,
+                        size: 14,
+                      )
+                    else if (!isOwned)
+                      const CoinIcon(size: 14),
+                    if (isComingSoon || isEquipped || !isOwned)
+                      const SizedBox(width: 4),
                     Text(
-                      isOwned
-                          ? 'OWNED'
-                          : (isComingSoon ? 'COMING SOON' : 'FREE'),
+                      isComingSoon
+                          ? 'COMING SOON'
+                          : (isEquipped
+                                ? 'UNEQUIP'
+                                : (isOwned ? 'EQUIP' : '$price COINS')),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
-                        color: isOwned
-                            ? context.primaryColor
-                            : (isComingSoon
-                                  ? context.textSecondary
-                                  : Colors.black),
+                        color: isComingSoon
+                            ? context.textSecondary
+                            : (isEquipped
+                                  ? context.primaryColor
+                                  : (isOwned
+                                        ? Colors.black
+                                        : context.textPrimary)),
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,

@@ -8,6 +8,7 @@ import 'package:build_up/core/widgets/coin_icon.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/widgets/pro_avatar.dart';
+import '../../../shop/models/pro_avatar_item.dart';
 import '../../../../core/services/native_health_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/step_provider.dart';
@@ -60,8 +61,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     final profileAsync = ref.watch(userProfileProvider);
     final profile = profileAsync.value;
     final avatar = profile?['avatarUrl'] ?? '👦';
-    final isProAvatarUnlocked =
-        (profile?['unlockedItems'] as List?)?.contains('avatar_pro') ?? false;
+    final isProAvatarUnlocked = showsProAvatar(profile);
 
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
