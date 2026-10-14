@@ -43,6 +43,7 @@ dependencies:
   in_app_update: ^5.0.0
   step_sensor:
     path: packages/step_sensor
+  google_mobile_ads: ^9.1.0
 
 
 flutter_launcher_icons:

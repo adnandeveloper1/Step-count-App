@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/utils/activity_log.dart';
 
+import '../../../shop/models/pro_avatar_item.dart' as pro_avatar;
+
 class LeaderboardUser {
   final String id;
   final String name;
@@ -10,6 +12,7 @@ class LeaderboardUser {
   final String avatarUrl;
   final String? currentLeague; // New field
   final List<String> unlockedItems;
+  final bool showsProAvatar;
 
   /// Steps for today, read from the synced `dailyHistory` map. 0 when the
   /// user hasn't synced today.
@@ -24,6 +27,7 @@ class LeaderboardUser {
     this.currentLeague,
     this.unlockedItems = const [],
     this.todaySteps = 0,
+    this.showsProAvatar = false,
   });
 
   int scoreFor(LeaderboardPeriod period) => switch (period) {
@@ -45,6 +49,7 @@ class LeaderboardUser {
       currentLeague: data['currentLeague'], // Read from Firestore
       unlockedItems: items?.map((e) => e.toString()).toList() ?? [],
       todaySteps: today is num ? today.toInt() : 0,
+      showsProAvatar: pro_avatar.showsProAvatar(data),
     );
   }
 }

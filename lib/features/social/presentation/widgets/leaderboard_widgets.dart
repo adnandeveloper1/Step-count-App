@@ -83,7 +83,7 @@ class LeaderAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isImageUrl = user.avatarUrl.startsWith('http');
-    if (user.unlockedItems.contains('avatar_pro') && !isImageUrl) {
+    if (user.showsProAvatar && !isImageUrl) {
       return ProAvatar(
         emojiAvatar: user.avatarUrl.isNotEmpty ? user.avatarUrl : '👤',
         radius: size / 2,

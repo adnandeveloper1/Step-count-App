@@ -340,6 +340,46 @@ class StepNotifier extends Notifier<StepState> {
   /// StepSyncCoordinator).
   Future<void> syncFromBackgroundRequest() => _fetchFallbackData();
 
+  /// Syncs, then whether today's goal can still be filled by the goal ad:
+  /// today's count is read and below the goal. Check before showing the ad.
+  Future<bool> canFillStepsToGoal() async {
+    await _fetchFallbackData();
+    if (!ref.mounted) return false;
+    final storage = ref.read(storageProvider);
+    return storage.getLastDate() == dateKey(DateTime.now()) &&
+        state.goalSteps > 0 &&
+        storage.getSteps() < state.goalSteps;
+  }
+
+  /// Reward of the goal ad: fills today's steps up to the goal (see
+  /// fillToGoal). Syncs first so the fill starts from the latest count.
+  /// Returns false when nothing was filled.
+  Future<bool> fillStepsToGoal() async {
+    final session = AccountSession.current;
+    await _fetchFallbackData();
+    if (!ref.mounted || session != AccountSession.current) return false;
+
+    final storage = ref.read(storageProvider);
+    // Without today's sensor read the stored count belongs to an earlier
+    // day; filling it would mix the two.
+    if (storage.getLastDate() != dateKey(DateTime.now())) return false;
+    final fill = fillToGoal(
+      todaySteps: storage.getSteps(),
+      goal: state.goalSteps,
+      baseline: storage.getHardwareBaseline(),
+      lastCoinStep: storage.getLastCoinStep(),
+      challengeCredited: storage.getChallengeCreditedSteps(),
+    );
+    if (fill == null) return false;
+
+    storage.saveHardwareBaseline(fill.baseline);
+    storage.saveLastCoinStep(fill.lastCoinStep);
+    storage.saveChallengeCreditedSteps(fill.challengeCredited);
+    _processSteps(fill.todaySteps, state.pedestrianStatus, challengeSteps: 0);
+    _forceCloudSync();
+    return true;
+  }
+
   void updateProfile(double height, double weight) {
     final storage = ref.read(storageProvider);
     storage.saveHeight(height);

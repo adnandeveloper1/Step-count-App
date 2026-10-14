@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../ads/rewarded_ad_limits.dart';
 import '../utils/activity_log.dart';
 import '../utils/step_counter_math.dart';
+import '../utils/step_history.dart';
 
 class LocalStorageService {
   static const String _boxName = 'buildUpData';
@@ -280,6 +282,28 @@ class LocalStorageService {
       rides: result.rides,
     );
     _box.put('activityLog', log.toJson());
+  }
+
+  /// Rewarded ads left today (see [adsLeftToday]).
+  int rewardedAdsLeft(RewardedAdKind kind, DateTime now) => adsLeftToday(
+    kind,
+    storedDate: _box.get('rewardedAdDate', defaultValue: ''),
+    watched: _box.get('rewardedAds_${kind.name}', defaultValue: 0),
+    today: now,
+  );
+
+  /// Counts one watched rewarded ad of [kind] for the day of [now]; the
+  /// counts of an earlier day are dropped.
+  void recordRewardedAd(RewardedAdKind kind, DateTime now) {
+    final today = dateKey(now);
+    if (_box.get('rewardedAdDate', defaultValue: '') != today) {
+      _box.put('rewardedAdDate', today);
+      for (final k in RewardedAdKind.values) {
+        _box.put('rewardedAds_${k.name}', 0);
+      }
+    }
+    final key = 'rewardedAds_${kind.name}';
+    _box.put(key, _box.get(key, defaultValue: 0) + 1);
   }
 
   Future<void> clearAllUserData() async {
