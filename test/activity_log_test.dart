@@ -151,19 +151,95 @@ void main() {
       expect(day.walks.single.start, at(0));
     });
 
-    test('joins walks with short pauses and splits long ones', () {
+    test('joins back-to-back syncs with steps into one walk', () {
+      final day = summarize([(at(9), 0), (at(9, 15), 300), (at(9, 30), 500)]);
+      expect(day.walks.map((w) => (w.start, w.end, w.steps)), [
+        (at(9), at(9, 30), 500),
+      ]);
+    });
+
+    test('any still sync in between starts a new walk', () {
       final day = summarize([
         (at(9), 0),
         (at(9, 15), 300),
-        (at(9, 20), 300), // 5 min still: same walk
+        (at(9, 17), 300), // 2 min still: a new walk after it
         (at(9, 30), 500),
-        (at(10), 500), // 30 min still: new walk
+        (at(10), 500),
         (at(10, 15), 900),
       ]);
       expect(day.walks.map((w) => (w.start, w.end, w.steps)), [
-        (at(9), at(9, 30), 500),
+        (at(9), at(9, 15), 300),
+        (at(9, 17), at(9, 30), 200),
         (at(10), at(10, 15), 400),
       ]);
+    });
+
+    DayActivity summarizeWithRides(
+      List<(DateTime, int)> syncs,
+      List<RideSteps> rides,
+    ) {
+      final (lastAt, lastSteps) = syncs.last;
+      final log = recordAll(syncs).record(
+        now: lastAt.add(const Duration(seconds: 1)),
+        todaySteps: lastSteps,
+        source: CheckSource.app,
+        rides: rides,
+      );
+      return summarizeDay(log.day(at(0)), at(0));
+    }
+
+    test('a walk window stops where a ride starts and resumes after it', () {
+      // Steps counted 10:09–10:29 were taken before the 10:12 ride; steps
+      // counted 10:29–10:40 after it ended at 10:30.
+      final day = summarizeWithRides(
+        [(at(10, 9), 0), (at(10, 29), 100), (at(10, 40), 160)],
+        [
+          ride(
+            1,
+            RideStatus.ended,
+            start: at(10, 12),
+            end: at(10, 30),
+            steps: 50,
+          ),
+        ],
+      );
+      expect(day.walks.map((w) => (w.start, w.end, w.steps)), [
+        (at(10, 9), at(10, 12), 100),
+        (at(10, 30), at(10, 40), 60),
+      ]);
+    });
+
+    test('a walk that starts as a ride ends runs on into the next sync', () {
+      final day = summarizeWithRides(
+        [(at(10), 0), (at(10, 9), 90), (at(10, 12), 190)],
+        [ride(1, RideStatus.ended, start: at(9, 59), end: at(10, 6))],
+      );
+      expect(day.walks.map((w) => (w.start, w.end, w.steps)), [
+        (at(10, 6), at(10, 12), 190),
+      ]);
+    });
+
+    test('rides with steps counted between them stay apart', () {
+      // 10:58–11:11 was a walk between two rides 13 minutes apart.
+      final day = summarizeWithRides(
+        [(at(10, 30), 0), (at(10, 58), 0), (at(11, 11), 285)],
+        [
+          ride(1, RideStatus.ended, start: at(10, 30), end: at(10, 58)),
+          ride(2, RideStatus.ended, start: at(11, 11), end: at(11, 14)),
+        ],
+      );
+      expect(day.rides.map((r) => r.id), [1, 2]);
+    });
+
+    test('the chart puts steps at the trimmed walk times', () {
+      // Counted 9:00–11:00, but a ride took 9:20–11:00: all in hour 9.
+      final day = summarizeWithRides(
+        [(at(9), 0), (at(11), 300)],
+        [ride(1, RideStatus.ended, start: at(9, 20), end: at(11), steps: 40)],
+      );
+      expect(day.hourly[9], 300);
+      expect(day.hourly[10], 0);
+      expect(day.walks.single.end, at(9, 20));
     });
 
     test('leaves tiny walks off the timeline but not the chart', () {
@@ -197,6 +273,68 @@ void main() {
         ],
       );
       expect(summarizeDay(log.day(at(0)), at(0)).rideSteps, 95);
+    });
+
+    DayActivity withRides(List<RideSteps> rides) => summarizeDay(
+      const ActivityLog()
+          .record(
+            now: at(20),
+            todaySteps: 900,
+            source: CheckSource.app,
+            rides: rides,
+          )
+          .day(at(0)),
+      at(0),
+    );
+
+    test('joins rides with short stops into one', () {
+      final day = withRides([
+        ride(4, RideStatus.ended, start: at(16, 1), end: at(16, 5), steps: 9),
+        ride(3, RideStatus.ended, start: at(15, 55), end: at(15, 57), steps: 8),
+        ride(2, RideStatus.ended, start: at(15, 31), end: at(15, 54), steps: 7),
+        ride(1, RideStatus.ended, start: at(15, 24), end: at(15, 25), steps: 6),
+      ]);
+      expect(day.rides, hasLength(1));
+      final joined = day.rides.single;
+      expect(joined.start, at(15, 24));
+      expect(joined.end, at(16, 5));
+      expect(joined.steps, 30);
+      expect(joined.status, RideStatus.ended);
+      expect(day.rideSteps, 30);
+    });
+
+    test('keeps rides with a long stop apart', () {
+      final day = withRides([
+        ride(1, RideStatus.ended, start: at(9), end: at(9, 30), steps: 5),
+        ride(2, RideStatus.ended, start: at(9, 46), end: at(10), steps: 5),
+      ]);
+      expect(day.rides.map((r) => r.id), [1, 2]);
+    });
+
+    test('a ride still going joins the one just before it', () {
+      final day = withRides([
+        ride(1, RideStatus.ended, start: at(9), end: at(9, 30), steps: 5),
+        ride(2, RideStatus.ongoing, start: at(9, 35), steps: 3),
+      ]);
+      final joined = day.rides.single;
+      expect(joined.start, at(9));
+      expect(joined.end, isNull);
+      expect(joined.status, RideStatus.ongoing);
+      expect(joined.steps, 8);
+    });
+
+    test('a timed-out ride or one without times stays on its own', () {
+      final day = withRides([
+        ride(1, RideStatus.ended, start: at(9), end: at(9, 30), steps: 5),
+        ride(2, RideStatus.timedOut, start: at(9, 32), steps: 3),
+        ride(3, RideStatus.ended, start: at(11), end: at(11, 10), steps: 4),
+        RideSteps(
+          Drive(id: 4, enterSteps: 1000, exitSteps: 1002),
+          2,
+          RideStatus.ended,
+        ),
+      ]);
+      expect(day.rides, hasLength(4));
     });
   });
 }

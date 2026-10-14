@@ -1,9 +1,13 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:build_up/core/services/local_storage_service.dart';
 import 'package:build_up/core/utils/activity_log.dart';
 import 'package:build_up/core/utils/step_counter_math.dart';
 import 'package:build_up/features/step_tracking/presentation/providers/step_provider.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/activity_log_screen.dart';
 import 'package:flutter/material.dart' hide StepState;
+import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -95,6 +99,60 @@ void main() {
     expect(find.byKey(const Key('activity_log_ride_steps')), findsOneWidget);
     // Step checks stay hidden until the title is long-pressed.
     expect(find.byKey(const Key('activity_log_syncs')), findsNothing);
+  });
+
+  // On a first open Google Fonts is still loading Sora, so the timeline is
+  // laid out in a fallback font, then again once Sora arrives. A row sized
+  // from cached text measurements kept the old height and overflowed.
+  testWidgets('timeline rows resize when the font finishes loading', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    const subtitle = '1:00 PM – 1:40 PM · 312 steps not counted';
+    final ride = find.byKey(const Key('activity_log_ride_5'));
+    final heightBefore = tester.getSize(ride).height;
+    final subtitleBefore = tester.getSize(find.text(subtitle)).height;
+
+    final family = tester.widget<Text>(find.text(subtitle)).style!.fontFamily!;
+    final roboto = File(
+      '${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/'
+      'material_fonts/roboto-regular.ttf',
+    ).readAsBytesSync();
+    await tester.runAsync(
+      () => (FontLoader(
+        family,
+      )..addFont(Future.value(ByteData.sublistView(roboto)))).load(),
+    );
+    await tester.pump();
+
+    final rideBox = tester.getSize(ride).height;
+    final content =
+        tester.getSize(find.text('Vehicle ride')).height +
+        2 +
+        tester.getSize(find.text(subtitle)).height +
+        16;
+    // The swap changes how the subtitle wraps, so the row must follow it.
+    expect(
+      tester.getSize(find.text(subtitle)).height,
+      isNot(subtitleBefore),
+      reason: 'the new font should re-wrap the subtitle',
+    );
+    expect(rideBox, isNot(heightBefore));
+    expect(rideBox, moreOrLessEquals(content, epsilon: 0.01));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the hour labels stay inside the chart', (tester) async {
+    await pumpScreen(tester);
+
+    final chart = tester.getRect(
+      find.byKey(const Key('activity_log_hourly_chart')),
+    );
+    for (final label in ['12:00 AM', '6:00 PM']) {
+      final rect = tester.getRect(find.text(label));
+      expect(rect.left, greaterThanOrEqualTo(chart.left), reason: label);
+      expect(rect.right, lessThanOrEqualTo(chart.right), reason: label);
+    }
   });
 
   testWidgets('long-pressing the title shows every step check', (tester) async {
