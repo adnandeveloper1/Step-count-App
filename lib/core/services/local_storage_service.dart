@@ -267,19 +267,67 @@ class LocalStorageService {
   ActivityLog getActivityLog() =>
       ActivityLog.fromJson(_box.get('activityLog', defaultValue: '{}'));
 
-  /// Adds a sync that saved [todaySteps] to the activity log, with the rides
-  /// [result] looked at. Both the app and the background task call this.
+  /// Adds a sync that saved [todaySteps] at [now] to the activity log, with
+  /// the [rides] it looked at. The app, the background task and the goal ad
+  /// call this.
   void logStepSync(
-    StepCounterResult result,
     int todaySteps,
     DateTime now,
-    CheckSource source,
-  ) {
+    CheckSource source, {
+    List<RideSteps> rides = const [],
+  }) {
     final log = getActivityLog().record(
       now: now,
       todaySteps: todaySteps,
       source: source,
-      rides: result.rides,
+      rides: rides,
+    );
+    _box.put('activityLog', log.toJson());
+    _box.put('lastSyncMs', now.millisecondsSinceEpoch);
+  }
+
+  /// When the steps were last saved; null before the first save.
+  DateTime? getLastSyncAt() => switch (_box.get('lastSyncMs')) {
+    final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+    _ => null,
+  };
+
+  /// On a new day, before [startNewDay]: adds the [steps] taken after the
+  /// last sync, before the end of its day, to that day (see
+  /// StepCounterResult.earlierDaySteps). Updates its total, coins, history,
+  /// week and activity log, as a sync at the end of that day would have.
+  void addStepsToLastDay(int steps, CheckSource source) {
+    final lastSync = getLastSyncAt();
+    if (steps <= 0 || lastSync == null) return;
+    final total = getSteps() + steps;
+    saveSteps(total);
+
+    final lastCoinStep = getLastCoinStep();
+    if (total >= lastCoinStep + 100) {
+      final coins = (total - lastCoinStep) ~/ 100;
+      saveCoins(getCoins() + coins);
+      saveLastCoinStep(lastCoinStep + coins * 100);
+    }
+
+    saveDailyHistory({...getDailyHistory(), dateKey(lastSync): total});
+    final weekly = getWeeklySteps()
+        .split(',')
+        .map((e) => int.tryParse(e) ?? 0)
+        .toList();
+    if (weekly.length == 7) {
+      weekly[lastSync.weekday - 1] = total;
+      saveWeeklySteps(weekly.join(','));
+    }
+
+    final endOfDay = DateTime(
+      lastSync.year,
+      lastSync.month,
+      lastSync.day + 1,
+    ).subtract(const Duration(milliseconds: 1));
+    final log = getActivityLog().record(
+      now: endOfDay,
+      todaySteps: total,
+      source: source,
     );
     _box.put('activityLog', log.toJson());
   }

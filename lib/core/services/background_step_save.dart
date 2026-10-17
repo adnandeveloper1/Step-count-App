@@ -40,8 +40,14 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
       drives: drives,
       appliedDriveIds: storage.getAppliedDriveIds(),
       now: now,
+      lastSyncAt: storage.getLastSyncAt(),
     );
     if (result == null) return null;
+
+    // Steps from before midnight finish off the last saved day.
+    if (isNewDay) {
+      storage.addStepsToLastDay(result.earlierDaySteps, CheckSource.background);
+    }
 
     // Only the app credits challenges; keep yesterday's uncredited steps for it.
     final credit = settleChallengeSteps(
@@ -75,7 +81,12 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
 
     // 4. Update Hive
     storage.saveSteps(todaySteps);
-    storage.logStepSync(result, todaySteps, now, CheckSource.background);
+    storage.logStepSync(
+      todaySteps,
+      now,
+      CheckSource.background,
+      rides: result.rides,
+    );
     String weeklyData = storage.getWeeklySteps();
     List<int> weekly = weeklyData
         .split(',')

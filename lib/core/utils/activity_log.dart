@@ -2,8 +2,9 @@ import 'dart:convert';
 
 import 'step_counter_math.dart';
 
-/// Who read the step counter.
-enum CheckSource { app, background }
+/// Who saved the steps. [goalReward] is the goal ad filling today up to the
+/// goal: those steps were not walked.
+enum CheckSource { app, background, goalReward }
 
 /// One step sync: today's total at [at].
 class StepCheck {
@@ -24,12 +25,24 @@ class LoggedRide {
   final int steps;
   final RideStatus status;
 
+  /// Steps the ride held out until it timed out, which then counted again;
+  /// [keptAt] is the sync that gave them back.
+  final int kept;
+  final DateTime? keptAt;
+
+  /// False when the step counter gave no reading at the enter or the exit,
+  /// so the ride could not hold any steps out: they all count.
+  final bool measured;
+
   const LoggedRide({
     required this.id,
     this.start,
     this.end,
     required this.steps,
     required this.status,
+    this.kept = 0,
+    this.keptAt,
+    this.measured = true,
   });
 }
 
@@ -59,6 +72,10 @@ class ActivityLog {
   ///
   /// A run of syncs with the same total keeps only its first and last, so a
   /// phone lying still all night costs two entries.
+  ///
+  /// A ride is logged on the day it started and, when it runs past midnight,
+  /// on [now]'s day too. Each day keeps the steps it held out by that day's
+  /// last sync, so a ride over midnight splits its steps between the two.
   ActivityLog record({
     required DateTime now,
     required int todaySteps,
@@ -74,47 +91,85 @@ class ActivityLog {
             rides: [...entry.value.rides],
           ),
     };
+    List<LoggedRide> ridesOf(String key) =>
+        (updated[key] ??= DayLog(checks: [], rides: [])).rides;
 
-    final today = updated[key] ??= DayLog(checks: [], rides: []);
-    final checks = today.checks;
+    final checks = (updated[key] ??= DayLog(checks: [], rides: [])).checks;
     final check = StepCheck(now, todaySteps, source);
     final n = checks.length;
     if (n >= 2 &&
+        source != CheckSource.goalReward &&
         checks[n - 1].steps == todaySteps &&
-        checks[n - 2].steps == todaySteps) {
+        checks[n - 2].steps == todaySteps &&
+        checks[n - 1].source != CheckSource.goalReward) {
       checks[n - 1] = check;
     } else {
       checks.add(check);
     }
 
+    final midnight = DateTime(now.year, now.month, now.day);
     for (final ride in rides) {
+      final drive = ride.drive;
       final logged = LoggedRide(
-        id: ride.drive.id,
-        start: ride.drive.enteredAt,
-        end: ride.status == RideStatus.ongoing ? null : ride.drive.exitedAt,
+        id: drive.id,
+        start: drive.enteredAt,
+        end: ride.status == RideStatus.ongoing ? null : drive.exitedAt,
         steps: ride.steps,
         status: ride.status,
+        measured:
+            (drive.enterSteps != Drive.unknown || drive.enteredBeforeBoot) &&
+            (ride.status != RideStatus.ended ||
+                drive.exitSteps != Drive.unknown ||
+                drive.exitedBeforeBoot),
       );
-      // A ride stays on the day it started, even when it ends after midnight.
-      final home = updated.entries
-          .where((e) => e.value.rides.any((r) => r.id == logged.id))
-          .map((e) => e.key)
-          .firstOrNull;
-      final rideKey = home ?? dayKey(logged.start ?? now);
-      if (!_isKept(rideKey, now)) continue;
-      final dayRides = (updated[rideKey] ??= DayLog(
-        checks: [],
-        rides: [],
-      )).rides;
-      final index = dayRides.indexWhere((r) => r.id == logged.id);
-      if (index == -1) {
-        dayRides.add(logged);
-      } else {
-        dayRides[index] = logged;
+      final startKey = dayKey(logged.start ?? now);
+      final touchesToday =
+          startKey == key ||
+          logged.status == RideStatus.ongoing ||
+          !(logged.end?.isBefore(midnight) ?? true);
+
+      var found = false;
+      for (final MapEntry(key: dayK, value: log) in updated.entries) {
+        final index = log.rides.indexWhere((r) => r.id == logged.id);
+        if (index == -1) continue;
+        found = true;
+        log.rides[index] = _update(
+          log.rides[index],
+          logged,
+          now: now,
+          isToday: dayK == key,
+        );
+      }
+      if (touchesToday && !ridesOf(key).any((r) => r.id == logged.id)) {
+        ridesOf(key).add(logged);
+      } else if (!found && !touchesToday && _isKept(startKey, now)) {
+        ridesOf(startKey).add(logged);
       }
     }
 
     return ActivityLog(updated);
+  }
+
+  /// [existing] as the newer [logged] sees it. A day other than today keeps
+  /// the steps it held out; a ride that timed out gives its steps back.
+  static LoggedRide _update(
+    LoggedRide existing,
+    LoggedRide logged, {
+    required DateTime now,
+    required bool isToday,
+  }) {
+    final timedOut = logged.status == RideStatus.timedOut;
+    final givesBack = timedOut && existing.status == RideStatus.ongoing;
+    return LoggedRide(
+      id: logged.id,
+      start: logged.start,
+      end: logged.end,
+      steps: timedOut ? 0 : (isToday ? logged.steps : existing.steps),
+      status: logged.status,
+      kept: givesBack ? existing.steps : existing.kept,
+      keptAt: givesBack ? now : existing.keptAt,
+      measured: logged.measured,
+    );
   }
 
   static bool _isKept(String key, DateTime now) {
@@ -137,43 +192,65 @@ class ActivityLog {
               'e': r.end?.millisecondsSinceEpoch,
               'n': r.steps,
               'st': r.status.name,
+              if (r.kept != 0) 'k': r.kept,
+              if (r.keptAt case final at?) 'ka': at.millisecondsSinceEpoch,
+              if (!r.measured) 'm': false,
             },
         ],
       },
   });
 
-  /// Reads [toJson]'s output; anything unreadable gives an empty log.
+  /// Reads [toJson]'s output. An unreadable day, sync or ride is skipped,
+  /// so damage to one entry costs only that entry; anything else unreadable
+  /// gives an empty log.
   factory ActivityLog.fromJson(String json) {
+    final Map<String, dynamic> decoded;
     try {
-      final decoded = jsonDecode(json) as Map<String, dynamic>;
-      DateTime? time(Object? ms) =>
-          ms is int ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
-      return ActivityLog({
-        for (final MapEntry(:key, :value) in decoded.entries)
-          key: DayLog(
-            checks: [
-              for (final c in (value['c'] as List? ?? const []).cast<List>())
-                StepCheck(
-                  time(c[0])!,
-                  c[1] as int,
-                  CheckSource.values[c[2] as int],
-                ),
-            ],
-            rides: [
-              for (final r in (value['r'] as List? ?? const []).cast<Map>())
-                LoggedRide(
-                  id: r['id'] as int,
-                  start: time(r['s']),
-                  end: time(r['e']),
-                  steps: r['n'] as int,
-                  status: RideStatus.values.byName(r['st'] as String),
-                ),
-            ],
-          ),
-      });
+      decoded = jsonDecode(json) as Map<String, dynamic>;
     } catch (_) {
       return const ActivityLog();
     }
+    DateTime? time(Object? ms) =>
+        ms is int ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
+    T? read<T>(T Function() parse) {
+      try {
+        return parse();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return ActivityLog({
+      for (final MapEntry(:key, :value) in decoded.entries)
+        if (value is Map)
+          key: DayLog(
+            checks: [
+              for (final c in value['c'] is List ? value['c'] as List : [])
+                ?read(
+                  () => StepCheck(
+                    time((c as List)[0])!,
+                    c[1] as int,
+                    CheckSource.values[c[2] as int],
+                  ),
+                ),
+            ],
+            rides: [
+              for (final r in value['r'] is List ? value['r'] as List : [])
+                ?read(
+                  () => LoggedRide(
+                    id: (r as Map)['id'] as int,
+                    start: time(r['s']),
+                    end: time(r['e']),
+                    steps: r['n'] as int,
+                    status: RideStatus.values.byName(r['st'] as String),
+                    kept: r['k'] as int? ?? 0,
+                    keptAt: time(r['ka']),
+                    measured: r['m'] as bool? ?? true,
+                  ),
+                ),
+            ],
+          ),
+    });
   }
 }
 
@@ -188,8 +265,9 @@ class WalkPeriod {
   final DateTime end;
   final int steps;
 
-  /// The day's first sync came too late to place these steps (see
-  /// [lateFirstSync]): they were taken some time before [end].
+  /// The syncs around these steps were too far apart to place them (see
+  /// [lateFirstSync] and [longSyncGap]): they were taken some time between
+  /// [start] and [end].
   final bool timeUnknown;
 
   const WalkPeriod(
@@ -220,6 +298,9 @@ class DayActivity {
   /// Vehicle rides, oldest first.
   final List<LoggedRide> rides;
 
+  /// Steps the goal ad added, oldest first.
+  final List<CheckRow> goalRewards;
+
   /// Every sync, oldest first.
   final List<CheckRow> checks;
 
@@ -228,6 +309,7 @@ class DayActivity {
     required this.walks,
     required this.rides,
     required this.checks,
+    this.goalRewards = const [],
   });
 
   /// Steps held out or removed for being in a vehicle.
@@ -246,23 +328,33 @@ const minWalkSteps = 20;
 /// installed, or had not run) can't say when its steps were taken.
 const lateFirstSync = Duration(hours: 1);
 
+/// Syncs further apart than this (the phone held back the background task,
+/// say overnight) can't say when the steps between them were taken.
+const longSyncGap = Duration(hours: 2);
+
 /// Works out [day]'s hourly steps and walks from [log].
 ///
 /// The sensor is read about every 15 minutes with the app closed (every
 /// minute while open), so steps between two syncs are spread evenly over
 /// the time between them, less any ride time at either end. Syncs with steps
 /// join into one walk only while no still sync or ride comes between. Steps
-/// in a [lateFirstSync] stay off the chart. A drop in the total (an open ride
-/// taking out steps already counted) comes off the most recent hours.
+/// after a [lateFirstSync] or a [longSyncGap] stay off the chart, and so do
+/// goal ad steps. Steps a timed-out ride gives back are spread over the
+/// ride. A drop in the total (an open ride taking out steps already counted)
+/// comes off the most recent hours.
 DayActivity summarizeDay(DayLog log, DateTime day) {
   final midnight = DateTime(day.year, day.month, day.day);
   final hourly = List<int>.filled(24, 0);
   final walks = <WalkPeriod>[];
+  final rewards = <CheckRow>[];
   final rows = <CheckRow>[];
 
+  // A timed-out ride's end is unknown and its steps counted, so it does not
+  // cut walks short.
   final rideTimes = [
     for (final r in log.rides)
-      if (r.start case final start?) (start: start, end: r.end),
+      if (r.status != RideStatus.timedOut)
+        if (r.start case final start?) (start: start, end: r.end),
   ];
 
   var prevAt = midnight;
@@ -270,12 +362,35 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
   // Whether the last walk can run on into the next sync's steps.
   var lastOpen = false;
   for (final check in log.checks) {
-    final added = check.steps - prevSteps;
+    var added = check.steps - prevSteps;
     rows.add(CheckRow(check, added));
+    if (added > 0 && check.source == CheckSource.goalReward) {
+      rewards.add(CheckRow(check, added));
+      lastOpen = false;
+      prevAt = check.at;
+      prevSteps = check.steps;
+      continue;
+    }
+    // Steps given back by a ride that timed out at this sync were taken
+    // while it held them.
+    for (final ride in log.rides) {
+      if (added <= 0 || ride.kept <= 0 || ride.keptAt != check.at) continue;
+      final back = ride.kept < added ? ride.kept : added;
+      final start = ride.start;
+      final from = start == null || start.isBefore(midnight) ? midnight : start;
+      _spread(
+        hourly,
+        midnight,
+        from,
+        from.isBefore(prevAt) ? prevAt : check.at,
+        back,
+      );
+      added -= back;
+    }
+    final gap = check.at.difference(prevAt);
     if (added > 0 &&
-        prevAt == midnight &&
-        check.at.difference(midnight) > lateFirstSync) {
-      walks.add(WalkPeriod(midnight, check.at, added, timeUnknown: true));
+        (prevAt == midnight ? gap > lateFirstSync : gap > longSyncGap)) {
+      walks.add(WalkPeriod(prevAt, check.at, added, timeUnknown: true));
       lastOpen = false;
     } else if (added > 0) {
       final (from, to, rideAfter) = _outsideRides(prevAt, check.at, rideTimes);
@@ -326,13 +441,14 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
       ),
       walks,
     ),
+    goalRewards: rewards,
     checks: rows,
   );
 }
 
 /// Joins each ended ride with the next when it starts within [rideMergeGap]
 /// and none of [walks] falls between them. Timed-out rides (their steps were
-/// kept) and rides without times stay apart.
+/// kept), unmeasured rides and rides without times stay apart.
 List<LoggedRide> _joinRides(List<LoggedRide> sorted, List<WalkPeriod> walks) {
   final joined = <LoggedRide>[];
   for (final ride in sorted) {
@@ -342,6 +458,8 @@ List<LoggedRide> _joinRides(List<LoggedRide> sorted, List<WalkPeriod> walks) {
     if (last != null &&
         last.status == RideStatus.ended &&
         ride.status != RideStatus.timedOut &&
+        last.measured &&
+        ride.measured &&
         lastEnd != null &&
         start != null &&
         start.difference(lastEnd) <= rideMergeGap &&

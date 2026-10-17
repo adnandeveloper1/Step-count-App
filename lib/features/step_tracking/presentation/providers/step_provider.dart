@@ -306,8 +306,17 @@ class StepNotifier extends Notifier<StepState> {
       isNewDay: isNewDay,
       drives: drives,
       appliedDriveIds: storage.getAppliedDriveIds(),
+      lastSyncAt: storage.getLastSyncAt(),
     );
     if (result == null) return;
+
+    // Steps from before midnight finish off the last saved day, coins
+    // included.
+    if (isNewDay && result.earlierDaySteps > 0) {
+      storage.addStepsToLastDay(result.earlierDaySteps, CheckSource.app);
+      state = state.copyWith(coins: storage.getCoins());
+      _syncCoinsToFirestore(state.coins);
+    }
 
     // Credit challenges from what is stored, so steps the background task
     // counted while the app was closed are included.
@@ -331,7 +340,12 @@ class StepNotifier extends Notifier<StepState> {
       'fallback',
       challengeSteps: credit.stepsToCredit,
     );
-    storage.logStepSync(result, state.currentSteps, now, CheckSource.app);
+    storage.logStepSync(
+      state.currentSteps,
+      now,
+      CheckSource.app,
+      rides: result.rides,
+    );
     // The baseline now includes these drives, and their ids are stored.
     await nativeHealth.removeDrives(result.appliedDriveIds);
   }
@@ -376,6 +390,12 @@ class StepNotifier extends Notifier<StepState> {
     storage.saveLastCoinStep(fill.lastCoinStep);
     storage.saveChallengeCreditedSteps(fill.challengeCredited);
     _processSteps(fill.todaySteps, state.pedestrianStatus, challengeSteps: 0);
+    // Logged apart so the activity screen does not show them as a walk.
+    storage.logStepSync(
+      fill.todaySteps,
+      DateTime.now(),
+      CheckSource.goalReward,
+    );
     _forceCloudSync();
     return true;
   }
@@ -528,6 +548,11 @@ class StepNotifier extends Notifier<StepState> {
     if (user != null) {
       final dateStr =
           '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+      final now = DateTime.now();
+      final yesterdayStr = dateKey(DateTime(now.year, now.month, now.day - 1));
+      final yesterdaySteps = ref
+          .read(storageProvider)
+          .getDailyHistory()[yesterdayStr];
       FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'currentCoins': coins,
         'todaySteps': todaySteps,
@@ -538,6 +563,8 @@ class StepNotifier extends Notifier<StepState> {
         'lastUpdated': FieldValue.serverTimestamp(),
         'dailyHistory': {
           dateStr: todaySteps,
+          // Steps from just before midnight can raise yesterday's total.
+          yesterdayStr: ?yesterdaySteps,
           // Keep only the last 31 days in the cloud too.
           for (final key in expiredDayKeys(DateTime.now()))
             key: FieldValue.delete(),

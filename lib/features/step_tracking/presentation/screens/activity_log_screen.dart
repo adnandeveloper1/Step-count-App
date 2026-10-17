@@ -70,7 +70,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
           const SizedBox(height: 16),
           _buildHourlyChart(activity, now),
           const SizedBox(height: 16),
-          _buildTimeline(activity),
+          _buildTimeline(activity, day),
           if (_showSyncs) ...[
             const SizedBox(height: 16),
             _buildSyncList(activity),
@@ -93,16 +93,14 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
   }
 
   Widget _buildDaySelector(DateTime now) {
-    return SizedBox(
-      height: 64,
-      child: Row(
-        children: [
-          for (var ago = activityLogDays - 1; ago >= 0; ago--) ...[
-            Expanded(child: _dayChip(now, ago)),
-            if (ago > 0) const SizedBox(width: 6),
-          ],
+    // No fixed height: the chips grow with the system text size.
+    return Row(
+      children: [
+        for (var ago = activityLogDays - 1; ago >= 0; ago--) ...[
+          Expanded(child: _dayChip(now, ago)),
+          if (ago > 0) const SizedBox(width: 6),
         ],
-      ),
+      ],
     );
   }
 
@@ -114,6 +112,8 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       onTap: () => setState(() => _daysAgo = ago),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: selected ? context.primaryColor : context.cardColor,
           borderRadius: BorderRadius.circular(16),
@@ -121,24 +121,31 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              ago == 0 ? 'Today' : _dayNames[date.weekday - 1],
-              maxLines: 1,
-              overflow: TextOverflow.visible,
-              softWrap: false,
-              style: GoogleFonts.jetBrainsMono(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.black : context.textSecondary,
+            // Shrinks rather than spill out of a narrow chip.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                ago == 0 ? 'Today' : _dayNames[date.weekday - 1],
+                maxLines: 1,
+                softWrap: false,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.black : context.textSecondary,
+                ),
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              '${date.day}',
-              style: GoogleFonts.sora(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.black : context.textPrimary,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '${date.day}',
+                maxLines: 1,
+                style: GoogleFonts.sora(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.black : context.textPrimary,
+                ),
               ),
             ),
           ],
@@ -318,12 +325,17 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
     );
   }
 
-  Widget _buildTimeline(DayActivity activity) {
+  Widget _buildTimeline(DayActivity activity, DateTime day) {
     // Newest first.
     final items = <({DateTime at, Widget row})>[
       for (final walk in activity.walks) (at: walk.end, row: _walkRow(walk)),
       for (final ride in activity.rides)
-        (at: ride.end ?? ride.start ?? DateTime.now(), row: _rideRow(ride)),
+        (
+          at: ride.end ?? ride.start ?? DateTime.now(),
+          row: _rideRow(ride, day),
+        ),
+      for (final reward in activity.goalRewards)
+        (at: reward.check.at, row: _goalRewardRow(reward)),
     ]..sort((a, b) => b.at.compareTo(a.at));
 
     return GlassCard(
@@ -361,20 +373,49 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       iconColor: context.primaryColor,
       title: '${formatThousands(walk.steps)} steps',
       subtitle: walk.timeUnknown
-          ? 'Before ${_time(walk.end)} · time not recorded'
+          ? fromMidnight
+                ? 'Before ${_time(walk.end)} · time not recorded'
+                : 'Between ${_time(walk.start)} and ${_time(walk.end)} · '
+                      'time not recorded'
           : fromMidnight
           ? 'Until ${_time(walk.end)}'
           : '${_time(walk.start)} – ${_time(walk.end)}',
     );
   }
 
-  Widget _rideRow(LoggedRide ride) {
-    final start = ride.start == null ? null : _time(ride.start!);
-    final end = ride.end == null ? null : _time(ride.end!);
+  Widget _goalRewardRow(CheckRow reward) => _TimelineEntry(
+    key: Key(
+      'activity_log_goal_reward_${reward.check.at.millisecondsSinceEpoch}',
+    ),
+    icon: Icons.emoji_events_rounded,
+    iconColor: context.primaryColor,
+    title: '+${formatThousands(reward.added)} steps',
+    subtitle: '${_time(reward.check.at)} · goal completed with a reward',
+  );
+
+  Widget _rideRow(LoggedRide ride, DateTime day) {
+    final start = ride.start == null ? null : _rideTime(ride.start!, day);
+    final end = ride.end == null ? null : _rideTime(ride.end!, day);
+    final past = _daysAgo > 0;
     final (title, detail) = switch (ride.status) {
+      RideStatus.ongoing when !ride.measured => (
+        past ? 'Vehicle ride' : 'In a vehicle',
+        'Since ${start ?? 'earlier'} · steps could not be measured, '
+            'still counted',
+      ),
+      RideStatus.ongoing when past => (
+        'Vehicle ride',
+        '${start ?? '?'} – still going · '
+            '${formatThousands(ride.steps)} steps not counted',
+      ),
       RideStatus.ongoing => (
         'In a vehicle',
         'Since ${start ?? 'earlier'} · steps paused',
+      ),
+      RideStatus.ended when !ride.measured => (
+        'Vehicle ride',
+        '${start ?? '?'} – ${end ?? '?'} · steps could not be measured, '
+            'counted',
       ),
       RideStatus.ended => (
         'Vehicle ride',
@@ -383,7 +424,10 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       ),
       RideStatus.timedOut => (
         'Vehicle ride',
-        'From ${start ?? '?'} · end not detected, steps kept',
+        ride.kept > 0
+            ? 'From ${start ?? '?'} · end not detected, '
+                  '${formatThousands(ride.kept)} steps kept'
+            : 'From ${start ?? '?'} · end not detected, steps kept',
       ),
     };
     return _TimelineEntry(
@@ -393,6 +437,20 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       title: title,
       subtitle: detail,
     );
+  }
+
+  /// [t] as a time, named by its day when it is not [day] (a ride over
+  /// midnight).
+  String _rideTime(DateTime t, DateTime day) {
+    final date = DateTime(t.year, t.month, t.day);
+    if (date == day) return _time(t);
+    if (date == DateTime(day.year, day.month, day.day - 1)) {
+      return '${_time(t)} the day before';
+    }
+    if (date == DateTime(day.year, day.month, day.day + 1)) {
+      return '${_time(t)} the next day';
+    }
+    return '${_time(t)} ${_dayNames[t.weekday - 1]}';
   }
 
   Widget _buildSyncList(DayActivity activity) {
@@ -444,7 +502,11 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
                   SizedBox(
                     width: 48,
                     child: Text(
-                      row.check.source == CheckSource.app ? 'app' : 'bg',
+                      switch (row.check.source) {
+                        CheckSource.app => 'app',
+                        CheckSource.background => 'bg',
+                        CheckSource.goalReward => 'ad',
+                      },
                       textAlign: TextAlign.right,
                       style: mono(context.textSecondary),
                     ),

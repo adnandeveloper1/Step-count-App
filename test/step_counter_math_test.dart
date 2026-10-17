@@ -146,6 +146,116 @@ void main() {
       expect(r.baseline, 30000);
     });
 
+    group('a new day after a sync the day before', () {
+      // Last sync 23:00 with 3000 saved (reading 30000); first sync of the
+      // new day at 1:00 with 2000 more counted: half before midnight.
+      final lastSync = DateTime(2026, 10, 11, 23);
+      final now = DateTime(2026, 10, 12, 1);
+
+      StepCounterResult resolve({
+        int hardwareSteps = 32000,
+        int baseline = 27000,
+        List<Drive> drives = const [],
+        DateTime? lastSyncAt,
+      }) => resolveTodaySteps(
+        hardwareSteps: hardwareSteps,
+        baseline: baseline,
+        savedToday: 3000,
+        isNewDay: true,
+        drives: drives,
+        now: now,
+        lastSyncAt: lastSyncAt ?? lastSync,
+      )!;
+
+      test('splits the steps since that sync at midnight', () {
+        final r = resolve();
+        expect((r.earlierDaySteps, r.todaySteps), (1000, 1000));
+        // Later reads count on from today's share.
+        expect(r.baseline, 31000);
+        final later = resolveTodaySteps(
+          hardwareSteps: 32500,
+          baseline: r.baseline,
+          savedToday: r.todaySteps,
+          isNewDay: false,
+          now: now,
+        )!;
+        expect(later.todaySteps, 1500);
+      });
+
+      test('days without any sync in between get none', () {
+        // Last sync two days before, at 23:00: 26 hours ago.
+        final r = resolve(lastSyncAt: DateTime(2026, 10, 10, 23));
+        expect(r.earlierDaySteps, 77); // 1 of 26 hours
+        expect(r.todaySteps, 77); // 1 of 26 hours, since midnight
+      });
+
+      test('leaves out the steps of a drive since that sync', () {
+        // 800 of the 2000 counted in a car that ended at 0:30.
+        final r = resolve(
+          drives: [
+            Drive(
+              id: 1,
+              enterSteps: 30500,
+              exitSteps: 31300,
+              enteredAt: DateTime(2026, 10, 11, 23, 50),
+              exitedAt: DateTime(2026, 10, 12, 0, 30),
+            ),
+          ],
+        );
+        expect(r.earlierDaySteps + r.todaySteps, 1200);
+        expect(r.drivingSteps, 800);
+        expect(r.appliedDriveIds, [1]);
+      });
+
+      test('keeps an open drive held out on the new day', () {
+        final r = resolve(
+          drives: [
+            Drive(
+              id: 1,
+              enterSteps: 31600,
+              enteredAt: DateTime(2026, 10, 12, 0, 40),
+            ),
+          ],
+        );
+        expect(r.earlierDaySteps + r.todaySteps, 1600);
+        // The next read, still driving, adds nothing.
+        final later = resolveTodaySteps(
+          hardwareSteps: 32300,
+          baseline: r.baseline,
+          savedToday: r.todaySteps,
+          isNewDay: false,
+          drives: [
+            Drive(
+              id: 1,
+              enterSteps: 31600,
+              enteredAt: DateTime(2026, 10, 12, 0, 40),
+            ),
+          ],
+          now: now,
+        )!;
+        expect(later.todaySteps, r.todaySteps);
+      });
+
+      for (final (name, hardware, baseline, sync) in [
+        ('no earlier sync time', 32000, 27000, null),
+        ('no baseline', 32000, 0, lastSync),
+        ('a reboot since', 900, 27000, lastSync),
+      ]) {
+        test('starts at zero with $name', () {
+          final r = resolveTodaySteps(
+            hardwareSteps: hardware,
+            baseline: baseline,
+            savedToday: 3000,
+            isNewDay: true,
+            now: now,
+            lastSyncAt: sync,
+          )!;
+          expect((r.todaySteps, r.earlierDaySteps), (0, 0));
+          expect(r.baseline, hardware);
+        });
+      }
+    });
+
     for (final sentinel in [0, -1, -2]) {
       test('ignores non-reading $sentinel and leaves the baseline alone', () {
         expect(

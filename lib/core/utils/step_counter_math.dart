@@ -13,12 +13,18 @@ class StepCounterResult {
   /// activity log.
   final List<RideSteps> rides;
 
+  /// On a new day: steps taken after the last sync but before the end of
+  /// its day, which belong to that day rather than today (see
+  /// [resolveTodaySteps]).
+  final int earlierDaySteps;
+
   const StepCounterResult({
     required this.todaySteps,
     required this.baseline,
     this.drivingSteps = 0,
     this.appliedDriveIds = const [],
     this.rides = const [],
+    this.earlierDaySteps = 0,
   });
 }
 
@@ -174,6 +180,13 @@ ChallengeCredit settleChallengeSteps({
 /// [StepCounterResult.todaySteps] until its exit arrives, or until
 /// [openDriveTimeout] has passed since [now] without one. Drives listed in
 /// [appliedDriveIds] are already in the baseline and are skipped.
+///
+/// On a new day, the steps counted since the last sync at [lastSyncAt] are
+/// split by time: the share up to the end of that sync's day goes to
+/// [StepCounterResult.earlierDaySteps], the share since midnight to today,
+/// and days in between (no sync for over a day) get none. Without
+/// [lastSyncAt], a baseline, or after a reboot since that sync, today
+/// starts from zero.
 StepCounterResult? resolveTodaySteps({
   required int hardwareSteps,
   required int baseline,
@@ -182,6 +195,7 @@ StepCounterResult? resolveTodaySteps({
   List<Drive> drives = const [],
   List<int> appliedDriveIds = const [],
   DateTime? now,
+  DateTime? lastSyncAt,
 }) {
   if (hardwareSteps <= 0) return null;
   drives = [
@@ -192,7 +206,37 @@ StepCounterResult? resolveTodaySteps({
   now ??= DateTime.now();
 
   if (isNewDay) {
-    return _removeDrives(hardwareSteps, hardwareSteps, drives, now);
+    // The counter reading at the last sync, held-out drive steps included.
+    final lastReading = baseline + savedToday;
+    final midnight = DateTime(now.year, now.month, now.day);
+    if (lastSyncAt == null ||
+        baseline == 0 ||
+        lastReading <= 0 ||
+        hardwareSteps < lastReading ||
+        !lastSyncAt.isBefore(midnight)) {
+      return _removeDrives(hardwareSteps, hardwareSteps, drives, now);
+    }
+    final sinceLast = _removeDrives(hardwareSteps, lastReading, drives, now);
+    final walked = sinceLast.todaySteps;
+    final span = now.difference(lastSyncAt).inMilliseconds;
+    final endOfLastDay = DateTime(
+      lastSyncAt.year,
+      lastSyncAt.month,
+      lastSyncAt.day + 1,
+    );
+    int share(DateTime from, DateTime to) =>
+        (walked * to.difference(from).inMilliseconds / span).round();
+    final earlier = share(lastSyncAt, endOfLastDay);
+    final today = share(midnight, now).clamp(0, walked - earlier);
+    return StepCounterResult(
+      todaySteps: today,
+      // Today counts from here; an open drive's steps stay held out.
+      baseline: hardwareSteps - today - _held(sinceLast),
+      drivingSteps: sinceLast.drivingSteps,
+      appliedDriveIds: sinceLast.appliedDriveIds,
+      rides: sinceLast.rides,
+      earlierDaySteps: earlier,
+    );
   }
 
   // Unset baseline: anchor so the steps already saved today are kept.
@@ -209,6 +253,11 @@ StepCounterResult? resolveTodaySteps({
 
   return _removeDrives(hardwareSteps, baseline, drives, now);
 }
+
+/// Steps an open drive holds out of today in [result].
+int _held(StepCounterResult result) => result.rides
+    .where((r) => r.status == RideStatus.ongoing)
+    .fold(0, (sum, r) => sum + r.steps);
 
 /// How long a drive may go without a sign the user is still in the vehicle.
 /// Activity Recognition can miss the exit, and checks may get no answer;

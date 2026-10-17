@@ -65,6 +65,19 @@ class _LateFirstSyncStorage extends LocalStorageService {
   Map<String, int> getDailyHistory() => {};
 }
 
+/// Today's log as given.
+class _LogStorage extends LocalStorageService {
+  final ActivityLog log;
+
+  _LogStorage(this.log);
+
+  @override
+  ActivityLog getActivityLog() => log;
+
+  @override
+  Map<String, int> getDailyHistory() => {};
+}
+
 class _FakeStepNotifier extends StepNotifier {
   @override
   StepState build() => const StepState(
@@ -82,6 +95,7 @@ void main() {
   Future<void> pumpScreen(
     WidgetTester tester, {
     LocalStorageService? storage,
+    double textScale = 1,
   }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.6;
@@ -92,7 +106,15 @@ void main() {
           storageProvider.overrideWithValue(storage ?? _FakeStorage()),
           stepNotifierProvider.overrideWith(_FakeStepNotifier.new),
         ],
-        child: const MaterialApp(home: ActivityLogScreen()),
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
+          home: const ActivityLogScreen(),
+        ),
       ),
     );
     await tester.pump();
@@ -200,5 +222,116 @@ void main() {
 
     expect(find.byKey(const Key('activity_log_empty')), findsOneWidget);
     expect(find.text('No activity logged this day.'), findsOneWidget);
+  });
+
+  for (final scale in [1.3, 2.0]) {
+    testWidgets('the day chips fit text at ${scale}x', (tester) async {
+      await pumpScreen(tester, textScale: scale);
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('activity_log_day_0')), findsOneWidget);
+    });
+  }
+
+  testWidgets('goal ad steps show as a reward, not a walk', (tester) async {
+    final log = const ActivityLog()
+        .record(now: _today(0, 30), todaySteps: 200, source: CheckSource.app)
+        .record(
+          now: _today(0, 40),
+          todaySteps: 10000,
+          source: CheckSource.goalReward,
+        );
+    await pumpScreen(tester, storage: _LogStorage(log));
+
+    expect(find.text('+9,800 steps'), findsOneWidget);
+    expect(find.text('9,800 steps'), findsNothing);
+    expect(
+      find.text('12:40 AM · goal completed with a reward'),
+      findsOneWidget,
+    );
+    await tester.longPress(find.byKey(const Key('activity_log_title')));
+    await tester.pump();
+    expect(find.text('ad'), findsOneWidget);
+  });
+
+  testWidgets('steps between syncs far apart say their time is unknown', (
+    tester,
+  ) async {
+    final log = const ActivityLog()
+        .record(now: _today(0, 30), todaySteps: 100, source: CheckSource.app)
+        .record(now: _today(7), todaySteps: 900, source: CheckSource.app);
+    await pumpScreen(tester, storage: _LogStorage(log));
+
+    expect(
+      find.text('Between 12:30 AM and 7:00 AM · time not recorded'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a ride the counter could not read says its steps counted', (
+    tester,
+  ) async {
+    final log = const ActivityLog().record(
+      now: _today(9),
+      todaySteps: 100,
+      source: CheckSource.app,
+      rides: [
+        RideSteps(
+          Drive(id: 8, enterSteps: Drive.unknown, enteredAt: _today(8, 30)),
+          0,
+          RideStatus.ongoing,
+        ),
+      ],
+    );
+    await pumpScreen(tester, storage: _LogStorage(log));
+
+    expect(
+      find.text('Since 8:30 AM · steps could not be measured, still counted'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a ride from the day before says so', (tester) async {
+    final yesterday = DateTime(_now.year, _now.month, _now.day - 1, 23, 30);
+    final log = const ActivityLog().record(
+      now: _today(0, 30),
+      todaySteps: 0,
+      source: CheckSource.app,
+      rides: [
+        RideSteps(
+          Drive(id: 9, enterSteps: 1000, enteredAt: yesterday),
+          40,
+          RideStatus.ongoing,
+        ),
+      ],
+    );
+    await pumpScreen(tester, storage: _LogStorage(log));
+
+    expect(
+      find.text('Since 11:30 PM the day before · steps paused'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a timed-out ride shows the steps it kept', (tester) async {
+    final drive = Drive(id: 4, enterSteps: 1000, enteredAt: _today(0, 10));
+    final log = const ActivityLog()
+        .record(
+          now: _today(0, 20),
+          todaySteps: 0,
+          source: CheckSource.app,
+          rides: [RideSteps(drive, 1200, RideStatus.ongoing)],
+        )
+        .record(
+          now: _today(4, 30),
+          todaySteps: 1200,
+          source: CheckSource.app,
+          rides: [RideSteps(drive, 0, RideStatus.timedOut)],
+        );
+    await pumpScreen(tester, storage: _LogStorage(log));
+
+    expect(
+      find.text('From 12:10 AM · end not detected, 1,200 steps kept'),
+      findsOneWidget,
+    );
   });
 }

@@ -162,4 +162,33 @@ void main() {
     ]);
     expect(day.rides.map((r) => (r.id, r.steps)), [(7, 250)]);
   });
+
+  test('steps walked before midnight finish off the day before', () async {
+    // Last sync 23:00 with 9000 saved; next run at 1:00, 2000 counted since.
+    final lastSync = DateTime(2026, 10, 11, 23);
+    await seed(lastDate: '2026-10-11', steps: 9000, baseline: 1000);
+    (await openBox()).putAll({
+      'lastSyncMs': lastSync.millisecondsSinceEpoch,
+      'lastCoinStep': 9000,
+      'coins': 5,
+      'weeklySteps': '0,0,0,0,0,0,9000',
+      'dailyHistory': '{"2026-10-11":9000}',
+    });
+
+    final result = await run(12000, now: DateTime(2026, 10, 12, 1));
+
+    expect(result!.todaySteps, 1000);
+    final box = await openBox();
+    expect(box.get('currentSteps'), 1000);
+    expect(box.get('dailyHistory'), contains('"2026-10-11":10000'));
+    // 1000 more yesterday: 10 coins; 1000 today: 10 more.
+    expect(box.get('coins'), 25);
+    expect(box.get('weeklySteps'), '1000,0,0,0,0,0,10000');
+    final log = ActivityLog.fromJson(box.get('activityLog'));
+    expect(
+      log.day(lastSync).checks.last.steps,
+      10000,
+      reason: 'logged at the end of the day before',
+    );
+  });
 }

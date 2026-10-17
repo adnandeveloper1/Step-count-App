@@ -14,7 +14,8 @@ Stable widget keys for driving the app in integration tests and Flutter Driver.
 | `activity_log_hourly_chart` | Activity chart | Steps per hour |
 | `activity_log_ride_<id>` | Activity timeline | One vehicle ride |
 | `activity_log_empty` | Activity timeline | No walks or rides that day |
-| `activity_log_syncs` | Activity, after the long-press | Each step check: time, total, change, `app` / `bg` |
+| `activity_log_goal_reward_<ms>` | Activity timeline | Steps the goal ad added (not a walk) |
+| `activity_log_syncs` | Activity, after the long-press | Each step check: time, total, change, `app` / `bg` / `ad` (goal ad) |
 | `background_access_dialog` | One-time message | Battery use is Restricted: how to allow background use |
 | `background_access_open_settings` | Message button | Opens the app's settings page |
 | `background_access_not_now` | Message button | Closes the message |
