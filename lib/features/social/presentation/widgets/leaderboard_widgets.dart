@@ -4,17 +4,10 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../app/theme/theme_extensions.dart';
 import '../../../../core/widgets/pro_avatar.dart';
 import '../../../step_tracking/presentation/providers/step_provider.dart';
+import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../providers/leaderboard_provider.dart';
 
 const _ink = Color(0xFF0D0F12);
-
-/// Gold, silver and bronze for positions 1–3; null below that.
-Color? medalColor(int rank) => switch (rank) {
-  1 => const Color(0xFFFFC83D),
-  2 => const Color(0xFFC0C7D1),
-  3 => const Color(0xFFCD7F32),
-  _ => null,
-};
 
 /// League colour for the avatar ring: the stored league, or one worked out
 /// from the monthly best for users synced before leagues existed.
@@ -35,36 +28,11 @@ Color leagueColor(LeaderboardUser user) {
   return LeagueTier.bronze.color;
 }
 
-/// Position shown left of the avatar: a medal circle for the top three, a
-/// plain number for everyone else.
-class RankBadge extends StatelessWidget {
-  final int rank;
-  final double size;
-
-  const RankBadge({super.key, required this.rank, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    final medal = medalColor(rank);
-    final text = Text(
-      '$rank',
-      textAlign: TextAlign.center,
-      style: GoogleFonts.inter(
-        color: medal != null ? _ink : context.textSecondary,
-        fontWeight: FontWeight.w800,
-        fontSize: size * (rank >= 100 ? 0.36 : 0.48),
-      ),
-    );
-    if (medal == null) return SizedBox(width: size, child: text);
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: medal),
-      child: text,
-    );
-  }
-}
+/// Fill behind an emoji or person icon inside the league ring: deep navy in
+/// dark themes, the page background in light themes so it doesn't show as a
+/// black disc on a white card.
+Color avatarBackground(BuildContext context) =>
+    context.isDarkMode ? const Color(0xFF1E293B) : context.backgroundColor;
 
 /// The user's photo, emoji or a person icon inside a coloured ring. Pro
 /// emoji avatars keep their animated frame.
@@ -98,8 +66,10 @@ class LeaderAvatar extends StatelessWidget {
         border: Border.all(color: ringColor, width: 2),
       ),
       child: CircleAvatar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: avatarBackground(context),
         backgroundImage: isImageUrl ? NetworkImage(user.avatarUrl) : null,
+        // A broken photo URL falls back to the plain circle instead of throwing.
+        onBackgroundImageError: isImageUrl ? (_, _) {} : null,
         child: isImageUrl
             ? null
             : (user.avatarUrl.isNotEmpty
@@ -113,271 +83,6 @@ class LeaderAvatar extends StatelessWidget {
                       size: size * 0.5,
                     )),
       ),
-    );
-  }
-}
-
-/// Score with a small "steps" caption underneath.
-class StepScore extends StatelessWidget {
-  final int steps;
-  final double fontSize;
-  final CrossAxisAlignment align;
-
-  const StepScore({
-    super.key,
-    required this.steps,
-    required this.fontSize,
-    this.align = CrossAxisAlignment.end,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: align,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          formatSteps(steps),
-          style: GoogleFonts.inter(
-            color: context.textPrimary,
-            fontWeight: FontWeight.w800,
-            fontSize: fontSize,
-          ),
-        ),
-        Text(
-          'steps',
-          style: GoogleFonts.inter(
-            color: context.textSecondary,
-            fontWeight: FontWeight.w600,
-            fontSize: fontSize * 0.55,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Small lime "YOU" tag next to the signed-in user's name.
-class YouTag extends StatelessWidget {
-  final double fontSize;
-
-  const YouTag({super.key, required this.fontSize});
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = context.primaryColor;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: fontSize * 0.6,
-        vertical: fontSize * 0.15,
-      ),
-      decoration: BoxDecoration(
-        color: primary.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(fontSize),
-      ),
-      child: Text(
-        'YOU',
-        style: GoogleFonts.inter(
-          color: context.isDarkMode
-              ? primary
-              : Color.lerp(primary, Colors.black, 0.4),
-          fontWeight: FontWeight.w800,
-          fontSize: fontSize,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
-  }
-}
-
-/// One leaderboard row below the podium.
-class LeaderboardRow extends StatelessWidget {
-  final LeaderboardUser user;
-  final int rank;
-  final int score;
-  final bool isMe;
-
-  const LeaderboardRow({
-    super.key,
-    required this.user,
-    required this.rank,
-    required this.score,
-    required this.isMe,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: width * 0.04,
-        vertical: width * 0.035,
-      ),
-      decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isMe ? context.primaryColor : Colors.transparent,
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          RankBadge(
-            key: Key('leaderboard-rank-${user.id}'),
-            rank: rank,
-            size: width * 0.08,
-          ),
-          SizedBox(width: width * 0.03),
-          LeaderAvatar(
-            user: user,
-            size: width * 0.12,
-            ringColor: leagueColor(user),
-          ),
-          SizedBox(width: width * 0.035),
-          Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    user.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      color: context.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: width * 0.04,
-                    ),
-                  ),
-                ),
-                if (isMe) ...[
-                  SizedBox(width: width * 0.02),
-                  YouTag(fontSize: width * 0.024),
-                ],
-              ],
-            ),
-          ),
-          SizedBox(width: width * 0.02),
-          StepScore(steps: score, fontSize: width * 0.045),
-        ],
-      ),
-    );
-  }
-}
-
-/// Entry in the [Podium]: avatar, name, score and a medal-coloured block
-/// whose height shows the position.
-class _PodiumSpot extends StatelessWidget {
-  final LeaderboardUser user;
-  final int rank;
-  final int score;
-  final bool isMe;
-  final bool isWinner;
-
-  const _PodiumSpot({
-    required this.user,
-    required this.rank,
-    required this.score,
-    required this.isMe,
-    required this.isWinner,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final medal = medalColor(rank) ?? context.textSecondary;
-    final avatarSize = width * (isWinner ? 0.2 : 0.155);
-    final blockHeight = width * (rank == 1 ? 0.24 : (rank == 2 ? 0.17 : 0.12));
-
-    return Column(
-      key: Key('podium-${user.id}'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.workspace_premium_rounded,
-          color: isWinner ? medal : Colors.transparent,
-          size: width * 0.08,
-        ),
-        LeaderAvatar(user: user, size: avatarSize, ringColor: medal),
-        SizedBox(height: width * 0.02),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: width * 0.01),
-          child: Text(
-            user.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              color: isMe ? context.primaryColor : context.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: width * 0.034,
-            ),
-          ),
-        ),
-        if (isMe) YouTag(fontSize: width * 0.022),
-        SizedBox(height: width * 0.01),
-        StepScore(
-          steps: score,
-          fontSize: width * 0.04,
-          align: CrossAxisAlignment.center,
-        ),
-        SizedBox(height: width * 0.02),
-        Container(
-          height: blockHeight,
-          alignment: Alignment.topCenter,
-          padding: EdgeInsets.only(top: width * 0.02),
-          decoration: BoxDecoration(
-            color: medal.withValues(alpha: 0.18),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            border: Border(top: BorderSide(color: medal, width: 3)),
-          ),
-          child: Text(
-            '$rank',
-            style: GoogleFonts.sora(
-              color: medal,
-              fontWeight: FontWeight.w900,
-              fontSize: width * (isWinner ? 0.08 : 0.065),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Top three as a podium: 2nd on the left, 1st raised in the middle, 3rd on
-/// the right. Takes up to three users already sorted highest first.
-class Podium extends StatelessWidget {
-  final List<LeaderboardUser> users;
-  final List<int> ranks;
-  final LeaderboardPeriod period;
-  final String? myId;
-
-  const Podium({
-    super.key,
-    required this.users,
-    required this.ranks,
-    required this.period,
-    required this.myId,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Widget spot(int i) => Expanded(
-      child: i < users.length
-          ? _PodiumSpot(
-              user: users[i],
-              rank: ranks[i],
-              score: users[i].scoreFor(period),
-              isMe: users[i].id == myId,
-              isWinner: i == 0,
-            )
-          : const SizedBox.shrink(),
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [spot(1), spot(0), spot(2)],
     );
   }
 }
@@ -529,57 +234,236 @@ class InviteFriendsCard extends StatelessWidget {
   }
 }
 
-/// Bar pinned under the list showing the signed-in user's position while
-/// their own row is off screen.
-class MyPositionBar extends StatelessWidget {
+/// Line under the rank card's progress bar, e.g. "1,241 STEPS TO PASS OMAR".
+String stepRaceHint(StepRaceStanding standing) {
+  if (!standing.isSignedIn) return 'SIGN IN TO JOIN THE RACE';
+  if (!standing.isRanked) return 'WALK MORE TO JOIN THE RACE';
+  if (standing.isLeader) {
+    return standing.isTied ? 'TIED FOR THE LEAD' : 'YOU ARE IN THE LEAD';
+  }
+  final name = (standing.aheadName ?? '').trim();
+  final who = name.isEmpty ? 'THE NEXT WALKER' : name.toUpperCase();
+  return '${formatSteps(standing.stepsToPass!)} STEPS TO PASS $who';
+}
+
+/// The signed-in user's place in the race: rank, score, a bar towards the
+/// walker just ahead and how many steps it takes to pass them.
+class StepRaceRankCard extends StatelessWidget {
+  final StepRaceStanding standing;
+
+  const StepRaceRankCard({super.key, required this.standing});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final primary = context.primaryColor;
+    final accent = _accent(context);
+    final score = standing.score;
+
+    return Container(
+      key: const Key('leaderboard-rank-card'),
+      padding: EdgeInsets.all(width * 0.05),
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: context.isDarkMode ? 0.12 : 0.18),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                standing.isRanked ? '#${standing.rank}' : '--',
+                style: GoogleFonts.sora(
+                  fontSize: width * 0.09,
+                  fontWeight: FontWeight.bold,
+                  color: accent,
+                ),
+              ),
+              SizedBox(width: width * 0.03),
+              if (score != null)
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomRight,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            formatSteps(score),
+                            style: GoogleFonts.sora(
+                              fontSize: width * 0.062,
+                              fontWeight: FontWeight.bold,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                          SizedBox(width: width * 0.01),
+                          Padding(
+                            padding: EdgeInsets.only(bottom: width * 0.01),
+                            child: Text(
+                              'steps',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: width * 0.031,
+                                fontWeight: FontWeight.w600,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(height: width * 0.035),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(width * 0.02),
+            child: LinearProgressIndicator(
+              value: standing.progress,
+              minHeight: width * 0.02,
+              backgroundColor: context.cardBorderColor,
+              color: accent,
+            ),
+          ),
+          SizedBox(height: width * 0.025),
+          Text(
+            stepRaceHint(standing),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: width * 0.031,
+              fontWeight: FontWeight.w600,
+              color: context.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Every walker on the board as plain rows inside one card.
+class StepRaceList extends StatelessWidget {
+  final StepRaceBoard board;
+  final String? myId;
+
+  const StepRaceList({super.key, required this.board, required this.myId});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return GlassCard(
+      padding: EdgeInsets.symmetric(
+        horizontal: width * 0.02,
+        vertical: width * 0.015,
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < board.length; i++)
+            _StepRaceRow(
+              user: board.users[i],
+              rank: board.ranks[i],
+              score: board.users[i].scoreFor(board.period),
+              isMe: board.users[i].id == myId,
+              showDivider: i > 0,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepRaceRow extends StatelessWidget {
   final LeaderboardUser user;
   final int rank;
   final int score;
+  final bool isMe;
+  final bool showDivider;
 
-  const MyPositionBar({
-    super.key,
+  const _StepRaceRow({
     required this.user,
     required this.rank,
     required this.score,
+    required this.isMe,
+    required this.showDivider,
   });
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    final accent = _accent(context);
+    final numberColor = isMe ? accent : context.textSecondary;
+    final numberStyle = GoogleFonts.jetBrainsMono(
+      fontSize: width * 0.034,
+      fontWeight: FontWeight.w700,
+      color: numberColor,
+    );
+
     return Container(
-      key: const Key('leaderboard-my-position'),
-      padding: EdgeInsets.symmetric(
-        horizontal: width * 0.04,
-        vertical: width * 0.028,
-      ),
+      key: Key('leaderboard-row-${user.id}'),
       decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.primaryColor, width: 1.5),
+        border: showDivider
+            ? Border(
+                top: BorderSide(color: context.cardBorderColor, width: 0.5),
+              )
+            : null,
       ),
-      child: Row(
-        children: [
-          RankBadge(rank: rank, size: width * 0.08),
-          SizedBox(width: width * 0.03),
-          LeaderAvatar(
-            user: user,
-            size: width * 0.1,
-            ringColor: leagueColor(user),
-          ),
-          SizedBox(width: width * 0.035),
-          Expanded(
-            child: Text(
-              'Your position',
-              style: GoogleFonts.inter(
-                color: context.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: width * 0.038,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: width * 0.02,
+          vertical: width * 0.03,
+        ),
+        decoration: isMe
+            ? BoxDecoration(
+                color: context.primaryColor.withValues(
+                  alpha: context.isDarkMode ? 0.1 : 0.16,
+                ),
+                borderRadius: BorderRadius.circular(width * 0.035),
+              )
+            : null,
+        child: Row(
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(minWidth: width * 0.07),
+              child: Text(
+                '$rank',
+                key: Key('leaderboard-rank-${user.id}'),
+                style: numberStyle,
               ),
             ),
-          ),
-          StepScore(steps: score, fontSize: width * 0.042),
-        ],
+            LeaderAvatar(
+              user: user,
+              size: width * 0.09,
+              ringColor: leagueColor(user),
+            ),
+            SizedBox(width: width * 0.03),
+            Expanded(
+              child: Text(
+                isMe ? 'You' : user.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.sora(
+                  fontSize: width * 0.038,
+                  fontWeight: FontWeight.w600,
+                  color: isMe ? accent : context.textPrimary,
+                ),
+              ),
+            ),
+            SizedBox(width: width * 0.02),
+            Text(formatSteps(score), style: numberStyle),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// The theme colour, darkened in light mode so lime text and bars keep
+/// enough contrast on a light card.
+Color _accent(BuildContext context) {
+  final primary = context.primaryColor;
+  return context.isDarkMode ? primary : Color.lerp(primary, Colors.black, 0.4)!;
 }
