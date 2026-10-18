@@ -81,7 +81,7 @@ class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
                     padding: const EdgeInsets.all(20.0),
                     child: Text(
                       'Error loading leaderboard',
-                      style: TextStyle(color: context.primaryColor),
+                      style: TextStyle(color: context.textSecondary),
                     ),
                   ),
                 ),
@@ -100,7 +100,7 @@ class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
   ) {
     final size = MediaQuery.of(context).size;
     final horizontalPadding = size.width * 0.05;
-    final ranks = leaderboardRanks(users, _period);
+    final board = StepRaceBoard.from(users, _period);
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
@@ -112,7 +112,7 @@ class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (users.isEmpty)
+          if (board.isEmpty)
             Padding(
               padding: EdgeInsets.symmetric(vertical: size.height * 0.04),
               child: Text(
@@ -128,16 +128,9 @@ class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
               ),
             )
           else ...[
-            StepRaceRankCard(
-              standing: StepRaceStanding.from(users, ranks, _period, myId),
-            ),
+            StepRaceRankCard(standing: StepRaceStanding.from(board, myId)),
             SizedBox(height: size.height * 0.02),
-            StepRaceList(
-              users: users,
-              ranks: ranks,
-              period: _period,
-              myId: myId,
-            ),
+            StepRaceList(board: board, myId: myId),
           ],
           SizedBox(height: size.height * 0.02),
           const InviteFriendsCard(),

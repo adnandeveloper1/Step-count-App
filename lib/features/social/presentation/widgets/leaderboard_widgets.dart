@@ -228,6 +228,18 @@ class InviteFriendsCard extends StatelessWidget {
   }
 }
 
+/// Line under the rank card's progress bar, e.g. "1,241 STEPS TO PASS OMAR".
+String stepRaceHint(StepRaceStanding standing) {
+  if (!standing.isSignedIn) return 'SIGN IN TO JOIN THE RACE';
+  if (!standing.isRanked) return 'WALK MORE TO JOIN THE RACE';
+  if (standing.isLeader) {
+    return standing.isTied ? 'TIED FOR THE LEAD' : 'YOU ARE IN THE LEAD';
+  }
+  final name = (standing.aheadName ?? '').trim();
+  final who = name.isEmpty ? 'THE NEXT WALKER' : name.toUpperCase();
+  return '${formatSteps(standing.stepsToPass!)} STEPS TO PASS $who';
+}
+
 /// The signed-in user's place in the race: rank, score, a bar towards the
 /// walker just ahead and how many steps it takes to pass them.
 class StepRaceRankCard extends StatelessWidget {
@@ -240,9 +252,10 @@ class StepRaceRankCard extends StatelessWidget {
     final width = MediaQuery.of(context).size.width;
     final primary = context.primaryColor;
     final accent = _accent(context);
+    final score = standing.score;
 
     return Container(
-      key: const Key('step-race-rank-card'),
+      key: const Key('leaderboard-rank-card'),
       padding: EdgeInsets.all(width * 0.05),
       decoration: BoxDecoration(
         color: primary.withValues(alpha: context.isDarkMode ? 0.12 : 0.18),
@@ -263,58 +276,59 @@ class StepRaceRankCard extends StatelessWidget {
                 ),
               ),
               SizedBox(width: width * 0.03),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          formatSteps(standing.score),
-                          style: GoogleFonts.sora(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: context.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4.0),
-                          child: Text(
-                            'steps',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: context.textSecondary,
+              if (score != null)
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomRight,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            formatSteps(score),
+                            style: GoogleFonts.sora(
+                              fontSize: width * 0.062,
+                              fontWeight: FontWeight.bold,
+                              color: context.textPrimary,
                             ),
                           ),
-                        ),
-                      ],
+                          SizedBox(width: width * 0.01),
+                          Padding(
+                            padding: EdgeInsets.only(bottom: width * 0.01),
+                            child: Text(
+                              'steps',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: width * 0.031,
+                                fontWeight: FontWeight.w600,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
           SizedBox(height: width * 0.035),
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(width * 0.02),
             child: LinearProgressIndicator(
               value: standing.progress,
-              minHeight: 8,
+              minHeight: width * 0.02,
               backgroundColor: context.cardBorderColor,
-              color: primary,
+              color: accent,
             ),
           ),
           SizedBox(height: width * 0.025),
           Text(
-            standing.hint,
+            stepRaceHint(standing),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.jetBrainsMono(
-              fontSize: 12,
+              fontSize: width * 0.031,
               fontWeight: FontWeight.w600,
               color: context.textSecondary,
             ),
@@ -327,32 +341,27 @@ class StepRaceRankCard extends StatelessWidget {
 
 /// Every walker on the board as plain rows inside one card.
 class StepRaceList extends StatelessWidget {
-  final List<LeaderboardUser> users;
-  final List<int> ranks;
-  final LeaderboardPeriod period;
+  final StepRaceBoard board;
   final String? myId;
 
-  const StepRaceList({
-    super.key,
-    required this.users,
-    required this.ranks,
-    required this.period,
-    required this.myId,
-  });
+  const StepRaceList({super.key, required this.board, required this.myId});
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     return GlassCard(
-      padding: EdgeInsets.symmetric(horizontal: width * 0.04),
+      padding: EdgeInsets.symmetric(
+        horizontal: width * 0.02,
+        vertical: width * 0.015,
+      ),
       child: Column(
         children: [
-          for (var i = 0; i < users.length; i++)
+          for (var i = 0; i < board.length; i++)
             _StepRaceRow(
-              user: users[i],
-              rank: ranks[i],
-              score: users[i].scoreFor(period),
-              isMe: users[i].id == myId,
+              user: board.users[i],
+              rank: board.ranks[i],
+              score: board.users[i].scoreFor(board.period),
+              isMe: board.users[i].id == myId,
               showDivider: i > 0,
             ),
         ],
@@ -381,10 +390,14 @@ class _StepRaceRow extends StatelessWidget {
     final width = MediaQuery.of(context).size.width;
     final accent = _accent(context);
     final numberColor = isMe ? accent : context.textSecondary;
+    final numberStyle = GoogleFonts.jetBrainsMono(
+      fontSize: width * 0.034,
+      fontWeight: FontWeight.w700,
+      color: numberColor,
+    );
 
     return Container(
       key: Key('leaderboard-row-${user.id}'),
-      padding: EdgeInsets.symmetric(vertical: width * 0.03),
       decoration: BoxDecoration(
         border: showDivider
             ? Border(
@@ -392,54 +405,58 @@ class _StepRaceRow extends StatelessWidget {
               )
             : null,
       ),
-      child: Row(
-        children: [
-          ConstrainedBox(
-            constraints: BoxConstraints(minWidth: width * 0.07),
-            child: Text(
-              '$rank',
-              key: Key('leaderboard-rank-${user.id}'),
-              style: GoogleFonts.jetBrainsMono(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: numberColor,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: width * 0.02,
+          vertical: width * 0.03,
+        ),
+        decoration: isMe
+            ? BoxDecoration(
+                color: context.primaryColor.withValues(
+                  alpha: context.isDarkMode ? 0.1 : 0.16,
+                ),
+                borderRadius: BorderRadius.circular(width * 0.035),
+              )
+            : null,
+        child: Row(
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(minWidth: width * 0.07),
+              child: Text(
+                '$rank',
+                key: Key('leaderboard-rank-${user.id}'),
+                style: numberStyle,
               ),
             ),
-          ),
-          LeaderAvatar(
-            user: user,
-            size: width * 0.09,
-            ringColor: leagueColor(user),
-          ),
-          SizedBox(width: width * 0.03),
-          Expanded(
-            child: Text(
-              isMe ? 'You' : user.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.sora(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: isMe ? accent : context.textPrimary,
+            LeaderAvatar(
+              user: user,
+              size: width * 0.09,
+              ringColor: leagueColor(user),
+            ),
+            SizedBox(width: width * 0.03),
+            Expanded(
+              child: Text(
+                isMe ? 'You' : user.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.sora(
+                  fontSize: width * 0.038,
+                  fontWeight: FontWeight.w600,
+                  color: isMe ? accent : context.textPrimary,
+                ),
               ),
             ),
-          ),
-          SizedBox(width: width * 0.02),
-          Text(
-            formatSteps(score),
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: numberColor,
-            ),
-          ),
-        ],
+            SizedBox(width: width * 0.02),
+            Text(formatSteps(score), style: numberStyle),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// The theme colour, darkened in light mode so lime text stays readable.
+/// The theme colour, darkened in light mode so lime text and bars keep
+/// enough contrast on a light card.
 Color _accent(BuildContext context) {
   final primary = context.primaryColor;
   return context.isDarkMode ? primary : Color.lerp(primary, Colors.black, 0.4)!;

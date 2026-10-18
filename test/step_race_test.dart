@@ -5,12 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-LeaderboardUser walker(
+LeaderboardUser _walker(
   String id,
   int score, {
   String? name,
   String avatar = '',
   int today = 0,
+  String? league,
 }) {
   return LeaderboardUser(
     id: id,
@@ -19,25 +20,32 @@ LeaderboardUser walker(
     monthlyHighScore: score,
     avatarUrl: avatar,
     todaySteps: today,
+    currentLeague: league,
   );
 }
 
-final race = [
-  walker('ali', 14820, name: 'Ali'),
-  walker('sara', 12960, name: 'Sara'),
-  walker('omar', 11380, name: 'Omar'),
-  walker('me', 10140, name: 'Moiz'),
-  walker('hina', 8730, name: 'Hina'),
+final _race = [
+  _walker('ali', 14820, name: 'Ali'),
+  _walker('sara', 12960, name: 'Sara'),
+  _walker('omar', 11380, name: 'Omar'),
+  _walker('me', 10140, name: 'Moiz'),
+  _walker('hina', 8730, name: 'Hina'),
 ];
 
-StepRaceStanding standing(
+StepRaceBoard _board(
+  List<LeaderboardUser> users, [
+  LeaderboardPeriod period = LeaderboardPeriod.month,
+]) => StepRaceBoard.from(users, period);
+
+StepRaceStanding _standing(
   List<LeaderboardUser> users,
   String? myId, [
   LeaderboardPeriod period = LeaderboardPeriod.month,
-]) =>
-    StepRaceStanding.from(users, leaderboardRanks(users, period), period, myId);
+]) => StepRaceStanding.from(_board(users, period), myId);
 
-Future<void> pumpInApp(
+const _lime = Color(0xFFCCFF00);
+
+Future<void> _pumpInApp(
   WidgetTester tester,
   Widget child, {
   double textScale = 1,
@@ -45,10 +53,7 @@ Future<void> pumpInApp(
 }) {
   return tester.pumpWidget(
     MaterialApp(
-      theme: ThemeData(
-        brightness: brightness,
-        primaryColor: const Color(0xFFCCFF00),
-      ),
+      theme: ThemeData(brightness: brightness, primaryColor: _lime),
       home: MediaQuery(
         data: MediaQueryData(
           size: const Size(360, 780),
@@ -63,55 +68,90 @@ Future<void> pumpInApp(
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
+  group('StepRaceBoard', () {
+    test('sorts by the period score, highest first', () {
+      final board = _board([
+        _walker('a', 100),
+        _walker('b', 900),
+        _walker('c', 500),
+      ]);
+      expect(board.users.map((u) => u.id), ['b', 'c', 'a']);
+      expect(board.ranks, [1, 2, 3]);
+    });
+
+    test('equal scores keep their incoming order and share a rank', () {
+      final board = _board([
+        _walker('a', 500),
+        _walker('b', 900),
+        _walker('c', 500),
+      ]);
+      expect(board.users.map((u) => u.id), ['b', 'a', 'c']);
+      expect(board.ranks, [1, 2, 2]);
+    });
+
+    test('Today sorts by today\'s steps, not the monthly best', () {
+      final board = _board([
+        _walker('a', 99999, today: 10),
+        _walker('b', 1, today: 500),
+      ], LeaderboardPeriod.today);
+      expect(board.users.map((u) => u.id), ['b', 'a']);
+    });
+  });
+
   group('StepRaceStanding', () {
     test('mid-table: rank, steps to pass the walker ahead, progress', () {
-      final s = standing(race, 'me');
+      final s = _standing(_race, 'me');
       expect(s.rank, 4);
       expect(s.score, 10140);
       expect(s.stepsToPass, 11380 - 10140 + 1);
       expect(s.aheadName, 'Omar');
       expect(s.progress, closeTo(10140 / 11380, 1e-9));
-      expect(s.hint, '1,241 STEPS TO PASS OMAR');
+      expect(stepRaceHint(s), '1,241 STEPS TO PASS OMAR');
     });
 
     test('leader has full progress and no one to pass', () {
-      final s = standing(race, 'ali');
+      final s = _standing(_race, 'ali');
       expect(s.isLeader, isTrue);
       expect(s.stepsToPass, isNull);
       expect(s.progress, 1);
-      expect(s.hint, 'YOU ARE IN THE LEAD');
+      expect(stepRaceHint(s), 'YOU ARE IN THE LEAD');
     });
 
     test('last place points at the walker just ahead', () {
-      final s = standing(race, 'hina');
+      final s = _standing(_race, 'hina');
       expect(s.rank, 5);
       expect(s.aheadName, 'Moiz');
     });
 
-    test('signed out (null id) is unranked', () {
-      final s = standing(race, null);
+    test('signed out: no rank, no score, asks to sign in', () {
+      final s = _standing(_race, null);
+      expect(s.isSignedIn, isFalse);
       expect(s.isRanked, isFalse);
       expect(s.isLeader, isFalse);
-      expect(s.score, 0);
+      expect(s.score, isNull);
       expect(s.progress, 0);
-      expect(s.hint, 'WALK MORE TO JOIN THE RACE');
+      expect(stepRaceHint(s), 'SIGN IN TO JOIN THE RACE');
     });
 
-    test('user outside the top 50 is unranked', () {
-      expect(standing(race, 'stranger').isRanked, isFalse);
+    test('signed in but outside the top 50: no score, asks to walk', () {
+      final s = _standing(_race, 'stranger');
+      expect(s.isSignedIn, isTrue);
+      expect(s.isRanked, isFalse);
+      expect(s.score, isNull);
+      expect(stepRaceHint(s), 'WALK MORE TO JOIN THE RACE');
     });
 
     test('empty board is unranked, no crash', () {
-      expect(standing(const [], 'me').isRanked, isFalse);
+      expect(_standing(const [], 'me').isRanked, isFalse);
     });
 
     test('tie: shares the rank and targets the walker above the tie', () {
       final users = [
-        walker('a', 9000, name: 'Ann'),
-        walker('b', 5000, name: 'Bob'),
-        walker('me', 5000),
+        _walker('a', 9000, name: 'Ann'),
+        _walker('b', 5000, name: 'Bob'),
+        _walker('me', 5000),
       ];
-      final s = standing(users, 'me');
+      final s = _standing(users, 'me');
       expect(s.rank, 2);
       expect(s.isTied, isTrue);
       expect(s.aheadName, 'Ann');
@@ -119,90 +159,102 @@ void main() {
     });
 
     test('tied for first says so', () {
-      final s = standing([walker('a', 5000), walker('me', 5000)], 'me');
+      final s = _standing([_walker('a', 5000), _walker('me', 5000)], 'me');
       expect(s.rank, 1);
       expect(s.isLeader, isTrue);
-      expect(s.hint, 'TIED FOR THE LEAD');
+      expect(stepRaceHint(s), 'TIED FOR THE LEAD');
     });
 
     test('passing takes one step more than the gap', () {
-      final s = standing([
-        walker('a', 5001, name: 'Ann'),
-        walker('me', 5000),
+      final s = _standing([
+        _walker('a', 5001, name: 'Ann'),
+        _walker('me', 5000),
       ], 'me');
-      expect(s.hint, '2 STEPS TO PASS ANN');
-      final one = standing([
-        walker('a', 5000, name: 'Ann'),
-        walker('me', 4999),
-      ], 'me');
-      expect(one.stepsToPass, 2);
-      final exact = standing([
-        walker('a', 1, name: 'Ann'),
-        walker('me', 0),
-      ], 'me');
-      expect(exact.stepsToPass, 2);
+      expect(s.stepsToPass, 2);
+      expect(stepRaceHint(s), '2 STEPS TO PASS ANN');
     });
 
     test('everyone on zero: tied lead, progress full, not NaN', () {
-      final s = standing([walker('a', 0), walker('me', 0)], 'me');
+      final s = _standing([_walker('a', 0), _walker('me', 0)], 'me');
       expect(s.isLeader, isTrue);
       expect(s.progress, 1);
     });
 
     test('blank name ahead falls back to generic copy', () {
-      final s = standing([
-        walker('a', 900, name: '   '),
-        walker('me', 100),
+      final s = _standing([
+        _walker('a', 900, name: '   '),
+        _walker('me', 100),
       ], 'me');
-      expect(s.hint, '801 STEPS TO PASS THE NEXT WALKER');
+      expect(stepRaceHint(s), '801 STEPS TO PASS THE NEXT WALKER');
     });
 
-    test('out-of-order data never gives a bad gap or progress', () {
-      final s = standing([walker('a', 100), walker('me', 900)], 'me');
+    test('out-of-order data: rank and lead agree after sorting', () {
+      final s = _standing([
+        _walker('a', 100, name: 'Ann'),
+        _walker('me', 900),
+      ], 'me');
+      expect(s.rank, 1);
       expect(s.isLeader, isTrue);
       expect(s.progress, 1);
+
+      final behind = _standing([
+        _walker('me', 100),
+        _walker('a', 900, name: 'Ann'),
+      ], 'me');
+      expect(behind.rank, 2);
+      expect(behind.aheadName, 'Ann');
+      expect(behind.stepsToPass, 801);
     });
 
     test('Today period uses today\'s steps, not the monthly best', () {
       final users = [
-        walker('a', 100, name: 'Ann', today: 4000),
-        walker('me', 99999, today: 2500),
+        _walker('a', 100, name: 'Ann', today: 4000),
+        _walker('me', 99999, today: 2500),
       ];
-      final s = standing(users, 'me', LeaderboardPeriod.today);
+      final s = _standing(users, 'me', LeaderboardPeriod.today);
       expect(s.score, 2500);
       expect(s.stepsToPass, 1501);
-      expect(s.hint, '1,501 STEPS TO PASS ANN');
+      expect(stepRaceHint(s), '1,501 STEPS TO PASS ANN');
     });
   });
 
   group('leagueColor', () {
-    LeaderboardUser leagued(int score, String? league) => LeaderboardUser(
-      id: 'x',
-      name: 'x',
-      totalSteps: 0,
-      monthlyHighScore: score,
-      avatarUrl: '',
-      currentLeague: league,
-    );
-
     test('saved league wins, any case', () {
-      expect(leagueColor(leagued(0, 'Diamond')), LeagueTier.diamond.color);
-      expect(leagueColor(leagued(0, 'GOLD')), LeagueTier.gold.color);
-      expect(leagueColor(leagued(0, 'silver')), LeagueTier.silver.color);
-      expect(leagueColor(leagued(99999, 'bronze')), LeagueTier.bronze.color);
+      expect(
+        leagueColor(_walker('x', 0, league: 'Diamond')),
+        LeagueTier.diamond.color,
+      );
+      expect(
+        leagueColor(_walker('x', 0, league: 'GOLD')),
+        LeagueTier.gold.color,
+      );
+      expect(
+        leagueColor(_walker('x', 0, league: 'silver')),
+        LeagueTier.silver.color,
+      );
+      expect(
+        leagueColor(_walker('x', 99999, league: 'bronze')),
+        LeagueTier.bronze.color,
+      );
     });
 
     test('no saved league falls back to the monthly best', () {
-      expect(leagueColor(leagued(12000, null)), LeagueTier.diamond.color);
-      expect(leagueColor(leagued(8000, null)), LeagueTier.gold.color);
-      expect(leagueColor(leagued(5000, null)), LeagueTier.silver.color);
-      expect(leagueColor(leagued(4999, 'unknown')), LeagueTier.bronze.color);
+      expect(leagueColor(_walker('x', 12000)), LeagueTier.diamond.color);
+      expect(leagueColor(_walker('x', 8000)), LeagueTier.gold.color);
+      expect(leagueColor(_walker('x', 5000)), LeagueTier.silver.color);
+      expect(
+        leagueColor(_walker('x', 4999, league: 'unknown')),
+        LeagueTier.bronze.color,
+      );
     });
   });
 
   group('StepRaceRankCard', () {
     testWidgets('shows rank, formatted score, bar and hint', (tester) async {
-      await pumpInApp(tester, StepRaceRankCard(standing: standing(race, 'me')));
+      await _pumpInApp(
+        tester,
+        StepRaceRankCard(standing: _standing(_race, 'me')),
+      );
       expect(find.text('#4'), findsOneWidget);
       expect(find.text('10,140'), findsOneWidget);
       expect(find.text('1,241 STEPS TO PASS OMAR'), findsOneWidget);
@@ -212,10 +264,30 @@ void main() {
       expect(bar.value, closeTo(10140 / 11380, 1e-9));
     });
 
-    testWidgets('unranked shows dashes', (tester) async {
-      await pumpInApp(tester, StepRaceRankCard(standing: standing(race, null)));
+    testWidgets('unranked shows dashes and no score', (tester) async {
+      await _pumpInApp(
+        tester,
+        StepRaceRankCard(standing: _standing(_race, 'stranger')),
+      );
       expect(find.text('--'), findsOneWidget);
+      expect(find.text('steps'), findsNothing);
+      expect(find.text('0'), findsNothing);
       expect(find.text('WALK MORE TO JOIN THE RACE'), findsOneWidget);
+    });
+
+    testWidgets('light theme darkens the lime bar for contrast', (
+      tester,
+    ) async {
+      await _pumpInApp(
+        tester,
+        StepRaceRankCard(standing: _standing(_race, 'me')),
+        brightness: Brightness.light,
+      );
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.color, isNot(_lime));
+      expect(bar.color!.computeLuminance(), lessThan(_lime.computeLuminance()));
     });
 
     for (final brightness in Brightness.values) {
@@ -223,12 +295,12 @@ void main() {
         tester,
       ) async {
         final users = [
-          walker('a', 999999999, name: 'A really long display name here'),
-          walker('me', 123456789),
+          _walker('a', 999999999, name: 'A really long display name here'),
+          _walker('me', 123456789),
         ];
-        await pumpInApp(
+        await _pumpInApp(
           tester,
-          StepRaceRankCard(standing: standing(users, 'me')),
+          StepRaceRankCard(standing: _standing(users, 'me')),
           textScale: 2,
           brightness: brightness,
         );
@@ -238,24 +310,50 @@ void main() {
   });
 
   group('StepRaceList', () {
-    Widget list(List<LeaderboardUser> users, String? myId) => StepRaceList(
-      users: users,
-      ranks: leaderboardRanks(users),
-      period: LeaderboardPeriod.month,
-      myId: myId,
-    );
+    Widget list(List<LeaderboardUser> users, String? myId) =>
+        StepRaceList(board: _board(users), myId: myId);
 
-    testWidgets('own row says You instead of the name', (tester) async {
-      await pumpInApp(tester, list(race, 'me'));
-      expect(find.text('You'), findsOneWidget);
-      expect(find.text('Moiz'), findsNothing);
-      expect(find.text('Ali'), findsOneWidget);
-      expect(find.text('14,820'), findsOneWidget);
+    BoxDecoration? rowTint(WidgetTester tester, String id) {
+      final inner = find.descendant(
+        of: find.byKey(Key('leaderboard-row-$id')),
+        matching: find.byType(Container),
+      );
+      return tester.widget<Container>(inner.first).decoration as BoxDecoration?;
+    }
+
+    for (final brightness in Brightness.values) {
+      testWidgets('own row says You and is tinted ($brightness)', (
+        tester,
+      ) async {
+        await _pumpInApp(tester, list(_race, 'me'), brightness: brightness);
+        expect(find.text('You'), findsOneWidget);
+        expect(find.text('Moiz'), findsNothing);
+        expect(find.text('Ali'), findsOneWidget);
+        expect(find.text('14,820'), findsOneWidget);
+        expect(rowTint(tester, 'me')?.color, isNotNull);
+        expect(rowTint(tester, 'ali'), isNull);
+      });
+    }
+
+    testWidgets('rows follow the score order, not the incoming order', (
+      tester,
+    ) async {
+      await _pumpInApp(
+        tester,
+        list([_walker('low', 10), _walker('high', 900)], null),
+      );
+      final highY = tester
+          .getTopLeft(find.byKey(const Key('leaderboard-row-high')))
+          .dy;
+      final lowY = tester
+          .getTopLeft(find.byKey(const Key('leaderboard-row-low')))
+          .dy;
+      expect(highY, lessThan(lowY));
     });
 
     testWidgets('tied walkers show the same rank', (tester) async {
-      final users = [walker('a', 900), walker('b', 500), walker('c', 500)];
-      await pumpInApp(tester, list(users, null));
+      final users = [_walker('a', 900), _walker('b', 500), _walker('c', 500)];
+      await _pumpInApp(tester, list(users, null));
       for (final id in ['b', 'c']) {
         final rank = tester.widget<Text>(
           find.byKey(Key('leaderboard-rank-$id')),
@@ -267,12 +365,12 @@ void main() {
     testWidgets('emoji, empty and broken-photo avatars at 2x text', (
       tester,
     ) async {
-      await pumpInApp(
+      await _pumpInApp(
         tester,
         list([
-          walker('a', 99999999, avatar: '🏃', name: 'x' * 80),
-          walker('b', 5),
-          walker('c', 1, avatar: 'https://invalid.example/none.png'),
+          _walker('a', 99999999, avatar: '🏃', name: 'x' * 80),
+          _walker('b', 5),
+          _walker('c', 1, avatar: 'https://invalid.example/none.png'),
         ], 'b'),
         textScale: 2,
       );

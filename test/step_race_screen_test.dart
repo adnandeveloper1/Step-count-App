@@ -26,11 +26,15 @@ LeaderboardUser _user(String id, int score, {int today = 0}) => LeaderboardUser(
   todaySteps: today,
 );
 
+/// Pumps the Step Race. [monthStream] replaces [month] for load-error and
+/// still-loading cases; [settle] is false when the board never arrives.
 Future<void> _pump(
   WidgetTester tester, {
-  required List<LeaderboardUser> month,
+  List<LeaderboardUser> month = const [],
+  Stream<List<LeaderboardUser>>? monthStream,
   List<LeaderboardUser> today = const [],
   String? myId,
+  bool settle = true,
 }) async {
   tester.view.physicalSize = const Size(1080, 2400);
   tester.view.devicePixelRatio = 2.6;
@@ -44,7 +48,7 @@ Future<void> _pump(
         ),
         leaderboardProvider(
           LeaderboardPeriod.month,
-        ).overrideWith((ref) => Stream.value(month)),
+        ).overrideWith((ref) => monthStream ?? Stream.value(month)),
         leaderboardProvider(
           LeaderboardPeriod.today,
         ).overrideWith((ref) => Stream.value(today)),
@@ -52,10 +56,14 @@ Future<void> _pump(
       child: const MaterialApp(home: ChallengeScreen()),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
-final _rankCard = find.byKey(const Key('step-race-rank-card'));
+final _rankCard = find.byKey(const Key('leaderboard-rank-card'));
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
@@ -159,46 +167,40 @@ void main() {
   });
 
   testWidgets('load error shows the error line, no rank card', (tester) async {
-    tester.view.physicalSize = const Size(1080, 2400);
-    tester.view.devicePixelRatio = 2.6;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authStateProvider.overrideWith(
-            (ref) => Stream.value(_FakeUser('me')),
-          ),
-          leaderboardProvider(LeaderboardPeriod.month).overrideWith(
-            (ref) => Stream<List<LeaderboardUser>>.error(Exception('offline')),
-          ),
-        ],
-        child: const MaterialApp(home: ChallengeScreen()),
-      ),
+    await _pump(
+      tester,
+      monthStream: Stream.error(Exception('offline')),
+      myId: 'me',
     );
-    await tester.pumpAndSettle();
 
     expect(find.text('Error loading leaderboard'), findsOneWidget);
     expect(_rankCard, findsNothing);
   });
 
   testWidgets('while loading shows a spinner, no rank card', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authStateProvider.overrideWith(
-            (ref) => Stream.value(_FakeUser('me')),
-          ),
-          leaderboardProvider(
-            LeaderboardPeriod.month,
-          ).overrideWith((ref) => const Stream<List<LeaderboardUser>>.empty()),
-        ],
-        child: const MaterialApp(home: ChallengeScreen()),
-      ),
+    await _pump(
+      tester,
+      monthStream: const Stream.empty(),
+      myId: 'me',
+      settle: false,
     );
-    await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     expect(_rankCard, findsNothing);
+  });
+
+  testWidgets('out-of-order data: card and list agree after sorting', (
+    tester,
+  ) async {
+    await _pump(tester, month: [_user('a', 100), _user('me', 900)], myId: 'me');
+
+    expect(find.descendant(of: _rankCard, matching: find.text('#1')), findsOne);
+    expect(find.text('YOU ARE IN THE LEAD'), findsOneWidget);
+    final meY = tester
+        .getTopLeft(find.byKey(const Key('leaderboard-row-me')))
+        .dy;
+    final aY = tester.getTopLeft(find.byKey(const Key('leaderboard-row-a'))).dy;
+    expect(meY, lessThan(aY));
   });
 
   testWidgets('switching tabs updates the rank card to that board', (
@@ -222,10 +224,10 @@ void main() {
     expect(find.descendant(of: _rankCard, matching: find.text('#2')), findsOne);
   });
 
-  testWidgets('signed out: dashes, list still shows', (tester) async {
+  testWidgets('signed out: asks to sign in, list still shows', (tester) async {
     await _pump(tester, month: twenty);
 
-    expect(find.text('WALK MORE TO JOIN THE RACE'), findsOneWidget);
+    expect(find.text('SIGN IN TO JOIN THE RACE'), findsOneWidget);
     expect(find.byKey(const Key('leaderboard-row-u0')), findsOneWidget);
   });
 }

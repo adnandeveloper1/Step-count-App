@@ -126,15 +126,53 @@ String formatSteps(int steps) {
   return out.toString();
 }
 
-/// Where the signed-in user stands in the Step Race for one period.
+/// One Step Race board as the screen shows it: [users] sorted by [period]'s
+/// score, highest first, and their shared [ranks].
+class StepRaceBoard {
+  final List<LeaderboardUser> users;
+  final List<int> ranks;
+  final LeaderboardPeriod period;
+
+  const StepRaceBoard._(this.users, this.ranks, this.period);
+
+  /// Sorts [users] by [period]'s score itself instead of trusting the query
+  /// order: the Today query picks its day when it subscribes, so after
+  /// midnight its order can follow yesterday while scores show today. Equal
+  /// scores keep their incoming order.
+  factory StepRaceBoard.from(
+    List<LeaderboardUser> users,
+    LeaderboardPeriod period,
+  ) {
+    final order = List<int>.generate(users.length, (i) => i)
+      ..sort((a, b) {
+        final byScore = users[b]
+            .scoreFor(period)
+            .compareTo(users[a].scoreFor(period));
+        return byScore != 0 ? byScore : a.compareTo(b);
+      });
+    final sorted = [for (final i in order) users[i]];
+    return StepRaceBoard._(sorted, leaderboardRanks(sorted, period), period);
+  }
+
+  bool get isEmpty => users.isEmpty;
+  int get length => users.length;
+}
+
+/// Where the signed-in user stands on a [StepRaceBoard].
 class StepRaceStanding {
+  /// False when nobody is signed in.
+  final bool isSignedIn;
+
   /// Shared position (ties share it), or null when the user isn't on the
   /// board: signed out, or outside the top 50.
   final int? rank;
-  final int score;
 
-  /// Steps needed to get past the nearest walker with a higher score. Null
-  /// when nobody is ahead.
+  /// The user's score, or null when they aren't on the board.
+  final int? score;
+
+  /// Steps needed to get past the nearest walker with a higher score
+  /// (always at least 2: one to draw level, one to pass). Null when nobody
+  /// is ahead.
   final int? stepsToPass;
   final String? aheadName;
 
@@ -145,6 +183,7 @@ class StepRaceStanding {
   final bool isTied;
 
   const StepRaceStanding({
+    required this.isSignedIn,
     required this.rank,
     required this.score,
     required this.stepsToPass,
@@ -156,19 +195,14 @@ class StepRaceStanding {
   bool get isRanked => rank != null;
   bool get isLeader => isRanked && stepsToPass == null;
 
-  /// [users] and [ranks] as the board shows them: sorted by [period]'s
-  /// score, highest first, with [ranks] from [leaderboardRanks].
-  factory StepRaceStanding.from(
-    List<LeaderboardUser> users,
-    List<int> ranks,
-    LeaderboardPeriod period,
-    String? myId,
-  ) {
+  factory StepRaceStanding.from(StepRaceBoard board, String? myId) {
+    final users = board.users;
     final myIndex = myId == null ? -1 : users.indexWhere((u) => u.id == myId);
     if (myIndex < 0) {
-      return const StepRaceStanding(
+      return StepRaceStanding(
+        isSignedIn: myId != null,
         rank: null,
-        score: 0,
+        score: null,
         stepsToPass: null,
         aheadName: null,
         progress: 0,
@@ -176,6 +210,7 @@ class StepRaceStanding {
       );
     }
 
+    final period = board.period;
     final score = users[myIndex].scoreFor(period);
     final isTied = [
       for (var i = 0; i < users.length; i++)
@@ -189,35 +224,15 @@ class StepRaceStanding {
         break;
       }
     }
-    if (ahead == null) {
-      return StepRaceStanding(
-        rank: ranks[myIndex],
-        score: score,
-        stepsToPass: null,
-        aheadName: null,
-        progress: 1,
-        isTied: isTied,
-      );
-    }
-
-    final aheadScore = ahead.scoreFor(period);
+    final aheadScore = ahead?.scoreFor(period);
     return StepRaceStanding(
-      rank: ranks[myIndex],
+      isSignedIn: true,
+      rank: board.ranks[myIndex],
       score: score,
-      stepsToPass: aheadScore - score + 1,
-      aheadName: ahead.name,
-      progress: (score / aheadScore).clamp(0.0, 1.0),
+      stepsToPass: aheadScore == null ? null : aheadScore - score + 1,
+      aheadName: ahead?.name,
+      progress: aheadScore == null ? 1 : (score / aheadScore).clamp(0.0, 1.0),
       isTied: isTied,
     );
-  }
-
-  /// Line under the progress bar, e.g. "1,241 STEPS TO PASS OMAR".
-  String get hint {
-    if (!isRanked) return 'WALK MORE TO JOIN THE RACE';
-    if (isLeader) return isTied ? 'TIED FOR THE LEAD' : 'YOU ARE IN THE LEAD';
-    final name = (aheadName ?? '').trim();
-    final who = name.isEmpty ? 'THE NEXT WALKER' : name.toUpperCase();
-    final unit = stepsToPass == 1 ? 'STEP' : 'STEPS';
-    return '${formatSteps(stepsToPass!)} $unit TO PASS $who';
   }
 }
