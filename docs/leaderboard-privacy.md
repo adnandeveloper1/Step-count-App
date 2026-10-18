@@ -41,7 +41,11 @@ Who writes it:
 `leaderboardProvider` reads only `leaderboard`, ordered by `monthlyHighScore`
 or `daySteps.<today>` (single-field indexes, created automatically).
 
-## The switch (your decision)
+## The switch
+
+**Decision (2026-10-18): Option B.** No Cloud Function. Release the app,
+then lock `users` once most active users have updated. Option A is kept
+below in case that changes.
 
 Users on older versions never write cards, so they are missing from the new
 race until they update. Two ways to handle it:
@@ -111,7 +115,8 @@ version. Until then the race only shows updated users.
 1. Release this app version. Keep the current Firestore rules for now, so old
    versions still work, but add the `leaderboard/{uid}` block from
    `firestore.rules` so new versions can write and read cards.
-2. Option A: deploy the function and run the backfill. Option B: wait.
+2. Wait until most active users are on this version (Play Console >
+   Statistics, by app version). Until then the race shows only updated users.
 3. Publish the full `firestore.rules`, which makes `users/{uid}` owner-only.
    Old versions' Step Race then fails to load (permission denied), so do it
    once most users have updated; the app's in-app update prompt helps.
