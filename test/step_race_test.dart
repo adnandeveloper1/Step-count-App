@@ -335,6 +335,35 @@ void main() {
       });
     }
 
+    testWidgets('avatar fill follows the theme', (tester) async {
+      const navy = Color(0xFF1E293B);
+      const lightPage = Color(0xFFEDEFF1);
+      Color fill() => tester
+          .widget<CircleAvatar>(
+            find.descendant(
+              of: find.byKey(const Key('leaderboard-row-ali')),
+              matching: find.byType(CircleAvatar),
+            ),
+          )
+          .backgroundColor!;
+
+      await _pumpInApp(tester, list(_race, null));
+      expect(fill(), navy);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primaryColor: _lime,
+            scaffoldBackgroundColor: lightPage,
+          ),
+          home: Scaffold(body: SingleChildScrollView(child: list(_race, null))),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fill(), lightPage);
+    });
+
     testWidgets('rows follow the score order, not the incoming order', (
       tester,
     ) async {

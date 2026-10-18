@@ -28,6 +28,12 @@ Color leagueColor(LeaderboardUser user) {
   return LeagueTier.bronze.color;
 }
 
+/// Fill behind an emoji or person icon inside the league ring: deep navy in
+/// dark themes, the page background in light themes so it doesn't show as a
+/// black disc on a white card.
+Color avatarBackground(BuildContext context) =>
+    context.isDarkMode ? const Color(0xFF1E293B) : context.backgroundColor;
+
 /// The user's photo, emoji or a person icon inside a coloured ring. Pro
 /// emoji avatars keep their animated frame.
 class LeaderAvatar extends StatelessWidget {
@@ -60,7 +66,7 @@ class LeaderAvatar extends StatelessWidget {
         border: Border.all(color: ringColor, width: 2),
       ),
       child: CircleAvatar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: avatarBackground(context),
         backgroundImage: isImageUrl ? NetworkImage(user.avatarUrl) : null,
         // A broken photo URL falls back to the plain circle instead of throwing.
         onBackgroundImageError: isImageUrl ? (_, _) {} : null,
