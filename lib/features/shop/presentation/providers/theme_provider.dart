@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_theme_model.dart';
 import '../../../step_tracking/presentation/providers/step_provider.dart';
+import '../../data/shop_cloud.dart';
 
 class ThemeState {
   final String activeThemeId;
@@ -74,6 +77,8 @@ class ThemeNotifier extends Notifier<ThemeState> {
         activeThemeId: theme.id,
       );
       storage.saveActiveTheme(theme.id);
+      // On the account too, so a sign-out or reinstall keeps it.
+      unawaited(ref.read(shopCloudProvider).saveThemePurchase(theme.id));
       return true;
     }
     return false;
@@ -85,5 +90,6 @@ class ThemeNotifier extends Notifier<ThemeState> {
     final storage = ref.read(storageProvider);
     storage.saveActiveTheme(theme.id);
     state = state.copyWith(activeThemeId: theme.id);
+    unawaited(ref.read(shopCloudProvider).saveActiveTheme(theme.id));
   }
 }

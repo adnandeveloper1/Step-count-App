@@ -1,11 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:build_up/core/widgets/coin_icon.dart';
+import 'package:build_up/core/widgets/pro_avatar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../app/theme/app_theme_model.dart';
 import '../../../../app/theme/theme_extensions.dart';
+import '../../data/shop_cloud.dart';
 import '../../models/pro_avatar_item.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/rewarded_ads_section.dart';
@@ -13,11 +15,122 @@ import '../../../step_tracking/presentation/widgets/glass_step_card.dart';
 import '../../../step_tracking/presentation/providers/step_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
-class StoreScreen extends ConsumerWidget {
+/// Asks before spending [price] coins on [name]; true when the user agreed.
+Future<bool> confirmPurchase(
+  BuildContext context, {
+  required String name,
+  required int price,
+}) async {
+  final agreed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      content: Text('Buy $name for $price coins?'),
+      actions: [
+        TextButton(
+          key: const Key('purchase.cancel'),
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('purchase.confirm'),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Buy'),
+        ),
+      ],
+    ),
+  );
+  return agreed ?? false;
+}
+
+class StoreScreen extends ConsumerStatefulWidget {
   const StoreScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StoreScreen> createState() => _StoreScreenState();
+}
+
+class _StoreScreenState extends ConsumerState<StoreScreen> {
+  /// A purchase is being asked about or made; other buy taps are ignored, so
+  /// a double tap can't charge twice.
+  bool _buying = false;
+
+  /// Items bought here that the account doesn't list yet (it updates after
+  /// the write, later still offline), so they can't be bought again.
+  final _boughtItems = <String>{};
+
+  bool _hasCoins(int price) => ref.read(stepNotifierProvider).coins >= price;
+
+  Future<void> _buyTheme(AppThemeModel theme) async {
+    if (_buying) return;
+    if (!_hasCoins(theme.costCoins)) {
+      context.showAppSnackBar(
+        'Not enough coins! Need ${theme.costCoins} coins.',
+        isError: true,
+      );
+      return;
+    }
+    _buying = true;
+    try {
+      final agreed = await confirmPurchase(
+        context,
+        name: theme.name,
+        price: theme.costCoins,
+      );
+      if (!agreed || !mounted) return;
+      if (ref.read(themeProvider.notifier).purchaseTheme(theme)) {
+        context.showAppSnackBar(
+          'Purchased and equipped ${theme.name}!',
+          backgroundColor: theme.primaryColor,
+        );
+      } else {
+        context.showAppSnackBar(
+          'Not enough coins! Need ${theme.costCoins} coins.',
+          isError: true,
+        );
+      }
+    } finally {
+      _buying = false;
+    }
+  }
+
+  Future<void> _buyItem(String id, String title) async {
+    if (_buying || _boughtItems.contains(id)) return;
+    // Items are kept on the account only: nobody to save it to, no charge.
+    if (!ref.read(shopCloudProvider).isSignedIn) return;
+    if (!_hasCoins(proAvatarPrice)) {
+      context.showAppSnackBar(
+        'Not enough coins! Need $proAvatarPrice coins.',
+        isError: true,
+      );
+      return;
+    }
+    _buying = true;
+    try {
+      final agreed = await confirmPurchase(
+        context,
+        name: title,
+        price: proAvatarPrice,
+      );
+      if (!agreed || !mounted) return;
+      if (!ref
+          .read(stepNotifierProvider.notifier)
+          .deductCoins(proAvatarPrice)) {
+        context.showAppSnackBar(
+          'Not enough coins! Need $proAvatarPrice coins.',
+          isError: true,
+        );
+        return;
+      }
+      setState(() => _boughtItems.add(id));
+      unawaited(ref.read(shopCloudProvider).buyItem(id));
+      context.showAppSnackBar('Purchased and equipped $title!');
+    } finally {
+      _buying = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final stepState = ref.watch(stepNotifierProvider);
     ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
@@ -43,6 +156,10 @@ class StoreScreen extends ConsumerWidget {
             .toList() ??
         [];
     final isProAvatarEquipped = showsProAvatar(profile);
+    final savedAvatar = profile?['avatarUrl'];
+    final avatar = savedAvatar is String && savedAvatar.isNotEmpty
+        ? savedAvatar
+        : '👤';
 
     return Scaffold(
       backgroundColor: context.backgroundColor,
@@ -162,20 +279,7 @@ class StoreScreen extends ConsumerWidget {
                                   backgroundColor: theme.primaryColor,
                                 );
                               } else {
-                                final success = themeNotifier.purchaseTheme(
-                                  theme,
-                                );
-                                if (success) {
-                                  context.showAppSnackBar(
-                                    'Purchased and equipped ${theme.name}!',
-                                    backgroundColor: theme.primaryColor,
-                                  );
-                                } else {
-                                  context.showAppSnackBar(
-                                    'Not enough coins! Need ${theme.costCoins} coins.',
-                                    isError: true,
-                                  );
-                                }
+                                _buyTheme(theme);
                               }
                             },
                           );
@@ -206,61 +310,41 @@ class StoreScreen extends ConsumerWidget {
                         itemBuilder: (context, index) {
                           final item = otherShopItems[index];
                           final id = item['id'] as String;
-                          final isOwned = unlockedItems.contains(id);
+                          // Bought here, not on the account yet: buying
+                          // equips it.
+                          final justBought =
+                              _boughtItems.contains(id) &&
+                              !unlockedItems.contains(id);
+                          final isOwned =
+                              justBought || unlockedItems.contains(id);
+                          final isEquipped =
+                              isOwned && (justBought || isProAvatarEquipped);
                           final title = item['title'] as String;
 
                           return ShopItemCard(
                             id: id,
                             title: title,
                             icon: item['icon'] as IconData,
+                            // The frame around the user's own avatar.
+                            preview: id == proAvatarItemId
+                                ? ProAvatar(emojiAvatar: avatar, radius: 30)
+                                : null,
                             price: proAvatarPrice,
                             isOwned: isOwned,
-                            isEquipped: isOwned && isProAvatarEquipped,
-                            onPurchase: () async {
-                              final user = FirebaseAuth.instance.currentUser;
-                              if (user == null) return;
-                              final paid = ref
-                                  .read(stepNotifierProvider.notifier)
-                                  .deductCoins(proAvatarPrice);
-                              if (!paid) {
-                                context.showAppSnackBar(
-                                  'Not enough coins! Need $proAvatarPrice coins.',
-                                  isError: true,
-                                );
-                                return;
-                              }
-                              await FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(user.uid)
-                                  .set({
-                                    'unlockedItems': FieldValue.arrayUnion([
-                                      id,
-                                    ]),
-                                    proAvatarEquippedField: true,
-                                  }, SetOptions(merge: true));
-                              if (context.mounted) {
-                                context.showAppSnackBar(
-                                  'Purchased and equipped $title!',
-                                );
-                              }
-                            },
-                            onToggleEquip: () async {
-                              final user = FirebaseAuth.instance.currentUser;
-                              if (user == null) return;
-                              final equip = !isProAvatarEquipped;
-                              await FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(user.uid)
-                                  .set({
-                                    proAvatarEquippedField: equip,
-                                  }, SetOptions(merge: true));
-                              if (context.mounted) {
-                                context.showAppSnackBar(
-                                  equip
-                                      ? 'Equipped $title!'
-                                      : 'Unequipped $title',
-                                );
-                              }
+                            isEquipped: isEquipped,
+                            onPurchase: () => _buyItem(id, title),
+                            onToggleEquip: () {
+                              final equip = !isEquipped;
+                              unawaited(
+                                ref
+                                    .read(shopCloudProvider)
+                                    .setProAvatarEquipped(equip),
+                              );
+                              context.showAppSnackBar(
+                                equip
+                                    ? 'Equipped $title!'
+                                    : 'Unequipped $title',
+                              );
                             },
                           );
                         },
@@ -398,6 +482,7 @@ class ThemeShopItemCard extends StatelessWidget {
             ),
           ),
           GestureDetector(
+            key: Key('theme.buy.${theme.id}'),
             onTap: onTap,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
@@ -469,11 +554,15 @@ class ShopItemCard extends StatelessWidget {
   final VoidCallback onPurchase;
   final VoidCallback? onToggleEquip;
 
+  /// Shown instead of [icon] when set, e.g. what the item looks like.
+  final Widget? preview;
+
   const ShopItemCard({
     super.key,
     required this.id,
     required this.title,
     required this.icon,
+    this.preview,
     this.price = 0,
     this.isOwned = false,
     this.isEquipped = false,
@@ -492,7 +581,7 @@ class ShopItemCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: context.textSecondary, size: 48),
+            preview ?? Icon(icon, color: context.textSecondary, size: 48),
             Text(
               title,
               textAlign: TextAlign.center,
@@ -505,6 +594,7 @@ class ShopItemCard extends StatelessWidget {
               ),
             ),
             GestureDetector(
+              key: Key('item.buy.$id'),
               onTap: isComingSoon
                   ? null
                   : (isOwned ? onToggleEquip : onPurchase),

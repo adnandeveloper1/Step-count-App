@@ -5,17 +5,34 @@ import 'package:build_up/core/services/local_storage_service.dart';
 import 'package:build_up/core/utils/local_data_state.dart';
 import 'package:build_up/features/auth/presentation/providers/account_data_provider.dart';
 import 'package:build_up/features/auth/presentation/screens/account_data_gate.dart';
+import 'package:build_up/features/shop/data/shop_cloud.dart';
+import 'package:build_up/features/shop/presentation/providers/theme_provider.dart';
 import 'package:build_up/features/step_tracking/presentation/providers/step_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeStorage extends LocalStorageService {
-  _FakeStorage({this.owner, this.lastDate = ''});
+  _FakeStorage({this.owner, this.lastDate = '', List<String>? purchased})
+    : purchased = purchased ?? ['default_dark', 'default_light'];
 
   String? owner;
   String lastDate;
   bool cleared = false;
+  List<String> purchased;
+  String active = 'default_dark';
+
+  @override
+  List<String> getPurchasedThemes() => List.of(purchased);
+
+  @override
+  void savePurchasedThemes(List<String> themes) => purchased = List.of(themes);
+
+  @override
+  String getActiveTheme() => active;
+
+  @override
+  void saveActiveTheme(String themeId) => active = themeId;
 
   @override
   String? getDataOwner() => owner;
@@ -31,7 +48,32 @@ class _FakeStorage extends LocalStorageService {
     cleared = true;
     owner = null;
     lastDate = '';
+    purchased = ['default_dark', 'default_light'];
+    active = 'default_dark';
   }
+}
+
+class _FakeShopCloud implements ShopCloud {
+  @override
+  bool get isSignedIn => true;
+
+  final backups = <(List<String>, String)>[];
+
+  @override
+  Future<void> backUpThemes(List<String> owned, String active) async =>
+      backups.add((owned, active));
+
+  @override
+  Future<void> saveThemePurchase(String themeId) async {}
+
+  @override
+  Future<void> saveActiveTheme(String themeId) async {}
+
+  @override
+  Future<void> buyItem(String itemId) async {}
+
+  @override
+  Future<void> setProAvatarEquipped(bool equipped) async {}
 }
 
 void main() {
@@ -72,11 +114,13 @@ void main() {
     late _FakeStorage storage;
     late int restores;
     late Completer<void> restore;
+    late _FakeShopCloud cloud;
 
     ProviderContainer container() {
       final c = ProviderContainer(
         overrides: [
           storageProvider.overrideWithValue(storage),
+          shopCloudProvider.overrideWithValue(cloud),
           accountRestoreProvider.overrideWithValue(() {
             restores++;
             return restore.future;
@@ -96,6 +140,7 @@ void main() {
     setUp(() {
       restores = 0;
       restore = Completer<void>();
+      cloud = _FakeShopCloud();
     });
 
     test(
@@ -171,6 +216,57 @@ void main() {
         expect(storage.owner, isNull);
       },
     );
+
+    test(
+      'themes bought before they were saved to the account are backed up',
+      () async {
+        storage = _FakeStorage(
+          owner: 'a',
+          lastDate: '2026-10-18',
+          purchased: ['default_dark', 'default_light', 'ocean_wave'],
+        )..active = 'ocean_wave';
+        await load(container());
+
+        final (owned, active) = cloud.backups.single;
+        expect(owned, ['ocean_wave']);
+        expect(active, 'ocean_wave');
+      },
+    );
+
+    test('themes on older app versions\' data are backed up too', () async {
+      storage = _FakeStorage(
+        lastDate: '2026-10-18',
+        purchased: ['default_dark', 'default_light', 'sunset_glow'],
+      );
+      await load(container());
+
+      expect(cloud.backups.single.$1, ['sunset_glow']);
+    });
+
+    test('nothing is backed up with only the free themes', () async {
+      storage = _FakeStorage(owner: 'a', lastDate: '2026-10-18');
+      await load(container());
+
+      expect(cloud.backups, isEmpty);
+    });
+
+    test('the theme screen shows the themes the load brought back', () async {
+      storage = _FakeStorage();
+      final c = container();
+      // The theme state is read before the load, as the app does.
+      expect(
+        c.read(themeProvider).purchasedThemeIds,
+        isNot(contains('ocean_wave')),
+      );
+
+      storage.purchased = ['default_dark', 'default_light', 'ocean_wave'];
+      storage.active = 'ocean_wave';
+      restore.complete();
+      await load(c);
+
+      expect(c.read(themeProvider).purchasedThemeIds, contains('ocean_wave'));
+      expect(c.read(themeProvider).activeThemeId, 'ocean_wave');
+    });
   });
 
   group('AccountDataGate', () {
@@ -184,6 +280,7 @@ void main() {
         ProviderScope(
           overrides: [
             storageProvider.overrideWithValue(_FakeStorage()),
+            shopCloudProvider.overrideWithValue(_FakeShopCloud()),
             accountRestoreProvider.overrideWithValue(restore),
           ],
           child: const MaterialApp(
