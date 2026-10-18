@@ -11,6 +11,7 @@ import '../../../../core/services/native_health_service.dart';
 import '../../../../core/services/widget_service.dart';
 import '../../../../core/utils/activity_log.dart';
 import '../../../../core/utils/calorie_calculator.dart';
+import '../../../../core/utils/monthly_best.dart';
 import '../../../../core/utils/step_counter_math.dart';
 import '../../../../core/utils/step_history.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
@@ -151,6 +152,11 @@ class StepNotifier extends Notifier<StepState> {
   int _lastSyncedSteps = 0;
   String? _lastProcessedDate;
 
+  // Monthly best last written to Firestore by this run; null until the first
+  // write, so every app start syncs it once.
+  int? _syncedHighScore;
+  bool _highScoreSyncing = false;
+
   //  runs on app start up , loads saved data
 
   @override
@@ -168,6 +174,7 @@ class StepNotifier extends Notifier<StepState> {
 
     final storage = ref.watch(storageProvider);
     final now = DateTime.now();
+    _syncedHighScore = null;
     _lastProcessedDate =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
@@ -528,27 +535,66 @@ class StepNotifier extends Notifier<StepState> {
   void _updateLeaderboardScore(int todaySteps) {
     final storage = ref.read(storageProvider);
     final now = DateTime.now();
-    if (now.month != storage.getSavedMonth()) {
+    final local = localMonthlyBest(
+      savedMonth: storage.getSavedMonth(),
+      savedBest: storage.getMonthlyHighScore(),
+      todaySteps: todaySteps,
+      now: now,
+    );
+    if (local.monthChanged) {
       storage.saveSavedMonth(now.month);
-      storage.saveMonthlyHighScore(0);
-      _syncHighScoreToFirestore(0);
+      _syncedHighScore = null;
     }
-    if (todaySteps > storage.getMonthlyHighScore()) {
-      storage.saveMonthlyHighScore(todaySteps);
-      _syncHighScoreToFirestore(todaySteps);
-    }
+    storage.saveMonthlyHighScore(local.best);
+    if (local.best != _syncedHighScore) _syncHighScoreToFirestore();
   }
 
   // Tells Firestore what the user's best score is so their friends can see it.
-
-  void _syncHighScoreToFirestore(int score) {
+  // Never lowers this month's remote best: storage may have been lost (a
+  // reinstall), so the phone's copy can be lower than the real best. A failed
+  // write (e.g. offline) is retried on the next step update.
+  Future<void> _syncHighScoreToFirestore() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'monthlyHighScore': score,
-        'currentLeague': state.currentLeague.name,
-        'lastUpdated': FieldValue.serverTimestamp(),
+    if (user == null || _highScoreSyncing) return;
+    _highScoreSyncing = true;
+    final session = AccountSession.current;
+    final storage = ref.read(storageProvider);
+    final localBest = storage.getMonthlyHighScore();
+    final league = state.currentLeague.name;
+    final now = DateTime.now();
+    final firestore = FirebaseFirestore.instance;
+    final doc = firestore.collection('users').doc(user.uid);
+    try {
+      final best = await firestore.runTransaction((tx) async {
+        final snapshot = await tx.get(doc);
+        final data = snapshot.data();
+        if (data == null) return null;
+        final best = mergeMonthlyBest(
+          localBest: localBest,
+          remoteBest: (data['monthlyHighScore'] as num?)?.toInt(),
+          remoteMonth: data['monthlyHighScoreMonth'] as String?,
+          remoteUpdatedAt: (data['lastUpdated'] as Timestamp?)?.toDate(),
+          now: now,
+        );
+        tx.update(doc, {
+          'monthlyHighScore': best,
+          'monthlyHighScoreMonth': monthKey(now),
+          'currentLeague': league,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+        return best;
       });
+      if (best == null || session != AccountSession.current) return;
+      _syncedHighScore = best;
+      // A higher remote best (from before a reinstall) becomes the local one.
+      if (storage.getSavedMonth() == now.month &&
+          best > storage.getMonthlyHighScore()) {
+        storage.saveMonthlyHighScore(best);
+      }
+    } catch (e) {
+      debugPrint('High score sync failed: $e');
+    } finally {
+      _highScoreSyncing = false;
     }
   }
 
@@ -659,8 +705,23 @@ class StepNotifier extends Notifier<StepState> {
       if (data.containsKey('currentCoins')) {
         storage.saveCoins(data['currentCoins']);
       }
-      if (data.containsKey('monthlyHighScore')) {
-        storage.saveMonthlyHighScore(data['monthlyHighScore']);
+      if (data['monthlyHighScore'] is num) {
+        // Restores the month too: without it the next step update would see
+        // a new month and start the best again from today's steps.
+        final now = DateTime.now();
+        final localBest = storage.getSavedMonth() == now.month
+            ? storage.getMonthlyHighScore()
+            : 0;
+        storage.saveSavedMonth(now.month);
+        storage.saveMonthlyHighScore(
+          mergeMonthlyBest(
+            localBest: localBest,
+            remoteBest: (data['monthlyHighScore'] as num).toInt(),
+            remoteMonth: data['monthlyHighScoreMonth'] as String?,
+            remoteUpdatedAt: (data['lastUpdated'] as Timestamp?)?.toDate(),
+            now: now,
+          ),
+        );
       }
 
       List<int> loadedWeekly = [0, 0, 0, 0, 0, 0, 0];
