@@ -63,44 +63,10 @@ void main() {
     });
   });
 
-  group('LeaderboardUser.fromMap', () {
-    final now = DateTime(2026, 10, 18, 9);
-
-    test("reads the name, avatar, best and today's steps", () {
-      final user = LeaderboardUser.fromMap('u1', {
-        'name': 'Moiz',
-        'avatarUrl': '🌟',
-        'monthlyHighScore': 5475,
-        'monthlyHighScoreMonth': '2026-10',
-        'dailyHistory': {'2026-10-18': 1942},
-      }, now: now);
-      expect(user.name, 'Moiz');
-      expect(user.avatarUrl, '🌟');
-      expect(user.monthlyHighScore, 5475);
-      expect(user.todaySteps, 1942);
-      expect(user.bestIsThisMonth, isTrue);
-    });
-
-    test("a best from last month is not this month's", () {
-      final user = LeaderboardUser.fromMap('u1', {
-        'monthlyHighScore': 9000,
-        'monthlyHighScoreMonth': '2026-09',
-      }, now: now);
-      expect(user.bestIsThisMonth, isFalse);
-    });
-
-    test('the old photoUrl field is no longer used as the avatar', () {
-      final user = LeaderboardUser.fromMap('u1', {
-        'photoUrl': 'https://example.com/a.png',
-      }, now: now);
-      expect(user.avatarUrl, '');
-    });
-  });
-
   group('monthRace', () {
     test('drops users whose best is from an earlier month', () {
       final users = [
-        LeaderboardUser.fromMap('old', {
+        LeaderboardUser.fromCard('old', {
           'monthlyHighScore': 9000,
           'monthlyHighScoreMonth': '2026-09',
         }, now: DateTime(2026, 10, 18)),

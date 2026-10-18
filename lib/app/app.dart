@@ -6,6 +6,7 @@ import '../features/auth/presentation/screens/account_data_gate.dart';
 import '../features/home/presentation/screens/main_screen.dart';
 import '../features/auth/presentation/screens/auth_screen.dart';
 import '../features/shop/presentation/providers/theme_provider.dart';
+import '../features/social/presentation/providers/leaderboard_card_sync.dart';
 
 class BuildUpApp extends ConsumerWidget {
   const BuildUpApp({super.key});
@@ -13,6 +14,9 @@ class BuildUpApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    // Publishes the signed-in user's Step Race card while they're signed in.
+    final uid = authState.value?.uid;
+    if (uid != null) ref.watch(leaderboardCardSyncProvider(uid));
     final themeState = ref.watch(themeProvider);
     final activeTheme = themeState.activeTheme;
 

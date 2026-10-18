@@ -18,6 +18,7 @@ import 'core/utils/calorie_calculator.dart';
 import 'core/utils/local_data_state.dart';
 import 'core/utils/step_counter_math.dart';
 import 'core/utils/step_history.dart';
+import 'features/social/models/leaderboard_card.dart';
 import 'features/step_tracking/presentation/providers/step_provider.dart';
 import 'firebase_options.dart';
 
@@ -108,6 +109,18 @@ void callbackDispatcher() {
           for (final key in expiredDayKeys(now)) key: FieldValue.delete(),
         },
       }, SetOptions(merge: true));
+
+      // The Step Race reads today's steps from the public card. Only an
+      // existing card is updated (a missing one fails): the app creates it
+      // with the name and avatar on the next open.
+      try {
+        await FirebaseFirestore.instance
+            .collection(leaderboardCollection)
+            .doc(uid)
+            .update(leaderboardDaySteps(result.todaySteps, now: now));
+      } on FirebaseException catch (e) {
+        debugPrint('Leaderboard card update failed: ${e.code}');
+      }
     }
 
     return Future.value(true);

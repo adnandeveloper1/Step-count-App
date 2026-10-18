@@ -3,23 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/utils/activity_log.dart';
 import '../../../../core/utils/monthly_best.dart' as monthly;
 
-import '../../../shop/models/pro_avatar_item.dart' as pro_avatar;
+import '../../models/leaderboard_card.dart';
 
 class LeaderboardUser {
   final String id;
   final String name;
   final int monthlyHighScore;
   final String avatarUrl;
-  final String? currentLeague; // New field
-  final List<String> unlockedItems;
+  final String? currentLeague;
   final bool showsProAvatar;
 
   /// False when [monthlyHighScore] is from an earlier month: the user hasn't
   /// walked since, so they are left out of this month's race.
   final bool bestIsThisMonth;
 
-  /// Steps for today, read from the synced `dailyHistory` map. 0 when the
-  /// user hasn't synced today.
+  /// Steps for today, from the card's `daySteps`. 0 when the user hasn't
+  /// synced today.
   final int todaySteps;
 
   LeaderboardUser({
@@ -28,7 +27,6 @@ class LeaderboardUser {
     required this.monthlyHighScore,
     required this.avatarUrl,
     this.currentLeague,
-    this.unlockedItems = const [],
     this.todaySteps = 0,
     this.showsProAvatar = false,
     this.bestIsThisMonth = true,
@@ -39,33 +37,24 @@ class LeaderboardUser {
     LeaderboardPeriod.today => todaySteps,
   };
 
-  factory LeaderboardUser.fromDocument(DocumentSnapshot doc) =>
-      LeaderboardUser.fromMap(
-        doc.id,
-        doc.data() as Map<String, dynamic>,
-        now: DateTime.now(),
-      );
-
-  factory LeaderboardUser.fromMap(
+  /// A `leaderboard/{uid}` card (see leaderboardCard).
+  factory LeaderboardUser.fromCard(
     String id,
-    Map<String, dynamic> data, {
+    Map<String, dynamic> card, {
     required DateTime now,
   }) {
-    final items = data['unlockedItems'] as List<dynamic>?;
-    final history = data['dailyHistory'] as Map<String, dynamic>?;
-    final today = history?[dayKey(now)];
+    final days = card['daySteps'] as Map?;
+    final today = days?[dayKey(now)];
     return LeaderboardUser(
       id: id,
-      name: data['name'] ?? 'Anonymous Walker',
-      monthlyHighScore: data['monthlyHighScore'] ?? 0,
-      avatarUrl: data['avatarUrl'] ?? '',
-      currentLeague: data['currentLeague'], // Read from Firestore
-      unlockedItems: items?.map((e) => e.toString()).toList() ?? [],
+      name: card['name'] as String? ?? defaultLeaderboardName,
+      monthlyHighScore: (card['monthlyHighScore'] as num?)?.toInt() ?? 0,
+      avatarUrl: card['avatarUrl'] as String? ?? '',
+      currentLeague: card['currentLeague'] as String?,
       todaySteps: today is num ? today.toInt() : 0,
-      showsProAvatar: pro_avatar.showsProAvatar(data),
+      showsProAvatar: card['proAvatar'] == true,
       bestIsThisMonth: monthly.bestIsThisMonth(
-        month: data['monthlyHighScoreMonth'] as String?,
-        updatedAt: (data['lastUpdated'] as Timestamp?)?.toDate(),
+        month: card['monthlyHighScoreMonth'] as String?,
         now: now,
       ),
     );
@@ -81,30 +70,36 @@ enum LeaderboardPeriod {
   /// Best single day this month (`monthlyHighScore`).
   month,
 
-  /// Steps so far today (`dailyHistory.<today>`).
+  /// Steps so far today (`daySteps.<today>`).
   today,
 }
 
 /// Top 50 users for [LeaderboardPeriod], highest score first, updating live.
+/// Reads the public cards, never other users' profiles.
 final leaderboardProvider =
     StreamProvider.family<List<LeaderboardUser>, LeaderboardPeriod>((
       ref,
       period,
     ) {
-      final users = FirebaseFirestore.instance.collection('users');
+      final now = DateTime.now();
+      final cards = FirebaseFirestore.instance.collection(
+        leaderboardCollection,
+      );
       final query = switch (period) {
-        LeaderboardPeriod.month => users.orderBy(
+        LeaderboardPeriod.month => cards.orderBy(
           'monthlyHighScore',
           descending: true,
         ),
-        LeaderboardPeriod.today => users.orderBy(
-          FieldPath(['dailyHistory', dayKey(DateTime.now())]),
+        LeaderboardPeriod.today => cards.orderBy(
+          FieldPath(['daySteps', dayKey(now)]),
           descending: true,
         ),
       };
       return query.limit(50).snapshots().map((snapshot) {
         final users = snapshot.docs
-            .map((doc) => LeaderboardUser.fromDocument(doc))
+            .map(
+              (doc) => LeaderboardUser.fromCard(doc.id, doc.data(), now: now),
+            )
             .toList();
         return period == LeaderboardPeriod.month ? monthRace(users) : users;
       });
