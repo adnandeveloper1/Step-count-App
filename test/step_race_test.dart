@@ -16,7 +16,6 @@ LeaderboardUser _walker(
   return LeaderboardUser(
     id: id,
     name: name ?? id,
-    totalSteps: score,
     monthlyHighScore: score,
     avatarUrl: avatar,
     todaySteps: today,
