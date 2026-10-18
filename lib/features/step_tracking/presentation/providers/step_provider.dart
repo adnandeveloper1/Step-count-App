@@ -10,6 +10,7 @@ import '../../../../core/services/local_storage_service.dart';
 import '../../../../core/services/native_health_service.dart';
 import '../../../../core/services/widget_service.dart';
 import '../../../../core/utils/activity_log.dart';
+import '../../../../core/utils/calorie_calculator.dart';
 import '../../../../core/utils/step_counter_math.dart';
 import '../../../../core/utils/step_history.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
@@ -177,9 +178,15 @@ class StepNotifier extends Notifier<StepState> {
     final savedHeight = storage.getHeight();
     final savedWeight = storage.getWeight();
 
-    double strideLengthMeters = (savedHeight * 0.413) / 100;
-    double initialDistanceKm = (displaySteps * strideLengthMeters) / 1000;
-    double initialCalories = initialDistanceKm * savedWeight * 1.036;
+    final initialDistanceKm = CalorieCalculator.distanceKm(
+      displaySteps,
+      savedHeight,
+    );
+    final initialCalories = CalorieCalculator.calories(
+      displaySteps,
+      heightCm: savedHeight,
+      weightKg: savedWeight,
+    );
 
     String weeklyData = storage.getWeeklySteps();
     List<int> loadedWeeklySteps = weeklyData
@@ -406,9 +413,12 @@ class StepNotifier extends Notifier<StepState> {
     storage.saveWeight(weight);
 
     // Recalculate based on current steps
-    double strideLengthMeters = (height * 0.413) / 100;
-    double dist = (state.currentSteps * strideLengthMeters) / 1000;
-    double cals = dist * weight * 1.036;
+    final dist = CalorieCalculator.distanceKm(state.currentSteps, height);
+    final cals = CalorieCalculator.calories(
+      state.currentSteps,
+      heightCm: height,
+      weightKg: weight,
+    );
 
     state = state.copyWith(
       height: height,
@@ -479,13 +489,15 @@ class StepNotifier extends Notifier<StepState> {
 
     if (todaySteps - _lastSyncedSteps >= 500) _forceCloudSync();
 
-    double strideLengthMeters = (state.height * 0.413) / 100;
-
-    //  Calculate accurate distance
-    double calculatedDistanceKm = (todaySteps * strideLengthMeters) / 1000;
-
-    //  Calculate precise calories
-    double calculatedCalories = calculatedDistanceKm * state.weight * 1.036;
+    final calculatedDistanceKm = CalorieCalculator.distanceKm(
+      todaySteps,
+      state.height,
+    );
+    final calculatedCalories = CalorieCalculator.calories(
+      todaySteps,
+      heightCm: state.height,
+      weightKg: state.weight,
+    );
 
     state = state.copyWith(
       currentSteps: todaySteps,
@@ -673,9 +685,12 @@ class StepNotifier extends Notifier<StepState> {
 
       final h = (data['height'] as num?)?.toDouble() ?? 170.0;
       final w = (data['weight'] as num?)?.toDouble() ?? 70.0;
-      double strideLengthMeters = (h * 0.413) / 100;
-      double dist = (restoredSteps * strideLengthMeters) / 1000;
-      double cals = dist * w * 1.036;
+      final dist = CalorieCalculator.distanceKm(restoredSteps, h);
+      final cals = CalorieCalculator.calories(
+        restoredSteps,
+        heightCm: h,
+        weightKg: w,
+      );
 
       state = state.copyWith(
         currentSteps: restoredSteps,

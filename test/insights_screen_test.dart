@@ -55,8 +55,11 @@ void main() {
     WidgetTester tester, {
     LocalStorageService? storage,
     _FakeStepNotifier Function()? notifier,
+    double width = 1080,
+    double textScale = 1,
+    bool disableAnimations = false,
   }) async {
-    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.physicalSize = Size(width, 2400);
     tester.view.devicePixelRatio = 2.6;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -67,7 +70,16 @@ void main() {
             notifier ?? () => _FakeStepNotifier(),
           ),
         ],
-        child: const MaterialApp(home: InsightsScreen()),
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(textScale),
+              disableAnimations: disableAnimations,
+            ),
+            child: child!,
+          ),
+          home: const InsightsScreen(),
+        ),
       ),
     );
     await tester.pump();
@@ -88,6 +100,15 @@ void main() {
       find.byKey(const Key('insights.newerWeek')),
     );
     expect(newer.onPressed, isNull);
+  });
+
+  // Same formula as the home screen: stride from height, then distance x
+  // weight x 1.036. The default profile is 170 cm and 70 kg.
+  testWidgets('total burn matches the home screen formula', (tester) async {
+    await pumpInsights(tester);
+
+    // 7 days x 7,000 steps = 49,000 steps = 34.4 km = 2,494 kcal.
+    expect(text(tester, 'insights.totalBurn'), '2,494');
   });
 
   testWidgets('back arrow shows last week with its own numbers', (
@@ -184,5 +205,164 @@ void main() {
     );
 
     expect(text(tester, 'insights.totalSteps'), '0');
+  });
+
+  group('chart', () {
+    BarChartData chart(WidgetTester tester) =>
+        tester.widget<BarChart>(find.byType(BarChart).first).data;
+
+    List<int> shownTooltips(WidgetTester tester) => [
+      for (final g in chart(tester).barGroups)
+        if (g.showingTooltipIndicators.isNotEmpty) g.x,
+    ];
+
+    // The chart's first and last bars, by their day label.
+    String labelAt(int index) {
+      const names = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+      final now = DateTime.now();
+      final day = DateTime(now.year, now.month, now.day - 6 + index);
+      return names[day.weekday - 1];
+    }
+
+    Future<void> tapBar(WidgetTester tester, int index) async {
+      final label = tester.getCenter(find.text(labelAt(index)).first);
+      await tester.tapAt(label - const Offset(0, 60));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a tap keeps the step count open', (tester) async {
+      await pumpInsights(tester);
+
+      await tapBar(tester, 2);
+
+      expect(chart(tester).barTouchData.handleBuiltInTouches, isFalse);
+      expect(shownTooltips(tester), [2]);
+    });
+
+    testWidgets('tapping the same bar again closes it', (tester) async {
+      await pumpInsights(tester);
+
+      await tapBar(tester, 2);
+      await tapBar(tester, 2);
+
+      expect(shownTooltips(tester), isEmpty);
+    });
+
+    testWidgets('tapping another bar moves it', (tester) async {
+      await pumpInsights(tester);
+
+      await tapBar(tester, 2);
+      await tapBar(tester, 4);
+
+      expect(shownTooltips(tester), [4]);
+    });
+
+    testWidgets('a short bar can be tapped anywhere on its track', (
+      tester,
+    ) async {
+      await pumpInsights(tester);
+
+      expect(chart(tester).barTouchData.allowTouchBarBackDraw, isTrue);
+    });
+
+    testWidgets('changing week closes the open count', (tester) async {
+      await pumpInsights(tester);
+      await tapBar(tester, 2);
+
+      await tester.tap(find.byKey(const Key('insights.olderWeek')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('insights.newerWeek')));
+      await tester.pumpAndSettle();
+
+      expect(shownTooltips(tester), isEmpty);
+    });
+
+    testWidgets('the count names the day', (tester) async {
+      await pumpInsights(tester);
+
+      final data = chart(tester);
+      final group = data.barGroups[6];
+      final item = data.barTouchData.touchTooltipData.getTooltipItem(
+        group,
+        6,
+        group.barRods.single,
+        0,
+      )!;
+      final text = item.text + item.children!.map((s) => s.text).join();
+      expect(text, contains('Today'));
+      expect(text, contains('7,000 steps'));
+
+      final monday = data.barGroups[0];
+      final first = data.barTouchData.touchTooltipData.getTooltipItem(
+        monday,
+        0,
+        monday.barRods.single,
+        0,
+      )!;
+      const full = {
+        'MON': 'Monday',
+        'TUE': 'Tuesday',
+        'WED': 'Wednesday',
+        'THU': 'Thursday',
+        'FRI': 'Friday',
+        'SAT': 'Saturday',
+        'SUN': 'Sunday',
+      };
+      expect(first.text, contains(full[labelAt(0)]!));
+    });
+
+    testWidgets('screen readers hear every day of the week', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpInsights(tester);
+
+      final label = tester
+          .getSemantics(find.byKey(const Key('insights.chart')))
+          .label;
+      expect(label, contains('Steps for'));
+      expect(label, contains('Today, 7,000 steps'));
+      expect(label.split('steps').length - 1, greaterThanOrEqualTo(7));
+      handle.dispose();
+    });
+
+    testWidgets('reduced motion stops the bar and week animations', (
+      tester,
+    ) async {
+      await pumpInsights(tester, disableAnimations: true);
+
+      final bar = tester.widget<BarChart>(find.byType(BarChart).first);
+      expect(bar.duration, Duration.zero);
+
+      await tester.tap(find.byKey(const Key('insights.olderWeek')));
+      await tester.pump();
+      expect(text(tester, 'insights.weekTitle'), 'PREVIOUS 7 DAYS');
+    });
+
+    for (final (width, scale) in [(832.0, 1.0), (1080.0, 2.0), (832.0, 2.0)]) {
+      testWidgets(
+        'day labels fit at ${(width / 2.6).round()}dp, text x$scale',
+        (tester) async {
+          await pumpInsights(tester, width: width, textScale: scale);
+
+          expect(tester.takeException(), isNull);
+          final chartRect = tester.getRect(find.byType(BarChart).first);
+          for (int i = 0; i < 7; i++) {
+            final rect = tester.getRect(find.text(labelAt(i)).first);
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(chartRect.bottom + 0.5),
+              reason: '${labelAt(i)} cut off',
+            );
+          }
+        },
+      );
+    }
+
+    testWidgets('bars keep a round top on a narrow phone', (tester) async {
+      await pumpInsights(tester, width: 832);
+
+      for (final rod in chart(tester).barGroups.map((g) => g.barRods.single)) {
+        expect(rod.borderRadius!.topLeft.x, lessThanOrEqualTo(rod.width / 2));
+      }
+    });
   });
 }

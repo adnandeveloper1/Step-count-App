@@ -1,4 +1,5 @@
 import '../utils/activity_log.dart';
+import '../utils/calorie_calculator.dart';
 import '../utils/step_counter_math.dart';
 import '../utils/step_history.dart';
 import 'local_storage_service.dart';
@@ -110,9 +111,12 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
 
     final double height = storage.getHeight();
     final double weight = storage.getWeight();
-    final double strideLengthMeters = (height * 0.413) / 100;
-    final double distanceKm = (todaySteps * strideLengthMeters) / 1000;
-    final double calories = distanceKm * weight * 1.036;
+    final double distanceKm = CalorieCalculator.distanceKm(todaySteps, height);
+    final double calories = CalorieCalculator.calories(
+      todaySteps,
+      heightCm: height,
+      weightKg: weight,
+    );
 
     return (
       todaySteps: todaySteps,

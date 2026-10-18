@@ -14,6 +14,7 @@ import 'core/services/native_health_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/step_sync_coordinator.dart';
 import 'core/services/widget_service.dart';
+import 'core/utils/calorie_calculator.dart';
 import 'core/utils/step_counter_math.dart';
 import 'core/utils/step_history.dart';
 import 'features/step_tracking/presentation/providers/step_provider.dart';
@@ -158,8 +159,8 @@ Future<void> _startApp(
   final int goal = storage.getStepGoal();
   final double h = storage.getHeight();
   final double w = storage.getWeight();
-  final double d = (steps * (h * 0.413) / 100) / 1000;
-  final double c = d * w * 1.036;
+  final double d = CalorieCalculator.distanceKm(steps, h);
+  final double c = CalorieCalculator.calories(steps, heightCm: h, weightKg: w);
 
   final widgetService = WidgetService();
   await widgetService.updateWidgetData(
