@@ -68,7 +68,7 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
     storage.saveChallengePendingSteps(credit.pending);
 
     // 1. Process Daily and Weekly Resets
-    if (isNewDay) storage.startNewDay(dateStr, now.weekday);
+    if (isNewDay) storage.startNewDay(dateStr);
 
     storage.saveHardwareBaseline(result.baseline);
     storage.markDrivesApplied(result);
@@ -93,18 +93,10 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
       CheckSource.background,
       rides: result.rides,
     );
-    String weeklyData = storage.getWeeklySteps();
-    List<int> weekly = weeklyData
-        .split(',')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    if (weekly.length == 7) {
-      weekly[now.weekday - 1] = todaySteps;
-      storage.saveWeeklySteps(weekly.join(','));
-    }
     storage.saveDailyHistory(
       recordDay(storage.getDailyHistory(), now, todaySteps),
     );
+    final weekly = storage.refreshWeeklySteps(now);
     // Marked now, while holding storage, so the app won't show it again.
     final goal = storage.getStepGoal();
     final notifyGoal = shouldNotifyGoal(
