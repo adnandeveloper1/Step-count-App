@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/utils/activity_log.dart';
-import '../../../../core/utils/monthly_best.dart' as monthly;
+import '../../../../core/utils/monthly_best.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 import '../../models/leaderboard_card.dart';
 
@@ -12,10 +13,6 @@ class LeaderboardUser {
   final String avatarUrl;
   final String? currentLeague;
   final bool showsProAvatar;
-
-  /// False when [monthlyHighScore] is from an earlier month: the user hasn't
-  /// walked since, so they are left out of this month's race.
-  final bool bestIsThisMonth;
 
   /// Steps for today, from the card's `daySteps`. 0 when the user hasn't
   /// synced today.
@@ -29,7 +26,6 @@ class LeaderboardUser {
     this.currentLeague,
     this.todaySteps = 0,
     this.showsProAvatar = false,
-    this.bestIsThisMonth = true,
   });
 
   int scoreFor(LeaderboardPeriod period) => switch (period) {
@@ -53,17 +49,9 @@ class LeaderboardUser {
       currentLeague: card['currentLeague'] as String?,
       todaySteps: today is num ? today.toInt() : 0,
       showsProAvatar: card['proAvatar'] == true,
-      bestIsThisMonth: monthly.bestIsThisMonth(
-        month: card['monthlyHighScoreMonth'] as String?,
-        now: now,
-      ),
     );
   }
 }
-
-/// [users] without those whose best is from an earlier month.
-List<LeaderboardUser> monthRace(List<LeaderboardUser> users) =>
-    users.where((u) => u.bestIsThisMonth).toList();
 
 /// Which score the Step Race ranks by.
 enum LeaderboardPeriod {
@@ -77,33 +65,49 @@ enum LeaderboardPeriod {
 /// Top 50 users for [LeaderboardPeriod], highest score first, updating live.
 /// Reads the public cards, never other users' profiles.
 final leaderboardProvider =
-    StreamProvider.family<List<LeaderboardUser>, LeaderboardPeriod>((
-      ref,
-      period,
-    ) {
-      final now = DateTime.now();
-      final cards = FirebaseFirestore.instance.collection(
-        leaderboardCollection,
-      );
-      final query = switch (period) {
-        LeaderboardPeriod.month => cards.orderBy(
-          'monthlyHighScore',
-          descending: true,
-        ),
-        LeaderboardPeriod.today => cards.orderBy(
-          FieldPath(['daySteps', dayKey(now)]),
-          descending: true,
-        ),
-      };
-      return query.limit(50).snapshots().map((snapshot) {
-        final users = snapshot.docs
+    StreamProvider.family<List<LeaderboardUser>, LeaderboardPeriod>(
+      (ref, period) => leaderboardStream(
+        ref.watch(firestoreProvider),
+        period,
+        now: DateTime.now(),
+      ),
+    );
+
+/// The cards behind [leaderboardProvider], for the day and month of [now].
+Stream<List<LeaderboardUser>> leaderboardStream(
+  FirebaseFirestore firestore,
+  LeaderboardPeriod period, {
+  required DateTime now,
+}) {
+  final cards = firestore.collection(leaderboardCollection);
+  // Filter before the limit, so older bests and days can't take the 50
+  // places. The month query needs the composite index in
+  // firestore.indexes.json; a card without a month never shows (its owner's
+  // next sync tags it).
+  final query = switch (period) {
+    LeaderboardPeriod.month =>
+      cards
+          .where('monthlyHighScoreMonth', isEqualTo: monthKey(now))
+          .orderBy('monthlyHighScore', descending: true),
+    LeaderboardPeriod.today =>
+      cards
+          .where(
+            FieldPath(['daySteps', dayKey(now)]),
+            isGreaterThanOrEqualTo: 0,
+          )
+          .orderBy(FieldPath(['daySteps', dayKey(now)]), descending: true),
+  };
+  return query
+      .limit(50)
+      .snapshots()
+      .map(
+        (snapshot) => snapshot.docs
             .map(
               (doc) => LeaderboardUser.fromCard(doc.id, doc.data(), now: now),
             )
-            .toList();
-        return period == LeaderboardPeriod.month ? monthRace(users) : users;
-      });
-    });
+            .toList(),
+      );
+}
 
 /// Leaderboard positions for [users], who must already be sorted by
 /// [period]'s score, highest first. Equal scores share a position and the

@@ -38,8 +38,21 @@ Who writes it:
   `restore`, same as the profile sync): updates `daySteps` on an existing card.
   It doesn't create cards; the app does on the next open.
 
-`leaderboardProvider` reads only `leaderboard`, ordered by `monthlyHighScore`
-or `daySteps.<today>` (single-field indexes, created automatically).
+`leaderboardProvider` reads only `leaderboard`, top 50:
+
+- **Month**: cards whose `monthlyHighScoreMonth` is this month, ordered by
+  `monthlyHighScore`. The filter comes before the limit, so last month's
+  bests can't fill the 50 places early in a month. This needs the composite
+  index in `firestore.indexes.json` (`monthlyHighScoreMonth` ascending,
+  `monthlyHighScore` descending). **Create it before releasing**: Firebase
+  console > Firestore > Indexes > Composite > Add index, collection
+  `leaderboard`, or `firebase deploy --only firestore:indexes`. Without it the
+  month board fails to load. A card with no `monthlyHighScoreMonth` (a
+  profile with neither that field nor `lastUpdated`) is left out until its
+  owner's next sync tags it.
+- **Today**: cards with `daySteps.<today>` of 0 or more, ordered by it
+  (single-field index, created automatically). Cards hold only one day, so
+  older days are already left out; the filter says so explicitly.
 
 ## The switch
 
@@ -112,7 +125,8 @@ version. Until then the race only shows updated users.
 
 ## Rollout steps (nothing here has been done)
 
-1. Release this app version. Keep the current Firestore rules for now, so old
+1. Create the month index from `firestore.indexes.json` (see above) and wait
+   until the console shows it as enabled. Release this app version. Keep the current Firestore rules for now, so old
    versions still work, but add the `leaderboard/{uid}` block from
    `firestore.rules` so new versions can write and read cards.
 2. Wait until most active users are on this version (Play Console >

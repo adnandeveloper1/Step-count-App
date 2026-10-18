@@ -185,15 +185,6 @@ void main() {
       expect(user.currentLeague, 'gold');
       expect(user.showsProAvatar, isTrue);
       expect(user.todaySteps, 1942);
-      expect(user.bestIsThisMonth, isTrue);
-    });
-
-    test("a best from last month is not this month's", () {
-      final user = LeaderboardUser.fromCard('u1', {
-        'monthlyHighScore': 9000,
-        'monthlyHighScoreMonth': '2026-09',
-      }, now: now);
-      expect(user.bestIsThisMonth, isFalse);
     });
 
     test("yesterday's steps are not today's", () {
@@ -211,7 +202,6 @@ void main() {
       expect(user.currentLeague, isNull);
       expect(user.showsProAvatar, isFalse);
       expect(user.todaySteps, 0);
-      expect(user.bestIsThisMonth, isTrue);
     });
   });
 }

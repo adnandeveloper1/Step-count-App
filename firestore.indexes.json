@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "leaderboard",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "monthlyHighScoreMonth", "order": "ASCENDING" },
+        { "fieldPath": "monthlyHighScore", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

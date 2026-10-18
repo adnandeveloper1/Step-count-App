@@ -63,19 +63,6 @@ void main() {
     });
   });
 
-  group('monthRace', () {
-    test('drops users whose best is from an earlier month', () {
-      final users = [
-        LeaderboardUser.fromCard('old', {
-          'monthlyHighScore': 9000,
-          'monthlyHighScoreMonth': '2026-09',
-        }, now: DateTime(2026, 10, 18)),
-        _user('a', 900),
-      ];
-      expect(monthRace(users).map((u) => u.id), ['a']);
-    });
-  });
-
   test('formatSteps groups thousands', () {
     expect(formatSteps(0), '0');
     expect(formatSteps(999), '999');
