@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:build_up/core/widgets/coin_icon.dart';
+import 'package:build_up/core/widgets/pro_avatar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_theme_model.dart';
@@ -155,6 +156,10 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
             .toList() ??
         [];
     final isProAvatarEquipped = showsProAvatar(profile);
+    final savedAvatar = profile?['avatarUrl'];
+    final avatar = savedAvatar is String && savedAvatar.isNotEmpty
+        ? savedAvatar
+        : '👤';
 
     return Scaffold(
       backgroundColor: context.backgroundColor,
@@ -320,6 +325,10 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                             id: id,
                             title: title,
                             icon: item['icon'] as IconData,
+                            // The frame around the user's own avatar.
+                            preview: id == proAvatarItemId
+                                ? ProAvatar(emojiAvatar: avatar, radius: 30)
+                                : null,
                             price: proAvatarPrice,
                             isOwned: isOwned,
                             isEquipped: isEquipped,
@@ -545,11 +554,15 @@ class ShopItemCard extends StatelessWidget {
   final VoidCallback onPurchase;
   final VoidCallback? onToggleEquip;
 
+  /// Shown instead of [icon] when set, e.g. what the item looks like.
+  final Widget? preview;
+
   const ShopItemCard({
     super.key,
     required this.id,
     required this.title,
     required this.icon,
+    this.preview,
     this.price = 0,
     this.isOwned = false,
     this.isEquipped = false,
@@ -568,7 +581,7 @@ class ShopItemCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: context.textSecondary, size: 48),
+            preview ?? Icon(icon, color: context.textSecondary, size: 48),
             Text(
               title,
               textAlign: TextAlign.center,

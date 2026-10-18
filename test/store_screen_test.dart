@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:build_up/app/theme/app_theme_model.dart';
 import 'package:build_up/core/ads/rewarded_ad_limits.dart';
 import 'package:build_up/core/services/local_storage_service.dart';
+import 'package:build_up/core/widgets/pro_avatar.dart';
 import 'package:build_up/features/auth/presentation/providers/auth_provider.dart';
 import 'package:build_up/features/shop/data/shop_cloud.dart';
 import 'package:build_up/features/shop/models/pro_avatar_item.dart';
@@ -90,7 +91,10 @@ void main() {
 
   // The profile never updates here, like Firestore before the purchase
   // reaches it (offline or slow).
-  Future<void> pump(WidgetTester tester) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    Map<String, dynamic> profile = const {},
+  }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
@@ -102,7 +106,7 @@ void main() {
         storageProvider.overrideWithValue(storage),
         stepNotifierProvider.overrideWith(_FakeStepNotifier.new),
         shopCloudProvider.overrideWithValue(cloud),
-        userProfileProvider.overrideWith((ref) => Stream.value({})),
+        userProfileProvider.overrideWith((ref) => Stream.value(profile)),
       ],
     );
     addTearDown(container.dispose);
@@ -124,6 +128,27 @@ void main() {
   }
 
   group('Pro Avatar Frame', () {
+    testWidgets('the card shows the frame around the user\'s own avatar', (
+      tester,
+    ) async {
+      await pump(tester, profile: {'avatarUrl': '🏃'});
+
+      final preview = tester.widget<ProAvatar>(find.byType(ProAvatar));
+      expect(preview.isPro, isTrue);
+      expect(preview.emojiAvatar, '🏃');
+    });
+
+    testWidgets('without an avatar the frame shows a placeholder', (
+      tester,
+    ) async {
+      await pump(tester);
+
+      expect(
+        tester.widget<ProAvatar>(find.byType(ProAvatar)).emojiAvatar,
+        '👤',
+      );
+    });
+
     testWidgets('asks before spending coins', (tester) async {
       await pump(tester);
 
