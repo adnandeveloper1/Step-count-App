@@ -6,8 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../../app/theme/theme_extensions.dart';
+import '../../../../core/utils/route_simplify.dart';
 import '../providers/gps_tracking_provider.dart';
 import '../widgets/glass_step_card.dart';
+import '../widgets/speed_polylines.dart';
 
 class GpsTrackingScreen extends ConsumerStatefulWidget {
   const GpsTrackingScreen({super.key});
@@ -19,6 +21,9 @@ class GpsTrackingScreen extends ConsumerStatefulWidget {
 class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
   final MapController _mapController = MapController();
   bool _isMapReady = false;
+  // A snackbar would sit behind the workout summary, so the summary shows
+  // save failures itself while it is open.
+  bool _summaryOpen = false;
 
   final darkMapFilter = const ColorFilter.matrix([
     -1,
@@ -54,38 +59,6 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
   @override
   void dispose() {
     super.dispose();
-  }
-
-  List<Polyline> _buildSpeedPolylines(List<Position> positions) {
-    List<Polyline> lines = [];
-    if (positions.length < 2) return lines;
-
-    for (int i = 0; i < positions.length - 1; i++) {
-      final p1 = positions[i];
-      final p2 = positions[i + 1];
-      final speed = p2.speed;
-
-      Color segmentColor = Colors.blue;
-      if (speed > 3.0) {
-        segmentColor = Colors.red;
-      } else if (speed > 2.0) {
-        segmentColor = Colors.orange;
-      } else if (speed > 1.0) {
-        segmentColor = Colors.green;
-      }
-
-      lines.add(
-        Polyline(
-          points: [
-            LatLng(p1.latitude, p1.longitude),
-            LatLng(p2.latitude, p2.longitude),
-          ],
-          color: segmentColor,
-          strokeWidth: 6,
-        ),
-      );
-    }
-    return lines;
   }
 
   List<Marker> _buildDistanceMarkers(List<Position> positions) {
@@ -153,6 +126,7 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
 
     final timeText = '${duration.inMinutes}m ${duration.inSeconds % 60}s';
 
+    _summaryOpen = true;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -230,6 +204,26 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                   ),
                 ],
               ),
+              Consumer(
+                builder: (context, ref, _) {
+                  final saveError = ref.watch(
+                    gpsTrackingProvider.select((s) => s.saveErrorMessage),
+                  );
+                  if (saveError == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Text(
+                      saveError,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -251,7 +245,7 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) => _summaryOpen = false);
   }
 
   void _toggleTracking() {
@@ -296,6 +290,12 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
         try {
           _mapController.move(latLng, 17.0);
         } catch (_) {}
+      }
+      final saveError = next.saveErrorMessage;
+      if (saveError != null &&
+          previous?.saveErrorMessage == null &&
+          !_summaryOpen) {
+        context.showAppSnackBar(saveError, isError: true);
       }
     });
 
@@ -399,8 +399,11 @@ class _GpsTrackingScreenState extends ConsumerState<GpsTrackingScreen> {
                             ),
                             if (trackingState.recordedPositions.length > 1)
                               PolylineLayer(
-                                polylines: _buildSpeedPolylines(
-                                  trackingState.recordedPositions,
+                                polylines: buildSpeedPolylines(
+                                  trackingState.recordedPositions
+                                      .map(RoutePoint.fromPosition)
+                                      .toList(),
+                                  strokeWidth: 6,
                                 ),
                               ),
                             MarkerLayer(

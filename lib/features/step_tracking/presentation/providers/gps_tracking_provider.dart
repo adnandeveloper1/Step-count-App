@@ -6,6 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../../core/utils/route_simplify.dart';
+
+const routeSaveFailedMessage = "Couldn't save this route to your history.";
+
+/// Stores a route's [points]; [recordedCount] is how many fixes the walk had
+/// before thinning.
+typedef RouteSaver =
+    Future<void> Function(List<Map<String, dynamic>> points, int recordedCount);
+
 class GpsTrackingState {
   final Position? currentPosition;
   final List<Position> recordedPositions;
@@ -13,12 +22,17 @@ class GpsTrackingState {
   final String? errorMessage;
   final DateTime? startTime;
 
+  /// Set when the finished route couldn't be saved. Like [errorMessage], the
+  /// next change clears it.
+  final String? saveErrorMessage;
+
   const GpsTrackingState({
     this.currentPosition,
     this.recordedPositions = const [],
     this.isTracking = false,
     this.errorMessage,
     this.startTime,
+    this.saveErrorMessage,
   });
 
   GpsTrackingState copyWith({
@@ -27,6 +41,7 @@ class GpsTrackingState {
     bool? isTracking,
     String? errorMessage,
     DateTime? startTime,
+    String? saveErrorMessage,
   }) {
     return GpsTrackingState(
       currentPosition: currentPosition ?? this.currentPosition,
@@ -34,15 +49,19 @@ class GpsTrackingState {
       isTracking: isTracking ?? this.isTracking,
       errorMessage: errorMessage,
       startTime: startTime ?? this.startTime,
+      saveErrorMessage: saveErrorMessage,
     );
   }
 }
 
 class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
   final Ref ref;
+  final RouteSaver _routeSaver;
   StreamSubscription<Position>? _positionSubscription;
 
-  GpsTrackingNotifier(this.ref) : super(const GpsTrackingState());
+  GpsTrackingNotifier(this.ref, {RouteSaver? routeSaver})
+    : _routeSaver = routeSaver ?? _saveToFirestore,
+      super(const GpsTrackingState());
 
   Future<void> checkPermissionAndGetLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -155,32 +174,48 @@ class GpsTrackingNotifier extends StateNotifier<GpsTrackingState> {
 
   Future<void> stopTracking() async {
     state = state.copyWith(isTracking: false);
-    await _saveRouteToHistory();
     disposeSubscription();
+    await saveRoute(state.recordedPositions);
   }
 
-  Future<void> _saveRouteToHistory() async {
-    if (state.recordedPositions.isEmpty) return;
+  /// Thins [positions] so a long walk fits in one Firestore document, then
+  /// saves it to the route history.
+  Future<void> saveRoute(List<Position> positions) async {
+    if (positions.isEmpty) return;
+
+    final points = simplifyRoute(
+      positions.map(RoutePoint.fromPosition).toList(),
+    );
+    try {
+      await _routeSaver(
+        points.map((p) => p.toMap()).toList(),
+        positions.length,
+      );
+    } catch (e) {
+      debugPrint('Failed to save route: $e');
+      if (mounted) {
+        state = state.copyWith(saveErrorMessage: routeSaveFailedMessage);
+      }
+    }
+  }
+
+  static Future<void> _saveToFirestore(
+    List<Map<String, dynamic>> points,
+    int recordedCount,
+  ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final routeData = state.recordedPositions
-        .map((p) => {'lat': p.latitude, 'lng': p.longitude, 'speed': p.speed})
-        .toList();
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('routes')
-          .add({
-            'timestamp': FieldValue.serverTimestamp(),
-            'points': routeData,
-            'pointCount': state.recordedPositions.length,
-          });
-    } catch (e) {
-      debugPrint('Failed to save route');
-    }
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('routes')
+        .add({
+          'timestamp': FieldValue.serverTimestamp(),
+          'points': points,
+          'pointCount': points.length,
+          'recordedPointCount': recordedCount,
+        });
   }
 
   void disposeSubscription() {
