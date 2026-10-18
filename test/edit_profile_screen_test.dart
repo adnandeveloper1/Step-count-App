@@ -120,6 +120,51 @@ void main() {
 
   setUp(() => cloud = _FakeProfileCloud());
 
+  group('avatar', () {
+    bool savedAvatar() => cloud.saved.any((d) => d.containsKey('avatarUrl'));
+
+    testWidgets('offline, Save leaves the account\'s avatar alone', (
+      tester,
+    ) async {
+      cloud.onLoad = () => Future.error(Exception('offline'));
+      await open(tester);
+      await tester.enterText(_goal, '9000');
+      await tapSave(tester);
+      await tester.pumpAndSettle();
+
+      expect(savedAvatar(), isFalse);
+    });
+
+    testWidgets(
+      'a new account\'s avatar outside the picker is kept, not replaced by 🤖',
+      (tester) async {
+        // Google accounts start with 🌟, which the picker doesn't offer.
+        cloud.onLoad = () async => {'avatarUrl': '🌟'};
+        await open(tester);
+        await tester.enterText(_goal, '9000');
+        await tapSave(tester);
+        await tester.pumpAndSettle();
+
+        expect(savedAvatar(), isFalse);
+      },
+    );
+
+    testWidgets('a picked avatar is saved', (tester) async {
+      cloud.onLoad = () async => {'avatarUrl': '🌟'};
+      await open(tester);
+      await tester.tap(find.text('👧'));
+      await tapSave(tester);
+      await tester.pumpAndSettle();
+
+      expect(
+        cloud.saved
+            .where((d) => d.containsKey('avatarUrl'))
+            .single['avatarUrl'],
+        '👧',
+      );
+    });
+  });
+
   group('prefill when the account can not be read (offline)', () {
     setUp(() => cloud.onLoad = () => Future.error(Exception('offline')));
 
@@ -133,15 +178,31 @@ void main() {
       expect(_text(tester, _height), '181');
     });
 
-    testWidgets('Save keeps the phone values, not 70 kg / 170 cm', (
-      tester,
-    ) async {
+    testWidgets('Save without changes writes no body values', (tester) async {
+      // The phone's values may be the 70 kg / 170 cm defaults of an account
+      // that never set them; saving must not make them the account's.
       await open(tester);
       await tapSave(tester);
       await tester.pumpAndSettle();
 
-      expect(steps.profiles.last, (181.0, 82.5));
-      expect(steps.goals.last, 8000);
+      expect(steps.profiles, isEmpty);
+      expect(steps.goals, isEmpty);
+      expect(cloud.saved.single.containsKey('weight'), isFalse);
+      expect(cloud.saved.single.containsKey('height'), isFalse);
+    });
+
+    testWidgets('only the changed value is sent to the account', (
+      tester,
+    ) async {
+      await open(tester);
+      await tester.enterText(_weight, '80');
+      await tapSave(tester);
+      await tester.pumpAndSettle();
+
+      expect(steps.profiles.single, (181.0, 80.0));
+      expect(steps.goals, isEmpty);
+      expect(cloud.saved.single['weight'], 80.0);
+      expect(cloud.saved.single.containsKey('height'), isFalse);
     });
 
     testWidgets('a field left blank keeps its saved value', (tester) async {
@@ -197,7 +258,9 @@ void main() {
       expect(find.byType(EditProfileScreen), findsNothing);
       expect(find.text('PROFILE UPDATED'), findsOneWidget);
       expect(steps.profiles.last, (181.0, 80.0));
-      expect(cloud.saved.single['avatarUrl'], isNotNull);
+      expect(cloud.saved.single['weight'], 80.0);
+      // Not loaded and not picked: the account's avatar is left as it is.
+      expect(cloud.saved.single.containsKey('avatarUrl'), isFalse);
     });
 
     testWidgets('an unchanged name is not sent to sign-in', (tester) async {

@@ -240,7 +240,7 @@ class StepNotifier extends Notifier<StepState> {
 
   void _syncCoinsToFirestore(int coins) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    if (user != null && !AccountSession.deleting) {
       FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'currentCoins': coins,
         'lastUpdated': FieldValue.serverTimestamp(),
@@ -612,7 +612,7 @@ class StepNotifier extends Notifier<StepState> {
     List<int> weekly,
   ) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    if (user != null && !AccountSession.deleting) {
       final day = DateTime.parse(dateStr);
       final yesterdayStr = dateKey(DateTime(day.year, day.month, day.day - 1));
       final yesterdaySteps = ref

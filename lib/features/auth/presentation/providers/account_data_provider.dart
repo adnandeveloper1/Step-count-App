@@ -60,7 +60,5 @@ void _backUpThemes(Ref ref) {
   final storage = ref.read(storageProvider);
   final paid = paidThemes(storage.getPurchasedThemes());
   if (paid.isEmpty) return;
-  unawaited(
-    ref.read(shopCloudProvider).backUpThemes(paid, storage.getActiveTheme()),
-  );
+  unawaited(ref.read(shopCloudProvider).backUpThemes(paid));
 }

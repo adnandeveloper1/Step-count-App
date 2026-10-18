@@ -71,7 +71,7 @@ class _FakeShopCloud implements ShopCloud {
   Future<void> saveActiveTheme(String themeId) async {}
 
   @override
-  Future<void> backUpThemes(List<String> owned, String active) async {}
+  Future<void> backUpThemes(List<String> owned) async {}
 
   @override
   Future<void> setProAvatarEquipped(bool equipped) async {}

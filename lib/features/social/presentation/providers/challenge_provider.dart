@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/notification_provider/notification_provider.dart';
+import '../../../../core/services/account_session.dart';
 import '../../../../core/services/local_storage_service.dart';
 
 class ChallengeItem {
@@ -342,7 +343,7 @@ class ChallengeNotifier extends Notifier<List<ChallengeItem>> {
     storage.saveChallengeData(jsonEncode(dataToSave));
 
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    if (user != null && !AccountSession.deleting) {
       FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'challengeProgress': dataToSave,
       }, SetOptions(merge: true));

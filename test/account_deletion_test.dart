@@ -31,10 +31,13 @@ class _FakeCloud implements AccountDeletionCloud {
 
   final calls = <String>[];
   final errors = <String, List<Object>>{};
+  // Whether step and coin syncs were held off during each call.
+  final syncsHeld = <String, bool>{};
   bool googleChosen = true;
 
   Future<void> _run(String call) async {
     calls.add(call);
+    syncsHeld[call] = AccountSession.deleting;
     final queued = errors[call];
     if (queued != null && queued.isNotEmpty) throw queued.removeAt(0);
   }
@@ -104,6 +107,41 @@ void main() {
     storage = _FakeStorage();
     passwords = [];
     passwordPrompts = 0;
+  });
+
+  group('step and coin syncs during a deletion', () {
+    // A sync between deleting the data and deleting the sign-in would write
+    // the profile, and through it the public Step Race card, back.
+    test(
+      'are held off from the data deletion until the sign-in is gone',
+      () async {
+        cloud = _FakeCloud(SignInMethod.email);
+        passwords = ['pw'];
+
+        expect(await delete(), DeleteAccountResult.deleted);
+
+        expect(cloud.syncsHeld['password:pw'], isFalse);
+        expect(cloud.syncsHeld['deleteData'], isTrue);
+        expect(cloud.syncsHeld['deleteUser'], isTrue);
+        expect(AccountSession.deleting, isFalse);
+      },
+    );
+
+    test('resume when the deletion stops halfway', () async {
+      cloud = _FakeCloud(SignInMethod.guest)
+        ..failNext('deleteUser', _authError('network-request-failed'));
+
+      expect(await delete(), DeleteAccountResult.unfinished);
+      expect(AccountSession.deleting, isFalse);
+    });
+
+    test('resume when nothing could be deleted', () async {
+      cloud = _FakeCloud(SignInMethod.guest)
+        ..failNext('deleteData', Exception('offline'));
+
+      expect(await delete(), DeleteAccountResult.failed);
+      expect(AccountSession.deleting, isFalse);
+    });
   });
 
   group('a guest', () {

@@ -178,6 +178,8 @@ void main() {
     final result = await run(12000, now: DateTime(2026, 10, 12, 1));
 
     expect(result!.todaySteps, 1000);
+    // Sent to Firestore too, so the cloud's yesterday isn't left at 9000.
+    expect(result.yesterdaySteps, 10000);
     final box = await openBox();
     expect(box.get('currentSteps'), 1000);
     expect(box.get('dailyHistory'), contains('"2026-10-11":10000'));
@@ -191,6 +193,13 @@ void main() {
       10000,
       reason: 'logged at the end of the day before',
     );
+  });
+
+  test('without a saved yesterday there is nothing to send for it', () async {
+    await seed(steps: 41, baseline: 1000);
+    final result = await run(1075);
+
+    expect(result!.yesterdaySteps, isNull);
   });
 
   test('reports whose data it saved, for the Firestore sync', () async {

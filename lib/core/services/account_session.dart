@@ -12,4 +12,9 @@ class AccountSession {
 
   /// Call at sign-out, before clearing local data.
   static void end() => _current++;
+
+  /// True while the account's data is being deleted. Syncs that start
+  /// meanwhile (the step poll, a background task's request) must not write
+  /// the profile back, which would also republish the public Step Race card.
+  static bool deleting = false;
 }

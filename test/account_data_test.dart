@@ -57,11 +57,10 @@ class _FakeShopCloud implements ShopCloud {
   @override
   bool get isSignedIn => true;
 
-  final backups = <(List<String>, String)>[];
+  final backups = <List<String>>[];
 
   @override
-  Future<void> backUpThemes(List<String> owned, String active) async =>
-      backups.add((owned, active));
+  Future<void> backUpThemes(List<String> owned) async => backups.add(owned);
 
   @override
   Future<void> saveThemePurchase(String themeId) async {}
@@ -227,9 +226,9 @@ void main() {
         )..active = 'ocean_wave';
         await load(container());
 
-        final (owned, active) = cloud.backups.single;
-        expect(owned, ['ocean_wave']);
-        expect(active, 'ocean_wave');
+        // Only the themes: the equipped one may differ between phones, and a
+        // start on one must not change the other's.
+        expect(cloud.backups.single, ['ocean_wave']);
       },
     );
 
@@ -240,7 +239,7 @@ void main() {
       );
       await load(container());
 
-      expect(cloud.backups.single.$1, ['sunset_glow']);
+      expect(cloud.backups.single, ['sunset_glow']);
     });
 
     test('nothing is backed up with only the free themes', () async {

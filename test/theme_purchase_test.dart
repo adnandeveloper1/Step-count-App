@@ -65,7 +65,7 @@ class FakeShopCloud implements ShopCloud {
       activeThemes.add(themeId);
 
   @override
-  Future<void> backUpThemes(List<String> owned, String active) async {}
+  Future<void> backUpThemes(List<String> owned) async {}
 
   @override
   Future<void> buyItem(String itemId) async {}
