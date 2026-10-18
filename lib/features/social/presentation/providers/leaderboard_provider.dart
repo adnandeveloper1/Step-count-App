@@ -125,3 +125,99 @@ String formatSteps(int steps) {
   }
   return out.toString();
 }
+
+/// Where the signed-in user stands in the Step Race for one period.
+class StepRaceStanding {
+  /// Shared position (ties share it), or null when the user isn't on the
+  /// board: signed out, or outside the top 50.
+  final int? rank;
+  final int score;
+
+  /// Steps needed to get past the nearest walker with a higher score. Null
+  /// when nobody is ahead.
+  final int? stepsToPass;
+  final String? aheadName;
+
+  /// Share of the way to [aheadName]'s score, 0 to 1.
+  final double progress;
+
+  /// Someone else has the same score as the user.
+  final bool isTied;
+
+  const StepRaceStanding({
+    required this.rank,
+    required this.score,
+    required this.stepsToPass,
+    required this.aheadName,
+    required this.progress,
+    required this.isTied,
+  });
+
+  bool get isRanked => rank != null;
+  bool get isLeader => isRanked && stepsToPass == null;
+
+  /// [users] and [ranks] as the board shows them: sorted by [period]'s
+  /// score, highest first, with [ranks] from [leaderboardRanks].
+  factory StepRaceStanding.from(
+    List<LeaderboardUser> users,
+    List<int> ranks,
+    LeaderboardPeriod period,
+    String? myId,
+  ) {
+    final myIndex = myId == null ? -1 : users.indexWhere((u) => u.id == myId);
+    if (myIndex < 0) {
+      return const StepRaceStanding(
+        rank: null,
+        score: 0,
+        stepsToPass: null,
+        aheadName: null,
+        progress: 0,
+        isTied: false,
+      );
+    }
+
+    final score = users[myIndex].scoreFor(period);
+    final isTied = [
+      for (var i = 0; i < users.length; i++)
+        if (i != myIndex) users[i].scoreFor(period),
+    ].contains(score);
+
+    LeaderboardUser? ahead;
+    for (var i = myIndex - 1; i >= 0; i--) {
+      if (users[i].scoreFor(period) > score) {
+        ahead = users[i];
+        break;
+      }
+    }
+    if (ahead == null) {
+      return StepRaceStanding(
+        rank: ranks[myIndex],
+        score: score,
+        stepsToPass: null,
+        aheadName: null,
+        progress: 1,
+        isTied: isTied,
+      );
+    }
+
+    final aheadScore = ahead.scoreFor(period);
+    return StepRaceStanding(
+      rank: ranks[myIndex],
+      score: score,
+      stepsToPass: aheadScore - score + 1,
+      aheadName: ahead.name,
+      progress: (score / aheadScore).clamp(0.0, 1.0),
+      isTied: isTied,
+    );
+  }
+
+  /// Line under the progress bar, e.g. "1,241 STEPS TO PASS OMAR".
+  String get hint {
+    if (!isRanked) return 'WALK MORE TO JOIN THE RACE';
+    if (isLeader) return isTied ? 'TIED FOR THE LEAD' : 'YOU ARE IN THE LEAD';
+    final name = (aheadName ?? '').trim();
+    final who = name.isEmpty ? 'THE NEXT WALKER' : name.toUpperCase();
+    final unit = stepsToPass == 1 ? 'STEP' : 'STEPS';
+    return '${formatSteps(stepsToPass!)} $unit TO PASS $who';
+  }
+}

@@ -15,41 +15,7 @@ class ChallengeScreen extends ConsumerStatefulWidget {
 }
 
 class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
-  final _scrollController = ScrollController();
-  final _viewportKey = GlobalKey();
-  final _myRowKey = GlobalKey();
-
   LeaderboardPeriod _period = LeaderboardPeriod.month;
-
-  /// Whether the signed-in user's own row (or podium spot) is on screen.
-  /// Starts true so the pinned bar doesn't flash before the first layout.
-  bool _myRowVisible = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_checkMyRowVisible);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _checkMyRowVisible() {
-    final row = _myRowKey.currentContext?.findRenderObject() as RenderBox?;
-    final viewport =
-        _viewportKey.currentContext?.findRenderObject() as RenderBox?;
-    var visible = false;
-    if (row != null && row.attached && viewport != null) {
-      final top = row.localToGlobal(Offset.zero, ancestor: viewport).dy;
-      // Count the row as visible while at least half of it shows.
-      final mid = top + row.size.height / 2;
-      visible = mid >= 0 && mid <= viewport.size.height;
-    }
-    if (visible != _myRowVisible) setState(() => _myRowVisible = visible);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,15 +23,6 @@ class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
     final horizontalPadding = size.width * 0.05;
     final myId = ref.watch(authStateProvider).value?.uid;
     final leaderboardAsync = ref.watch(leaderboardProvider(_period));
-
-    // Re-check after every layout: the list can change under a still scroll.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _checkMyRowVisible();
-    });
-
-    final users = leaderboardAsync.value ?? const <LeaderboardUser>[];
-    final ranks = leaderboardRanks(users, _period);
-    final myIndex = users.indexWhere((u) => u.id == myId);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -113,42 +70,23 @@ class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
               ),
             ),
             Expanded(
-              child: Container(
-                key: _viewportKey,
-                child: leaderboardAsync.when(
-                  skipLoadingOnReload: true,
-                  data: (_) => _buildBoard(context, users, ranks, myId),
-                  loading: () => Center(
-                    child: CircularProgressIndicator(
-                      color: context.primaryColor,
-                    ),
-                  ),
-                  error: (error, stack) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Text(
-                        'Error loading leaderboard',
-                        style: TextStyle(color: context.primaryColor),
-                      ),
+              child: leaderboardAsync.when(
+                skipLoadingOnReload: true,
+                data: (users) => _buildBoard(context, users, myId),
+                loading: () => Center(
+                  child: CircularProgressIndicator(color: context.primaryColor),
+                ),
+                error: (error, stack) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Text(
+                      'Error loading leaderboard',
+                      style: TextStyle(color: context.primaryColor),
                     ),
                   ),
                 ),
               ),
             ),
-            if (myIndex >= 0 && !_myRowVisible)
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPadding,
-                  size.height * 0.008,
-                  horizontalPadding,
-                  size.height * 0.012,
-                ),
-                child: MyPositionBar(
-                  user: users[myIndex],
-                  rank: ranks[myIndex],
-                  score: users[myIndex].scoreFor(_period),
-                ),
-              ),
           ],
         ),
       ),
@@ -158,17 +96,13 @@ class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
   Widget _buildBoard(
     BuildContext context,
     List<LeaderboardUser> users,
-    List<int> ranks,
     String? myId,
   ) {
     final size = MediaQuery.of(context).size;
     final horizontalPadding = size.width * 0.05;
-    final podiumCount = users.length < 3 ? users.length : 3;
-    final meOnPodium =
-        myId != null && users.take(podiumCount).any((u) => u.id == myId);
+    final ranks = leaderboardRanks(users, _period);
 
     return SingleChildScrollView(
-      controller: _scrollController,
       padding: EdgeInsets.fromLTRB(
         horizontalPadding,
         size.height * 0.02,
@@ -193,29 +127,19 @@ class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
                 ),
               ),
             )
-          else
-            KeyedSubtree(
-              key: meOnPodium ? _myRowKey : null,
-              child: Podium(
-                users: users.take(podiumCount).toList(),
-                ranks: ranks.take(podiumCount).toList(),
-                period: _period,
-                myId: myId,
-              ),
+          else ...[
+            StepRaceRankCard(
+              standing: StepRaceStanding.from(users, ranks, _period, myId),
             ),
+            SizedBox(height: size.height * 0.02),
+            StepRaceList(
+              users: users,
+              ranks: ranks,
+              period: _period,
+              myId: myId,
+            ),
+          ],
           SizedBox(height: size.height * 0.02),
-          for (var i = podiumCount; i < users.length; i++)
-            Padding(
-              key: users[i].id == myId ? _myRowKey : null,
-              padding: EdgeInsets.only(bottom: size.height * 0.012),
-              child: LeaderboardRow(
-                user: users[i],
-                rank: ranks[i],
-                score: users[i].scoreFor(_period),
-                isMe: users[i].id == myId,
-              ),
-            ),
-          SizedBox(height: size.height * 0.01),
           const InviteFriendsCard(),
         ],
       ),
