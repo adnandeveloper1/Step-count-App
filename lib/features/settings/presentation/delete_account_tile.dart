@@ -123,7 +123,8 @@ class _DeleteAccountTileState extends ConsumerState<DeleteAccountTile> {
     final screenWidth = MediaQuery.of(context).size.width;
     return ListTile(
       leading: Icon(
-        Icons.delete_forever,
+        // As wide as Sign Out's icon, so the two line up.
+        Icons.person_remove_outlined,
         color: Colors.redAccent,
         size: screenWidth * 0.06,
       ),
