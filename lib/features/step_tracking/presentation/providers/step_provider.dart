@@ -14,6 +14,8 @@ import '../../../../core/utils/calorie_calculator.dart';
 import '../../../../core/utils/monthly_best.dart';
 import '../../../../core/utils/step_counter_math.dart';
 import '../../../../core/utils/step_history.dart';
+import '../../../../core/utils/step_upload.dart';
+import '../../../shop/models/owned_themes.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
 
 // list of all  ranks users can reach based on their walking.
@@ -149,8 +151,11 @@ class StepNotifier extends Notifier<StepState> {
   Timer? _pollingTimer;
 
   AppLifecycleListener? _lifecycleListener;
-  int _lastSyncedSteps = 0;
-  String? _lastProcessedDate;
+  // Today's steps last sent to Firestore by this run; null until the first.
+  SentSteps? _lastSent;
+  // Day (yyyy-MM-dd) that state.currentSteps belongs to. Just after midnight
+  // it is still yesterday until the next sensor read.
+  String? _stepsDay;
 
   // Monthly best last written to Firestore by this run; null until the first
   // write, so every app start syncs it once.
@@ -175,10 +180,11 @@ class StepNotifier extends Notifier<StepState> {
     final storage = ref.watch(storageProvider);
     final now = DateTime.now();
     _syncedHighScore = null;
-    _lastProcessedDate =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    _lastSent = null;
+    // Steps saved on an earlier day are shown as 0 for today.
+    _stepsDay = dateKey(now);
 
-    final isToday = storage.getLastDate() == _lastProcessedDate;
+    final isToday = storage.getLastDate() == _stepsDay;
     final displaySteps = isToday ? storage.getSteps() : 0;
     final savedCoins = storage.getCoins();
     final savedGoal = storage.getStepGoal();
@@ -250,15 +256,27 @@ class StepNotifier extends Notifier<StepState> {
 
   // Pushes all data to cloud right now if their is new data
 
-  void _forceCloudSync() {
-    if (state.currentSteps > _lastSyncedSteps) {
-      _syncCompleteProfileToFirestore(
-        state.currentSteps,
-        state.coins,
-        state.weeklySteps,
-      );
-      _lastSyncedSteps = state.currentSteps;
+  void _forceCloudSync() => _syncIfNeeded(minNewSteps: 1);
+
+  // Sends today's steps once [minNewSteps] more were taken since the last
+  // send, and on the first update of each day (see needsStepUpload).
+  void _syncIfNeeded({required int minNewSteps}) {
+    final day = _stepsDay ?? dateKey(DateTime.now());
+    if (!needsStepUpload(
+      todaySteps: state.currentSteps,
+      today: day,
+      sent: _lastSent,
+      minNewSteps: minNewSteps,
+    )) {
+      return;
     }
+    _syncCompleteProfileToFirestore(
+      day,
+      state.currentSteps,
+      state.coins,
+      state.weeklySteps,
+    );
+    _lastSent = (day: day, steps: state.currentSteps);
   }
 
   Future initializeTracking() async {
@@ -497,8 +515,6 @@ class StepNotifier extends Notifier<StepState> {
       recordDay(storage.getDailyHistory(), now, todaySteps),
     );
 
-    if (todaySteps - _lastSyncedSteps >= 500) _forceCloudSync();
-
     final calculatedDistanceKm = CalorieCalculator.distanceKm(
       todaySteps,
       state.height,
@@ -518,7 +534,10 @@ class StepNotifier extends Notifier<StepState> {
       weeklySteps: weekly,
       drivingSteps: storage.getDrivingStepsToday(),
     );
+    _stepsDay = dateKey(now);
     storage.saveSteps(todaySteps);
+    // After the state update, so the new count is what gets sent.
+    _syncIfNeeded(minNewSteps: 500);
     ref
         .read(widgetServiceProvider)
         .updateWidgetData(
@@ -598,17 +617,17 @@ class StepNotifier extends Notifier<StepState> {
 
   // sync that sends everything Firebase
 
+  // [dateStr] (yyyy-MM-dd) is the day [todaySteps] were counted on.
   void _syncCompleteProfileToFirestore(
+    String dateStr,
     int todaySteps,
     int coins,
     List<int> weekly,
   ) {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final dateStr =
-          '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
-      final now = DateTime.now();
-      final yesterdayStr = dateKey(DateTime(now.year, now.month, now.day - 1));
+      final day = DateTime.parse(dateStr);
+      final yesterdayStr = dateKey(DateTime(day.year, day.month, day.day - 1));
       final yesterdaySteps = ref
           .read(storageProvider)
           .getDailyHistory()[yesterdayStr];
@@ -622,8 +641,7 @@ class StepNotifier extends Notifier<StepState> {
           // Steps from just before midnight can raise yesterday's total.
           yesterdayStr: ?yesterdaySteps,
           // Keep only the last 31 days in the cloud too.
-          for (final key in expiredDayKeys(DateTime.now()))
-            key: FieldValue.delete(),
+          for (final key in expiredDayKeys(day)) key: FieldValue.delete(),
         },
       }, SetOptions(merge: true));
     }
@@ -699,6 +717,12 @@ class StepNotifier extends Notifier<StepState> {
       if (data.containsKey('currentCoins')) {
         storage.saveCoins(data['currentCoins']);
       }
+      final themes = themesFromAccount(
+        data,
+        local: storage.getPurchasedThemes(),
+      );
+      storage.savePurchasedThemes(themes.owned);
+      if (themes.active != null) storage.saveActiveTheme(themes.active!);
       if (data['monthlyHighScore'] is num) {
         // Restores the month too: without it the next step update would see
         // a new month and start the best again from today's steps.
@@ -752,6 +776,7 @@ class StepNotifier extends Notifier<StepState> {
         weightKg: w,
       );
 
+      _stepsDay = dateStr;
       state = state.copyWith(
         currentSteps: restoredSteps,
         goalSteps: data['stepGoal'] ?? 10000,

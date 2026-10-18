@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart' as g_sign_in;
 import '../../../../core/services/account_session.dart';
 import '../../../../core/services/local_storage_service.dart';
+import '../../../shop/presentation/providers/theme_provider.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
 import '../../../step_tracking/presentation/providers/step_provider.dart';
 
@@ -144,6 +145,8 @@ class AuthController {
   void _resetUserState() {
     _ref.invalidate(stepNotifierProvider);
     _ref.invalidate(challengeProvider);
+    // Back to the free themes; the next account's come back when it loads.
+    _ref.invalidate(themeProvider);
   }
 
   Future<void> resetPassword(String email) async {

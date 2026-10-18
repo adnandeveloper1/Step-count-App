@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/services/account_session.dart';
 import '../../../../core/utils/local_data_state.dart';
+import '../../../shop/data/shop_cloud.dart';
+import '../../../shop/models/owned_themes.dart';
+import '../../../shop/presentation/providers/theme_provider.dart';
 import '../../../social/presentation/providers/challenge_provider.dart'
     show challengeProvider;
 import '../../../step_tracking/presentation/providers/step_provider.dart';
@@ -25,9 +30,11 @@ final accountDataProvider = FutureProvider.autoDispose.family<void, String>(
     );
     switch (state) {
       case LocalDataState.ready:
+        _backUpThemes(ref);
         return;
       case LocalDataState.adopt:
         storage.saveDataOwner(uid);
+        _backUpThemes(ref);
         return;
       case LocalDataState.restore:
         final session = AccountSession.current;
@@ -37,6 +44,8 @@ final accountDataProvider = FutureProvider.autoDispose.family<void, String>(
           ref.invalidate(challengeProvider);
         }
         await ref.read(accountRestoreProvider)();
+        // The load may have brought back bought themes.
+        ref.invalidate(themeProvider);
         // Signed out meanwhile: the data was cleared, not loaded.
         if (session == AccountSession.current) storage.saveDataOwner(uid);
     }
@@ -44,3 +53,14 @@ final accountDataProvider = FutureProvider.autoDispose.family<void, String>(
   // The screen offers Try again instead.
   retry: (_, _) => null,
 );
+
+/// Themes bought before they were saved to the account are only on the
+/// phone: adds them to the account (once they are there it changes nothing).
+void _backUpThemes(Ref ref) {
+  final storage = ref.read(storageProvider);
+  final paid = paidThemes(storage.getPurchasedThemes());
+  if (paid.isEmpty) return;
+  unawaited(
+    ref.read(shopCloudProvider).backUpThemes(paid, storage.getActiveTheme()),
+  );
+}
