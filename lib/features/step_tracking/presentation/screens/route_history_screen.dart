@@ -4,18 +4,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../app/theme/theme_extensions.dart';
+import '../../../../core/utils/route_simplify.dart';
 import '../widgets/glass_step_card.dart';
+import '../widgets/speed_polylines.dart';
 
 class RouteHistoryScreen extends StatelessWidget {
   const RouteHistoryScreen({super.key});
 
-  double _calculateDistance(List<dynamic> points) {
+  /// Reads a route document's points, saved before or after thinning.
+  List<RoutePoint> _readPoints(Map<String, dynamic> data) {
+    final raw = data['points'] as List<dynamic>? ?? [];
+    return raw.map((p) => RoutePoint.fromMap(p as Map)).toList();
+  }
+
+  double _calculateDistance(List<RoutePoint> points) {
     double total = 0.0;
     final distanceCalc = const Distance();
     for (int index = 0; index < points.length - 1; index++) {
       total += distanceCalc(
-        LatLng(points[index]['lat'], points[index]['lng']),
-        LatLng(points[index + 1]['lat'], points[index + 1]['lng']),
+        LatLng(points[index].lat, points[index].lng),
+        LatLng(points[index + 1].lat, points[index + 1].lng),
       );
     }
     return total;
@@ -23,39 +31,14 @@ class RouteHistoryScreen extends StatelessWidget {
 
   void _showRouteDetails(
     BuildContext context,
-    List<dynamic> rawPoints,
+    List<RoutePoint> points,
     double distance,
     String dateStr,
   ) {
-    if (rawPoints.isEmpty) return;
+    if (points.isEmpty) return;
 
-    List<LatLng> routePoints = rawPoints
-        .map((p) => LatLng(p['lat'], p['lng']))
-        .toList();
-    List<Polyline> lines = [];
-
-    for (int i = 0; i < rawPoints.length - 1; i++) {
-      final p1 = rawPoints[i];
-      final p2 = rawPoints[i + 1];
-      final speed = p2['speed'] ?? 0.0;
-
-      Color segmentColor = Colors.blue;
-      if (speed > 3.0) {
-        segmentColor = Colors.red;
-      } else if (speed > 2.0) {
-        segmentColor = Colors.orange;
-      } else if (speed > 1.0) {
-        segmentColor = Colors.green;
-      }
-
-      lines.add(
-        Polyline(
-          points: [LatLng(p1['lat'], p1['lng']), LatLng(p2['lat'], p2['lng'])],
-          color: segmentColor,
-          strokeWidth: 4,
-        ),
-      );
-    }
+    List<LatLng> routePoints = points.map((p) => LatLng(p.lat, p.lng)).toList();
+    final lines = buildSpeedPolylines(points, strokeWidth: 4);
 
     final distanceText = distance > 1000
         ? '${(distance / 1000).toStringAsFixed(2)} km'
@@ -245,7 +228,7 @@ class RouteHistoryScreen extends StatelessWidget {
 
                 for (var doc in docs) {
                   final data = doc.data() as Map<String, dynamic>;
-                  final points = data['points'] as List<dynamic>? ?? [];
+                  final points = _readPoints(data);
                   final distance = _calculateDistance(points);
                   if (distance > maxDistance) {
                     maxDistance = distance;
@@ -259,7 +242,7 @@ class RouteHistoryScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final doc = docs[index];
                     final data = doc.data() as Map<String, dynamic>;
-                    final points = data['points'] as List<dynamic>? ?? [];
+                    final points = _readPoints(data);
                     final distance = _calculateDistance(points);
                     final isLongest = doc.id == longestDocId && distance > 0;
                     final timestamp = data['timestamp'] as Timestamp?;
