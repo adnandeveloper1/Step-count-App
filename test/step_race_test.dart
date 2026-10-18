@@ -1,5 +1,6 @@
 import 'package:build_up/features/social/presentation/providers/leaderboard_provider.dart';
 import 'package:build_up/features/social/presentation/widgets/leaderboard_widgets.dart';
+import 'package:build_up/features/step_tracking/presentation/providers/step_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -171,6 +172,31 @@ void main() {
       expect(s.score, 2500);
       expect(s.stepsToPass, 1501);
       expect(s.hint, '1,501 STEPS TO PASS ANN');
+    });
+  });
+
+  group('leagueColor', () {
+    LeaderboardUser leagued(int score, String? league) => LeaderboardUser(
+      id: 'x',
+      name: 'x',
+      totalSteps: 0,
+      monthlyHighScore: score,
+      avatarUrl: '',
+      currentLeague: league,
+    );
+
+    test('saved league wins, any case', () {
+      expect(leagueColor(leagued(0, 'Diamond')), LeagueTier.diamond.color);
+      expect(leagueColor(leagued(0, 'GOLD')), LeagueTier.gold.color);
+      expect(leagueColor(leagued(0, 'silver')), LeagueTier.silver.color);
+      expect(leagueColor(leagued(99999, 'bronze')), LeagueTier.bronze.color);
+    });
+
+    test('no saved league falls back to the monthly best', () {
+      expect(leagueColor(leagued(12000, null)), LeagueTier.diamond.color);
+      expect(leagueColor(leagued(8000, null)), LeagueTier.gold.color);
+      expect(leagueColor(leagued(5000, null)), LeagueTier.silver.color);
+      expect(leagueColor(leagued(4999, 'unknown')), LeagueTier.bronze.color);
     });
   });
 

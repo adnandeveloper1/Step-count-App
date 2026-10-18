@@ -158,6 +158,70 @@ void main() {
     expect(find.text('You'), findsNothing);
   });
 
+  testWidgets('load error shows the error line, no rank card', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.6;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith(
+            (ref) => Stream.value(_FakeUser('me')),
+          ),
+          leaderboardProvider(LeaderboardPeriod.month).overrideWith(
+            (ref) => Stream<List<LeaderboardUser>>.error(Exception('offline')),
+          ),
+        ],
+        child: const MaterialApp(home: ChallengeScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Error loading leaderboard'), findsOneWidget);
+    expect(_rankCard, findsNothing);
+  });
+
+  testWidgets('while loading shows a spinner, no rank card', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith(
+            (ref) => Stream.value(_FakeUser('me')),
+          ),
+          leaderboardProvider(
+            LeaderboardPeriod.month,
+          ).overrideWith((ref) => const Stream<List<LeaderboardUser>>.empty()),
+        ],
+        child: const MaterialApp(home: ChallengeScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(_rankCard, findsNothing);
+  });
+
+  testWidgets('switching tabs updates the rank card to that board', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      month: [_user('a', 9000), _user('me', 5000)],
+      today: [_user('me', 5000, today: 3000), _user('a', 9000, today: 100)],
+      myId: 'me',
+    );
+    expect(find.descendant(of: _rankCard, matching: find.text('#2')), findsOne);
+
+    await tester.tap(find.byKey(const Key('leaderboard-tab-today')));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: _rankCard, matching: find.text('#1')), findsOne);
+    expect(find.text('YOU ARE IN THE LEAD'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('leaderboard-tab-month')));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: _rankCard, matching: find.text('#2')), findsOne);
+  });
+
   testWidgets('signed out: dashes, list still shows', (tester) async {
     await _pump(tester, month: twenty);
 
