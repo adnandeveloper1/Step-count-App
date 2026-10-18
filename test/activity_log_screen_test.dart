@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:build_up/core/services/local_storage_service.dart';
+import 'package:build_up/core/services/native_health_service.dart';
 import 'package:build_up/core/utils/activity_log.dart';
 import 'package:build_up/core/utils/step_counter_math.dart';
 import 'package:build_up/features/step_tracking/presentation/providers/step_provider.dart';
@@ -96,6 +97,7 @@ void main() {
     WidgetTester tester, {
     LocalStorageService? storage,
     double textScale = 1,
+    RecordedSteps? recorded,
   }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.6;
@@ -105,6 +107,7 @@ void main() {
         overrides: [
           storageProvider.overrideWithValue(storage ?? _FakeStorage()),
           stepNotifierProvider.overrideWith(_FakeStepNotifier.new),
+          recordedStepsProvider.overrideWith((ref, day) async => recorded),
         ],
         child: MaterialApp(
           builder: (context, child) => MediaQuery(
@@ -137,6 +140,29 @@ void main() {
     expect(find.byKey(const Key('activity_log_ride_steps')), findsOneWidget);
     // Step checks stay hidden until the title is long-pressed.
     expect(find.byKey(const Key('activity_log_syncs')), findsNothing);
+  });
+
+  testWidgets('recorded steps give the walk its real times', (tester) async {
+    await pumpScreen(
+      tester,
+      recorded: RecordedSteps(
+        since: _today(0),
+        minutes: [for (var m = 0; m < 10; m++) (_today(9, 10 + m), 64)],
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('640 steps'), findsOneWidget);
+    expect(find.text('9:10 AM – 9:20 AM'), findsOneWidget);
+    expect(find.textContaining('Times come from your phone'), findsOneWidget);
+  });
+
+  testWidgets('without recorded steps the times are estimates', (tester) async {
+    await pumpScreen(tester);
+    await tester.pump();
+
+    expect(find.text('9:00 AM – 9:30 AM'), findsOneWidget);
+    expect(find.textContaining('times are approximate'), findsOneWidget);
   });
 
   // On a first open Google Fonts is still loading Sora, so the timeline is

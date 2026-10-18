@@ -55,4 +55,6 @@ android {
 dependencies {
     // Activity Recognition transitions, for removing steps counted in a vehicle.
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    // Recording API: steps minute by minute, kept on the device (see StepRecorder).
+    implementation("com.google.android.gms:play-services-fitness:21.3.0")
 }

@@ -80,6 +80,8 @@ void callbackDispatcher() {
     // missed (e.g. the app was force-stopped before a reboot). After the
     // sensor read, so Play Services can't delay it.
     await NativeHealthService().startDriveDetection();
+    // Keeps minute-by-minute step recording on for the activity screen.
+    await NativeHealthService().startStepRecording();
 
     // 5. Silent Firebase Sync
     if (uid != null) {

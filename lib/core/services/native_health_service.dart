@@ -1,11 +1,19 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../utils/activity_log.dart';
 import '../utils/step_counter_math.dart';
 
 final nativeHealthProvider = Provider<NativeHealthService>((ref) {
   return NativeHealthService();
 });
+
+/// The day's steps minute by minute from the Recording API, or null without
+/// it. Keyed by the day's midnight.
+final recordedStepsProvider = FutureProvider.autoDispose
+    .family<RecordedSteps?, DateTime>(
+      (ref, day) => ref.read(nativeHealthProvider).getRecordedSteps(day),
+    );
 
 class NativeHealthService {
   static const platform = MethodChannel('com.buildup.app/health_services');
@@ -31,6 +39,57 @@ class NativeHealthService {
       return false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// Subscribes to the Recording API, which counts steps minute by minute
+  /// on the device even while the app is closed. False without a recent
+  /// enough Google Play Services or the Physical activity permission; the
+  /// activity screen then estimates times from the syncs.
+  Future<bool> startStepRecording() async {
+    try {
+      return await platform.invokeMethod<bool>('startStepRecording') ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// [day]'s steps minute by minute up to now, or null when the Recording
+  /// API is unavailable or not subscribed.
+  Future<RecordedSteps?> getRecordedSteps(DateTime day) async {
+    final midnight = DateTime(day.year, day.month, day.day);
+    final next = DateTime(day.year, day.month, day.day + 1);
+    final now = DateTime.now();
+    final end = now.isBefore(next) ? now : next;
+    if (!end.isAfter(midnight)) return null;
+    try {
+      final result = await platform
+          .invokeMapMethod<String, Object?>('getRecordedSteps', {
+            'startMs': midnight.millisecondsSinceEpoch,
+            'endMs': end.millisecondsSinceEpoch,
+            'bucketMinutes': 1,
+          });
+      // Anything malformed reads as no recording: the screen estimates.
+      if (result case {
+        'since': final int since,
+        'buckets': final List<Object?> buckets,
+      }) {
+        return RecordedSteps(
+          since: DateTime.fromMillisecondsSinceEpoch(since),
+          minutes: [
+            for (final bucket in buckets)
+              if (bucket case [final int start, final int steps])
+                (DateTime.fromMillisecondsSinceEpoch(start), steps),
+          ],
+        );
+      }
+      return null;
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 
