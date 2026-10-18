@@ -307,8 +307,8 @@ void main() {
     }
 
     test('a walk window stops where a ride starts and resumes after it', () {
-      // Steps counted 10:09–10:29 were taken before the 10:12 ride; steps
-      // counted 10:29–10:40 after it ended at 10:30.
+      // Steps counted 10:09â€“10:29 were taken before the 10:12 ride; steps
+      // counted 10:29â€“10:40 after it ended at 10:30.
       final day = summarizeWithRides(
         [(at(10, 9), 0), (at(10, 29), 100), (at(10, 40), 160)],
         [
@@ -338,7 +338,7 @@ void main() {
     });
 
     test('rides with steps counted between them stay apart', () {
-      // 10:58–11:11 was a walk between two rides 13 minutes apart.
+      // 10:58â€“11:11 was a walk between two rides 13 minutes apart.
       final day = summarizeWithRides(
         [(at(10, 30), 0), (at(10, 58), 0), (at(11, 11), 285)],
         [
@@ -350,7 +350,7 @@ void main() {
     });
 
     test('the chart puts steps at the trimmed walk times', () {
-      // Counted 9:00–11:00, but a ride took 9:20–11:00: all in hour 9.
+      // Counted 9:00â€“11:00, but a ride took 9:20â€“11:00: all in hour 9.
       final day = summarizeWithRides(
         [(at(9), 0), (at(11), 300)],
         [ride(1, RideStatus.ended, start: at(9, 20), end: at(11), steps: 40)],
@@ -526,6 +526,341 @@ void main() {
         ),
       ]);
       expect(day.rides, hasLength(4));
+    });
+  });
+
+  group('summarizeDay with recorded steps', () {
+    /// [walking] minutes from [from], [perMinute] steps each.
+    List<(DateTime, int)> walk(DateTime from, int minutes, int perMinute) => [
+      for (var m = 0; m < minutes; m++)
+        (from.add(Duration(minutes: m)), perMinute),
+    ];
+
+    RecordedSteps recorded(List<(DateTime, int)> minutes, {DateTime? since}) =>
+        RecordedSteps(since: since ?? at(0), minutes: minutes);
+
+    DayActivity summarize(
+      List<(DateTime, int)> syncs,
+      RecordedSteps? steps, {
+      List<RideSteps> rides = const [],
+    }) {
+      var log = recordAll(syncs);
+      if (rides.isNotEmpty) {
+        final (lastAt, lastSteps) = syncs.last;
+        log = log.record(
+          now: lastAt.add(const Duration(seconds: 1)),
+          todaySteps: lastSteps,
+          source: CheckSource.app,
+          rides: rides,
+        );
+      }
+      return summarizeDay(log.day(at(0)), at(0), recorded: steps);
+    }
+
+    List<(DateTime, DateTime, int)> walksOf(DayActivity day) =>
+        day.walks.map((w) => (w.start, w.end, w.steps)).toList();
+
+    test('puts the steps between two syncs where they were recorded', () {
+      final day = summarize([
+        (at(8), 0),
+        (at(12), 1000),
+      ], recorded([...walk(at(9, 10), 10, 60), ...walk(at(11), 5, 80)]));
+      expect(day.hourly[8], 0);
+      expect(day.hourly[9], 600);
+      expect(day.hourly[10], 0);
+      expect(day.hourly[11], 400);
+      expect(walksOf(day), [
+        (at(9, 10), at(9, 20), 600),
+        (at(11), at(11, 5), 400),
+      ]);
+    });
+
+    test('scales the recorded minutes to the steps the syncs counted', () {
+      final day = summarize([
+        (at(8), 0),
+        (at(12), 1000),
+      ], recorded([...walk(at(9), 10, 30), ...walk(at(11), 10, 20)]));
+      expect(day.hourly.sublist(9, 12), [600, 0, 400]);
+      expect(day.hourly.reduce((a, b) => a + b), 1000);
+    });
+
+    test('places steps across a long sync gap and knows their time', () {
+      final day = summarize([
+        (at(0, 30), 0),
+        (at(7), 500),
+      ], recorded(walk(at(3), 5, 100)));
+      expect(day.hourly[3], 500);
+      expect(walksOf(day), [(at(3), at(3, 5), 500)]);
+      expect(day.walks.single.timeUnknown, isFalse);
+    });
+
+    test('a late first sync is placed when recording covers the night', () {
+      final day = summarize([(at(9), 400)], recorded(walk(at(7), 4, 100)));
+      expect(day.hourly[7], 400);
+      expect(walksOf(day), [(at(7), at(7, 4), 400)]);
+    });
+
+    test('syncs before recording began keep the even spread', () {
+      final day = summarize([
+        (at(8), 0),
+        (at(10), 1000),
+        (at(12), 1200),
+      ], recorded(walk(at(11), 4, 50), since: at(9)));
+      expect(day.hourly.sublist(8, 12), [500, 500, 0, 200]);
+      expect(walksOf(day), [(at(8), at(10), 1000), (at(11), at(11, 4), 200)]);
+    });
+
+    test('too few recorded steps keep the even spread', () {
+      // Recording missed most of the window (just subscribed, say).
+      final day = summarize([
+        (at(8), 0),
+        (at(10), 1000),
+      ], recorded(walk(at(9), 1, 100)));
+      expect(day.hourly.sublist(8, 10), [500, 500]);
+      expect(walksOf(day), [(at(8), at(10), 1000)]);
+    });
+
+    test('no recorded steps gives the same day as before', () {
+      final syncs = [(at(8), 0), (at(9), 300), (at(9, 30), 300), (at(11), 900)];
+      final before = summarize(syncs, null);
+      final after = summarize(syncs, recorded(const []));
+      expect(after.hourly, before.hourly);
+      expect(walksOf(after), walksOf(before));
+    });
+
+    test('a short pause stays one walk, a long one starts another', () {
+      final day = summarize(
+        [(at(8), 0), (at(10), 1000)],
+        recorded([
+          ...walk(at(8, 10), 5, 50),
+          // 3 minutes at the lights.
+          ...walk(at(8, 18), 5, 50),
+          // 20 minutes in a shop.
+          ...walk(at(8, 43), 10, 50),
+        ]),
+      );
+      expect(walksOf(day), [
+        (at(8, 10), at(8, 23), 500),
+        (at(8, 43), at(8, 53), 500),
+      ]);
+    });
+
+    test('walks never overlap a ride inside the sync window', () {
+      // Two hours between syncs with a ride in the middle; bumps on the
+      // bus also reached the recorder.
+      final day = summarize(
+        [(at(9), 0), (at(11), 800)],
+        recorded([
+          ...walk(at(9, 10), 10, 50),
+          ...walk(at(9, 40), 20, 5),
+          ...walk(at(10, 40), 6, 50),
+        ]),
+        rides: [
+          ride(
+            1,
+            RideStatus.ended,
+            start: at(9, 30),
+            end: at(10, 30),
+            steps: 100,
+          ),
+        ],
+      );
+      expect(walksOf(day), [
+        (at(9, 10), at(9, 20), 500),
+        (at(10, 40), at(10, 46), 300),
+      ]);
+      expect(day.hourly.sublist(9, 11), [500, 300]);
+      final ride1 = day.rides.single;
+      for (final w in day.walks) {
+        expect(
+          w.end.isAfter(ride1.start!) && w.start.isBefore(ride1.end!),
+          isFalse,
+        );
+      }
+    });
+
+    test('steps recorded after the last sync are not counted yet', () {
+      final day = summarize([
+        (at(8), 0),
+        (at(9), 300),
+      ], recorded([...walk(at(8, 20), 3, 100), ...walk(at(9, 30), 5, 100)]));
+      expect(day.hourly.reduce((a, b) => a + b), 300);
+      expect(walksOf(day), [(at(8, 20), at(8, 23), 300)]);
+    });
+
+    test('recorded minutes join walks across back-to-back syncs', () {
+      // The app syncs every minute while open.
+      final day = summarize([
+        (at(8), 0),
+        (at(8, 5), 250),
+        (at(8, 10), 500),
+      ], recorded(walk(at(8, 2), 6, 50) + walk(at(8, 8), 2, 100)));
+      expect(walksOf(day), [(at(8, 2), at(8, 10), 500)]);
+    });
+
+    test('a drop in the total comes off the latest recorded walk', () {
+      final day = summarize([
+        (at(8), 0),
+        (at(9), 600),
+        (at(9, 30), 500),
+      ], recorded([...walk(at(8, 10), 3, 100), ...walk(at(8, 40), 3, 100)]));
+      expect(day.hourly[8], 500);
+      expect(walksOf(day), [
+        (at(8, 10), at(8, 13), 300),
+        (at(8, 40), at(8, 42), 200),
+      ]);
+    });
+
+    test('steps a timed-out ride gives back skip other rides', () {
+      var log = recordAll([(at(7, 55), 1000)]);
+      log = log.record(
+        now: at(9, 15),
+        todaySteps: 1000,
+        source: CheckSource.app,
+        rides: [
+          ride(1, RideStatus.ongoing, start: at(8), steps: 600),
+          ride(
+            2,
+            RideStatus.ended,
+            start: at(8, 20),
+            end: at(8, 40),
+            steps: 50,
+          ),
+        ],
+      );
+      log = log.record(
+        now: at(9, 16),
+        todaySteps: 1600,
+        source: CheckSource.app,
+        rides: [ride(1, RideStatus.timedOut, start: at(8))],
+      );
+      final day = summarizeDay(
+        log.day(at(0)),
+        at(0),
+        recorded: recorded([
+          ...walk(at(8, 5), 10, 50),
+          // Bumps during the real ride.
+          ...walk(at(8, 20), 20, 5),
+          ...walk(at(8, 50), 10, 30),
+        ]),
+      );
+      // Recording saw none of the 1000 steps before 7:55.
+      expect(walksOf(day).skip(1), [
+        (at(8, 5), at(8, 15), 375),
+        (at(8, 50), at(9), 225),
+      ]);
+    });
+
+    test('a ride still going takes no steps after it started', () {
+      final day = summarize(
+        [(at(9), 0), (at(10), 500)],
+        recorded([...walk(at(9), 10, 50), ...walk(at(9, 40), 10, 10)]),
+        rides: [ride(1, RideStatus.ongoing, start: at(9, 30), steps: 50)],
+      );
+      expect(walksOf(day), [(at(9), at(9, 10), 500)]);
+    });
+
+    test('a ride from last night takes no steps before it ended', () {
+      final day = summarize(
+        [(at(1), 300)],
+        recorded([...walk(at(0, 10), 10, 20), ...walk(at(0, 40), 10, 30)]),
+        rides: [
+          ride(
+            1,
+            RideStatus.ended,
+            start: at(23, 0, 11),
+            end: at(0, 30),
+            steps: 200,
+          ),
+        ],
+      );
+      expect(walksOf(day), [(at(0, 40), at(0, 50), 300)]);
+    });
+
+    test('two syncs in the same minute lose no steps', () {
+      final day = summarize([
+        (at(8), 0),
+        (at(8, 30), 300),
+      ], recorded([...walk(at(8, 10), 10, 30), (at(8, 30), 50)]));
+      final next = summarizeDay(
+        recordAll([
+          (at(8), 0),
+          (at(8, 30), 300),
+          (at(8, 30).add(const Duration(seconds: 20)), 350),
+        ]).day(at(0)),
+        at(0),
+        recorded: recorded([...walk(at(8, 10), 10, 30), (at(8, 30), 50)]),
+      );
+      expect(day.hourly[8], 300);
+      expect(next.hourly[8], 350);
+    });
+
+    test('recorded minutes from other days are ignored', () {
+      final day = summarize(
+        [(at(8), 0), (at(9), 300)],
+        recorded([
+          (at(23, 59, 11), 500),
+          ...walk(at(8, 10), 3, 100),
+          (at(0, 1, 13), 500),
+        ]),
+      );
+      expect(walksOf(day), [(at(8, 10), at(8, 13), 300)]);
+    });
+
+    test('a messy day keeps its total and never goes below zero', () {
+      var log = recordAll([
+        (at(6), 0),
+        (at(7), 500),
+        // A ride took 100 counted steps back.
+        (at(7, 30), 400),
+        (at(9), 900),
+      ]);
+      log = log.record(
+        now: at(9, 30),
+        todaySteps: 1500,
+        source: CheckSource.goalReward,
+      );
+      log = log.record(
+        now: at(12),
+        todaySteps: 1800,
+        source: CheckSource.background,
+        rides: [
+          ride(1, RideStatus.ended, start: at(10), end: at(10, 30), steps: 40),
+        ],
+      );
+      final minutes = recorded([
+        ...walk(at(6, 10), 10, 50),
+        ...walk(at(8), 10, 50),
+        ...walk(at(10, 5), 10, 4),
+        ...walk(at(11), 10, 30),
+      ]);
+      final without = summarizeDay(log.day(at(0)), at(0));
+      final withRecorded = summarizeDay(
+        log.day(at(0)),
+        at(0),
+        recorded: minutes,
+      );
+      int sum(List<int> l) => l.reduce((a, b) => a + b);
+      // Steps with no known time are left off the chart, so the chart and
+      // those add up to the same total either way.
+      int unplaced(DayActivity day) =>
+          day.walks.where((w) => w.timeUnknown).fold(0, (s, w) => s + w.steps);
+      expect(
+        sum(withRecorded.hourly) + unplaced(withRecorded),
+        sum(without.hourly) + unplaced(without),
+      );
+      // The 9:30-12:00 gap was too long to place without recording.
+      expect(unplaced(without), 300);
+      expect(unplaced(withRecorded), 0);
+      expect(withRecorded.hourly.every((h) => h >= 0), isTrue);
+      expect(
+        withRecorded.walks.fold(0, (s, w) => s + w.steps),
+        sum(withRecorded.hourly),
+      );
+      expect(withRecorded.goalRewards.single.added, 600);
+      for (final w in withRecorded.walks) {
+        expect(w.end.isAfter(at(10)) && w.start.isBefore(at(10, 30)), isFalse);
+      }
     });
   });
 }

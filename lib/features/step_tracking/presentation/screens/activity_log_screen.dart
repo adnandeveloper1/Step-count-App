@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/theme_extensions.dart';
+import '../../../../core/services/native_health_service.dart';
 import '../../../../core/utils/activity_log.dart';
 import '../../../../core/utils/number_format.dart';
 import '../../../../core/utils/step_counter_math.dart';
@@ -33,7 +34,17 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
     final storage = ref.watch(storageProvider);
     final now = DateTime.now();
     final day = DateTime(now.year, now.month, now.day - _daysAgo);
-    final activity = summarizeDay(storage.getActivityLog().day(day), day);
+    // Kept while it reloads after each sync, so the chart does not jump.
+    final recorded = ref.watch(recordedStepsProvider(day)).value;
+    ref.listen(
+      stepNotifierProvider.select((s) => s.currentSteps),
+      (_, _) => ref.invalidate(recordedStepsProvider),
+    );
+    final activity = summarizeDay(
+      storage.getActivityLog().day(day),
+      day,
+      recorded: recorded,
+    );
     final total = _daysAgo == 0
         ? stepState.currentSteps
         : storage.getDailyHistory()[dayKey(day)] ??
@@ -77,9 +88,12 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
           ],
           const SizedBox(height: 16),
           Text(
-            'Steps are checked about every 15 minutes while the app is '
-            'closed, so times are approximate. Steps taken in a car, bus or '
-            'other vehicle are not counted.',
+            recorded == null || recorded.since.isAfter(day)
+                ? 'Steps are checked about every 15 minutes while the app is '
+                      'closed, so times are approximate. Steps taken in a '
+                      'car, bus or other vehicle are not counted.'
+                : 'Times come from your phone\'s step recording. Steps '
+                      'taken in a car, bus or other vehicle are not counted.',
             textAlign: TextAlign.center,
             style: GoogleFonts.sora(
               fontSize: 11,

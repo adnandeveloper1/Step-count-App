@@ -262,6 +262,11 @@ class StepNotifier extends Notifier<StepState> {
     await ref.read(nativeHealthProvider).startDriveDetection();
     if (!ref.mounted) return;
 
+    // Steps minute by minute for the activity screen; does nothing without
+    // Play Services.
+    await ref.read(nativeHealthProvider).startStepRecording();
+    if (!ref.mounted) return;
+
     await _setupFallbackTracking();
   }
 

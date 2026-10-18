@@ -332,6 +332,22 @@ const lateFirstSync = Duration(hours: 1);
 /// say overnight) can't say when the steps between them were taken.
 const longSyncGap = Duration(hours: 2);
 
+/// Steps Play Services counted minute by minute on the device (the
+/// Recording API), read when the activity screen opens.
+class RecordedSteps {
+  /// When recording began: nothing before it was recorded.
+  final DateTime since;
+
+  /// Each minute's start and its steps, minutes without steps left out.
+  final List<(DateTime, int)> minutes;
+
+  const RecordedSteps({required this.since, required this.minutes});
+}
+
+/// Recorded minutes this far apart or closer (waiting at the lights, say)
+/// stay one walk.
+const walkPauseGap = Duration(minutes: 5);
+
 /// Works out [day]'s hourly steps and walks from [log].
 ///
 /// The sensor is read about every 15 minutes with the app closed (every
@@ -342,7 +358,12 @@ const longSyncGap = Duration(hours: 2);
 /// goal ad steps. Steps a timed-out ride gives back are spread over the
 /// ride. A drop in the total (an open ride taking out steps already counted)
 /// comes off the most recent hours.
-DayActivity summarizeDay(DayLog log, DateTime day) {
+///
+/// With [recorded] steps covering a sync window, its steps go where the
+/// recorder saw them instead (outside any ride), whatever the gap, and
+/// walks are the runs of recorded minutes. The syncs still decide how many
+/// steps each window holds, so the totals do not change.
+DayActivity summarizeDay(DayLog log, DateTime day, {RecordedSteps? recorded}) {
   final midnight = DateTime(day.year, day.month, day.day);
   final hourly = List<int>.filled(24, 0);
   final walks = <WalkPeriod>[];
@@ -357,10 +378,14 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
         if (r.start case final start?) (start: start, end: r.end),
   ];
 
+  final minutes = _Minutes(midnight, recorded, hourly, rideTimes);
+
   var prevAt = midnight;
   var prevSteps = 0;
   // Whether the last walk can run on into the next sync's steps.
   var lastOpen = false;
+  // Whether the latest steps were placed by recorded minutes.
+  var lastRecorded = false;
   for (final check in log.checks) {
     var added = check.steps - prevSteps;
     rows.add(CheckRow(check, added));
@@ -378,20 +403,21 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
       final back = ride.kept < added ? ride.kept : added;
       final start = ride.start;
       final from = start == null || start.isBefore(midnight) ? midnight : start;
-      _spread(
-        hourly,
-        midnight,
-        from,
-        from.isBefore(prevAt) ? prevAt : check.at,
-        back,
-      );
+      final to = from.isBefore(prevAt) ? prevAt : check.at;
+      if (!minutes.place(from, to, back)) {
+        _spread(hourly, midnight, from, to, back);
+      }
       added -= back;
     }
     final gap = check.at.difference(prevAt);
-    if (added > 0 &&
+    if (added > 0 && minutes.place(prevAt, check.at, added)) {
+      lastOpen = false;
+      lastRecorded = true;
+    } else if (added > 0 &&
         (prevAt == midnight ? gap > lateFirstSync : gap > longSyncGap)) {
       walks.add(WalkPeriod(prevAt, check.at, added, timeUnknown: true));
       lastOpen = false;
+      lastRecorded = false;
     } else if (added > 0) {
       final (from, to, rideAfter) = _outsideRides(prevAt, check.at, rideTimes);
       _spread(hourly, midnight, from, to, added);
@@ -402,15 +428,20 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
         walks.add(WalkPeriod(from, to, added));
       }
       lastOpen = !rideAfter;
+      lastRecorded = false;
     } else if (added < 0) {
       var removed = -added;
+      if (lastRecorded) {
+        removed = minutes.takeBack(check.at, removed);
+        added = -removed;
+      }
       for (var h = _hourOf(check.at, midnight); h >= 0 && removed > 0; h--) {
         final take = removed < hourly[h] ? removed : hourly[h];
         hourly[h] -= take;
         removed -= take;
       }
       final last = walks.lastOrNull;
-      if (last != null) {
+      if (last != null && added < 0) {
         final left = last.steps + added;
         walks.last = WalkPeriod(
           last.start,
@@ -427,6 +458,9 @@ DayActivity summarizeDay(DayLog log, DateTime day) {
     prevSteps = check.steps;
   }
 
+  walks
+    ..addAll(minutes.walks())
+    ..sort((a, b) => a.start.compareTo(b.start));
   return DayActivity(
     hourly: hourly,
     walks: [
@@ -549,5 +583,137 @@ void _spread(
         : (steps * end.difference(start).inMilliseconds / total).round();
     hourly[h] += share;
     given += share;
+  }
+}
+
+/// [summarizeDay]'s day minute by minute: the [RecordedSteps] as weights,
+/// and the logged steps placed by them, which [place] also adds to [hourly].
+class _Minutes {
+  final DateTime midnight;
+  final DateTime? since;
+  final List<int> hourly;
+
+  /// Rides whose minutes take no steps: what the recorder counted then was
+  /// the vehicle shaking the phone. Walks never run across one.
+  final List<({DateTime start, DateTime? end})> rides;
+
+  /// Recorded steps per minute since [midnight].
+  final List<int> _weights;
+
+  /// Logged steps placed per minute.
+  final List<int> _placed;
+
+  _Minutes._(
+    this.midnight,
+    this.since,
+    this.hourly,
+    this.rides,
+    this._weights,
+    this._placed,
+  );
+
+  factory _Minutes(
+    DateTime midnight,
+    RecordedSteps? recorded,
+    List<int> hourly,
+    List<({DateTime start, DateTime? end})> rides,
+  ) {
+    final next = DateTime(midnight.year, midnight.month, midnight.day + 1);
+    final length = next.difference(midnight).inMinutes;
+    final weights = List<int>.filled(length, 0);
+    for (final (start, steps)
+        in recorded?.minutes ?? const <(DateTime, int)>[]) {
+      final i = start.difference(midnight).inMinutes;
+      if (i >= 0 && i < length && steps > 0) weights[i] += steps;
+    }
+    return _Minutes._(
+      midnight,
+      recorded?.since,
+      hourly,
+      rides,
+      weights,
+      List<int>.filled(length, 0),
+    );
+  }
+
+  DateTime _at(int i) => midnight.add(Duration(minutes: i));
+
+  int _index(DateTime at) {
+    final i = at.difference(midnight).inMinutes;
+    return i < 0 ? 0 : (i > _placed.length ? _placed.length : i);
+  }
+
+  /// Whether a ride falls in minutes [from] to [to]; one still going runs
+  /// to [openEnd].
+  bool _ride(int from, int to, DateTime openEnd) {
+    final start = _at(from);
+    final end = _at(to);
+    return rides.any(
+      (r) => r.start.isBefore(end) && (r.end ?? openEnd).isAfter(start),
+    );
+  }
+
+  /// Places [steps] counted from [from] to [to] by the recorded minutes in
+  /// between, less ride minutes. False, placing
+  /// nothing, when recording had not begun by [from] or saw under half as
+  /// many steps (it missed some, so their times are unknown).
+  bool place(DateTime from, DateTime to, int steps) {
+    final since = this.since;
+    if (since == null || from.isBefore(since) || steps <= 0) return false;
+    final first = _index(from);
+    final weights = [
+      for (var i = first; i < _index(to); i++)
+        _ride(i, i + 1, to) ? 0 : _weights[i],
+    ];
+    final total = weights.fold(0, (sum, w) => sum + w);
+    if (total * 2 < steps) return false;
+    // Rounds the running total, so the shares add up to [steps].
+    var sum = 0;
+    var given = 0;
+    for (var k = 0; k < weights.length; k++) {
+      if (weights[k] == 0) continue;
+      sum += weights[k];
+      final share = (steps * sum / total).round() - given;
+      given += share;
+      _placed[first + k] += share;
+      hourly[_hourOf(_at(first + k), midnight)] += share;
+    }
+    return true;
+  }
+
+  /// Takes up to [steps] placed steps back, latest first, from before [at].
+  /// Returns what is left to take.
+  int takeBack(DateTime at, int steps) {
+    for (var i = _index(at) - 1; i >= 0 && steps > 0; i--) {
+      final take = steps < _placed[i] ? steps : _placed[i];
+      _placed[i] -= take;
+      hourly[_hourOf(_at(i), midnight)] -= take;
+      steps -= take;
+    }
+    return steps;
+  }
+
+  /// Runs of minutes with placed steps, joined across pauses up to
+  /// [walkPauseGap] but never across a ride.
+  List<WalkPeriod> walks() {
+    final result = <WalkPeriod>[];
+    int? start;
+    var end = 0;
+    var steps = 0;
+    for (var i = 0; i < _placed.length; i++) {
+      if (_placed[i] <= 0) continue;
+      if (start != null &&
+          (_at(i).difference(_at(end)) > walkPauseGap ||
+              _ride(end, i, _at(i)))) {
+        result.add(WalkPeriod(_at(start), _at(end), steps));
+        start = null;
+        steps = 0;
+      }
+      start ??= i;
+      end = i + 1;
+      steps += _placed[i];
+    }
+    if (start != null) result.add(WalkPeriod(_at(start), _at(end), steps));
+    return result;
   }
 }

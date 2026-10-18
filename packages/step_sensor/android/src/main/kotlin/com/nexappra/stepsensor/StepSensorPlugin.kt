@@ -24,6 +24,18 @@ class StepSensorPlugin : FlutterPlugin {
                 "isBackgroundRestricted" -> result.success(isBackgroundRestricted())
                 "startDriveDetection" -> DriveDetector.start(context) { result.success(it) }
                 "checkStillDriving" -> DriveDetector.checkStillDriving(context) { result.success(it) }
+                "startStepRecording" -> StepRecorder.start(context) { result.success(it) }
+                "getRecordedSteps" -> {
+                    val startMs = call.argument<Number>("startMs")?.toLong()
+                    val endMs = call.argument<Number>("endMs")?.toLong()
+                    if (startMs == null || endMs == null) {
+                        result.success(null)
+                    } else {
+                        StepRecorder.read(context, startMs, endMs, call.argument<Int>("bucketMinutes") ?: 1) {
+                            result.success(it)
+                        }
+                    }
+                }
                 "getDrives" -> result.success(DriveStore.all(context))
                 "removeDrives" -> {
                     DriveStore.remove(context, call.arguments<List<Int>>().orEmpty())
