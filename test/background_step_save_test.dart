@@ -183,7 +183,8 @@ void main() {
     expect(box.get('dailyHistory'), contains('"2026-10-11":10000'));
     // 1000 more yesterday: 10 coins; 1000 today: 10 more.
     expect(box.get('coins'), 25);
-    expect(box.get('weeklySteps'), '1000,0,0,0,0,0,10000');
+    // Sunday 11 Oct belongs to last week; Monday 12 Oct starts a new one.
+    expect(box.get('weeklySteps'), '1000,0,0,0,0,0,0');
     final log = ActivityLog.fromJson(box.get('activityLog'));
     expect(
       log.day(lastSync).checks.last.steps,
@@ -206,4 +207,24 @@ void main() {
     expect(result!.dataOwner, isNull);
     expect(result.hadLocalData, isTrue);
   });
+
+  test(
+    'a new week drops the days of last week the phone never synced',
+    () async {
+      // Last synced Wednesday 7 Oct 2026; next run Monday 12 Oct.
+      await seed(lastDate: '2026-10-07', steps: 12000, baseline: 1000);
+      (await openBox()).putAll({
+        'weeklySteps': '8000,9000,12000,0,0,0,0',
+        'dailyHistory':
+            '{"2026-10-05":8000,"2026-10-06":9000,"2026-10-07":12000}',
+      });
+
+      final result = await run(1500);
+
+      // Only Monday, today, is in this week.
+      final week = [result!.todaySteps, 0, 0, 0, 0, 0, 0];
+      expect(result.weekly, week);
+      expect((await openBox()).get('weeklySteps'), week.join(','));
+    },
+  );
 }

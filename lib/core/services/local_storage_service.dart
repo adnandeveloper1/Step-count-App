@@ -176,6 +176,14 @@ class LocalStorageService {
     _box.put('weeklySteps', data);
   }
 
+  /// Rebuilds the week of [now] from the daily history (see calendarWeek)
+  /// and saves it. Call after saving today's steps to the history.
+  List<int> refreshWeeklySteps(DateTime now) {
+    final week = calendarWeek(getDailyHistory(), now);
+    saveWeeklySteps(week.join(','));
+    return week;
+  }
+
   // Date (yyyy-MM-dd) to steps for the last 31 days, kept by step_history.dart.
   Map<String, int> getDailyHistory() {
     try {
@@ -223,23 +231,16 @@ class LocalStorageService {
   void saveChallengePendingSteps(int steps) =>
       _box.put('challengePendingSteps', steps);
 
-  /// Resets today's counters for a new day [date] (yyyy-MM-dd) whose
-  /// weekday is [weekday] (1 = Monday). Both the app and the background task
-  /// call this.
-  void startNewDay(String date, int weekday) {
+  /// Resets today's counters for a new day [date] (yyyy-MM-dd). Both the app
+  /// and the background task call this.
+  void startNewDay(String date) {
     saveLastDate(date);
     saveSteps(0);
     saveLastCoinStep(0);
     saveGoalNotified(false);
     saveDrivingStepsToday(0);
-
-    List<int> weekly = getWeeklySteps()
-        .split(',')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
-    weekly[weekday - 1] = 0;
-    saveWeeklySteps(weekly.join(','));
+    // Also drops last week's days when the week changed.
+    refreshWeeklySteps(DateTime.parse(date));
   }
 
   // Drives already folded into the hardware baseline, so a drive the native
@@ -294,8 +295,8 @@ class LocalStorageService {
 
   /// On a new day, before [startNewDay]: adds the [steps] taken after the
   /// last sync, before the end of its day, to that day (see
-  /// StepCounterResult.earlierDaySteps). Updates its total, coins, history,
-  /// week and activity log, as a sync at the end of that day would have.
+  /// StepCounterResult.earlierDaySteps). Updates its total, coins, history
+  /// and activity log, as a sync at the end of that day would have.
   void addStepsToLastDay(int steps, CheckSource source) {
     final lastSync = getLastSyncAt();
     if (steps <= 0 || lastSync == null) return;
@@ -309,15 +310,8 @@ class LocalStorageService {
       saveLastCoinStep(lastCoinStep + coins * 100);
     }
 
+    // The week is rebuilt from this history by the startNewDay that follows.
     saveDailyHistory({...getDailyHistory(), dateKey(lastSync): total});
-    final weekly = getWeeklySteps()
-        .split(',')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    if (weekly.length == 7) {
-      weekly[lastSync.weekday - 1] = total;
-      saveWeeklySteps(weekly.join(','));
-    }
 
     final endOfDay = DateTime(
       lastSync.year,
@@ -362,8 +356,20 @@ class LocalStorageService {
     _box.put('dataOwner', uid);
   }
 
+  /// Clears the account's data. Today's rewarded ad counts belong to the
+  /// phone, not the account, so they are kept: signing out and in again
+  /// must not give more ads.
   Future<void> clearAllUserData() async {
+    final adKeys = [
+      'rewardedAdDate',
+      for (final kind in RewardedAdKind.values) 'rewardedAds_${kind.name}',
+    ];
+    final adCounts = {
+      for (final key in adKeys)
+        if (_box.containsKey(key)) key: _box.get(key),
+    };
     await _box.clear();
+    await _box.putAll(adCounts);
   }
 
   String getChallengeData() {

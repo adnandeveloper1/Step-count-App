@@ -57,6 +57,18 @@ Map<String, int> mergeHistories(
   return trimHistory(merged, today);
 }
 
+// Steps of each day of [today]'s calendar week, Monday first, read from
+// [history]. A day of an earlier week never lands in this one, and a day
+// with no entry (the phone never synced it) is 0.
+List<int> calendarWeek(Map<String, int> history, DateTime today) {
+  final monday = _daysBefore(today, today.weekday - DateTime.monday);
+  return [
+    for (int i = 0; i < 7; i++)
+      history[dateKey(DateTime(monday.year, monday.month, monday.day + i))] ??
+          0,
+  ];
+}
+
 // Days just outside the window, for the cloud sync to delete.
 List<String> expiredDayKeys(DateTime today) {
   return [

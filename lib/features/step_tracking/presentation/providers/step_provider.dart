@@ -15,7 +15,7 @@ import '../../../../core/utils/monthly_best.dart';
 import '../../../../core/utils/step_counter_math.dart';
 import '../../../../core/utils/step_history.dart';
 import '../../../../core/utils/step_upload.dart';
-import '../../../shop/models/owned_themes.dart';
+import '../../data/account_restore.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
 
 // list of all  ranks users can reach based on their walking.
@@ -201,14 +201,8 @@ class StepNotifier extends Notifier<StepState> {
       weightKg: savedWeight,
     );
 
-    String weeklyData = storage.getWeeklySteps();
-    List<int> loadedWeeklySteps = weeklyData
-        .split(',')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    if (loadedWeeklySteps.length != 7) {
-      loadedWeeklySteps = [0, 0, 0, 0, 0, 0, 0];
-    }
+    // Rebuilt, as the saved week may be from before this one began.
+    final loadedWeeklySteps = storage.refreshWeeklySteps(now);
 
     return StepState(
       currentSteps: displaySteps,
@@ -366,7 +360,7 @@ class StepNotifier extends Notifier<StepState> {
     storage.saveChallengeCreditedSteps(credit.credited);
     storage.saveChallengePendingSteps(credit.pending);
 
-    if (isNewDay) storage.startNewDay(dateStr, now.weekday);
+    if (isNewDay) storage.startNewDay(dateStr);
     storage.saveHardwareBaseline(result.baseline);
     storage.markDrivesApplied(result);
 
@@ -503,17 +497,10 @@ class StepNotifier extends Notifier<StepState> {
 
     _updateLeaderboardScore(todaySteps);
 
-    String weeklyData = storage.getWeeklySteps();
-    List<int> weekly = weeklyData
-        .split(',')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    if (weekly.length != 7) weekly = [0, 0, 0, 0, 0, 0, 0];
-    weekly[now.weekday - 1] = todaySteps;
-    storage.saveWeeklySteps(weekly.join(','));
     storage.saveDailyHistory(
       recordDay(storage.getDailyHistory(), now, todaySteps),
     );
+    final weekly = storage.refreshWeeklySteps(now);
 
     final calculatedDistanceKm = CalorieCalculator.distanceKm(
       todaySteps,
@@ -690,7 +677,7 @@ class StepNotifier extends Notifier<StepState> {
   }
 
   // After user logs in restore data from firebase. Throws when the account
-  // can't be read (e.g. offline), so the caller can try again.
+  // can't be read (e.g. offline) or saved, so the caller can try again.
 
   Future<void> restoreDataFromFirebase() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -703,118 +690,44 @@ class StepNotifier extends Notifier<StepState> {
     if (!ref.mounted || session != AccountSession.current || !doc.exists) {
       return;
     }
-    try {
-      final data = doc.data()!;
-      final storage = ref.read(storageProvider);
+    final now = DateTime.now();
+    final restored = restoreAccount(
+      ref.read(storageProvider),
+      doc.data()!,
+      now,
+    );
+    _deleteCloudDays(user.uid, restored.staleCloudDays);
 
-      if (data.containsKey('stepGoal')) storage.saveStepGoal(data['stepGoal']);
-      if (data.containsKey('height')) {
-        storage.saveHeight((data['height'] as num).toDouble());
-      }
-      if (data.containsKey('weight')) {
-        storage.saveWeight((data['weight'] as num).toDouble());
-      }
-      if (data.containsKey('currentCoins')) {
-        storage.saveCoins(data['currentCoins']);
-      }
-      final themes = themesFromAccount(
-        data,
-        local: storage.getPurchasedThemes(),
-      );
-      storage.savePurchasedThemes(themes.owned);
-      if (themes.active != null) storage.saveActiveTheme(themes.active!);
-      if (data['monthlyHighScore'] is num) {
-        // Restores the month too: without it the next step update would see
-        // a new month and start the best again from today's steps.
-        final now = DateTime.now();
-        final localBest = storage.getSavedMonth() == now.month
-            ? storage.getMonthlyHighScore()
-            : 0;
-        storage.saveSavedMonth(now.month);
-        storage.saveMonthlyHighScore(
-          mergeMonthlyBest(
-            localBest: localBest,
-            remoteBest: (data['monthlyHighScore'] as num).toInt(),
-            remoteMonth: data['monthlyHighScoreMonth'] as String?,
-            remoteUpdatedAt: (data['lastUpdated'] as Timestamp?)?.toDate(),
-            now: now,
-          ),
-        );
-      }
-
-      List<int> loadedWeekly = [0, 0, 0, 0, 0, 0, 0];
-      if (data.containsKey('weeklySteps')) {
-        loadedWeekly = (data['weeklySteps'] as List)
-            .map((e) => e as int)
-            .toList();
-        storage.saveWeeklySteps(loadedWeekly.join(','));
-      }
-
-      final dateStr =
-          '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
-      _restoreDailyHistory(user.uid, data['dailyHistory']);
-      int restoredSteps = 0;
-      if (data.containsKey('dailyHistory') &&
-          data['dailyHistory'][dateStr] != null) {
-        restoredSteps = data['dailyHistory'][dateStr] as int;
-        storage.saveSteps(restoredSteps);
-        storage.saveLastDate(dateStr);
-        storage.saveLastCoinStep((restoredSteps ~/ 100) * 100);
-        // Re-anchor the sensor baseline to the restored steps on the next read.
-        storage.saveHardwareBaseline(0);
-        // Challenges are restored from Firestore with these steps included.
-        storage.saveChallengeCreditedSteps(restoredSteps);
-        storage.saveChallengePendingSteps(0);
-      }
-
-      final h = (data['height'] as num?)?.toDouble() ?? 170.0;
-      final w = (data['weight'] as num?)?.toDouble() ?? 70.0;
-      final dist = CalorieCalculator.distanceKm(restoredSteps, h);
-      final cals = CalorieCalculator.calories(
-        restoredSteps,
-        heightCm: h,
-        weightKg: w,
-      );
-
-      _stepsDay = dateStr;
-      state = state.copyWith(
-        currentSteps: restoredSteps,
-        goalSteps: data['stepGoal'] ?? 10000,
-        height: h,
-        weight: w,
-        coins: data['currentCoins'] ?? 0,
-        weeklySteps: loadedWeekly,
-        calories: cals,
-        distanceKm: dist,
-      );
-      await ref.read(challengeProvider.notifier).syncWithFirestore();
-    } catch (e) {
-      debugPrint('Firebase restore failed: $e');
-    }
+    _stepsDay = dateKey(now);
+    state = state.copyWith(
+      currentSteps: restored.todaySteps,
+      goalSteps: restored.goal,
+      height: restored.height,
+      weight: restored.weight,
+      coins: restored.coins,
+      weeklySteps: restored.weekly,
+      calories: CalorieCalculator.calories(
+        restored.todaySteps,
+        heightCm: restored.height,
+        weightKg: restored.weight,
+      ),
+      distanceKm: CalorieCalculator.distanceKm(
+        restored.todaySteps,
+        restored.height,
+      ),
+    );
+    await ref.read(challengeProvider.notifier).syncWithFirestore();
   }
 
-  // Copies the cloud history onto the phone and deletes cloud days older
-  // than the 31 day window (users who skipped the per-sync cleanup).
-  void _restoreDailyHistory(String uid, Object? cloudHistory) {
-    if (cloudHistory is! Map) return;
-    final today = DateTime.now();
-    final cloud = <String, int>{
-      for (final entry in cloudHistory.entries)
-        if (entry.key is String && entry.value is num)
-          entry.key as String: (entry.value as num).toInt(),
-    };
-    final storage = ref.read(storageProvider);
-    storage.saveDailyHistory(
-      mergeHistories(storage.getDailyHistory(), cloud, today),
-    );
-
-    final stale = staleKeys(cloud.keys, today);
-    if (stale.isEmpty) return;
+  // Deletes cloud history days older than the 31 day window (users who
+  // skipped the per-sync cleanup).
+  void _deleteCloudDays(String uid, List<String> days) {
+    if (days.isEmpty) return;
     FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .update({
-          for (final key in stale)
+          for (final key in days)
             FieldPath(['dailyHistory', key]): FieldValue.delete(),
         })
         .catchError((e) => debugPrint('History cleanup failed: $e'));

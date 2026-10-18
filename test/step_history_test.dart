@@ -101,4 +101,52 @@ void main() {
       expect(goalStreak({daysAgo(0): 500}, 0, today), 0);
     });
   });
+
+  group('calendarWeek', () {
+    // Monday 12 Oct 2026; Sunday 11 Oct belongs to the week before.
+    test('on a Monday only today counts, not last week', () {
+      final history = {
+        '2026-10-07': 12000,
+        '2026-10-11': 9000,
+        '2026-10-12': 500,
+      };
+
+      expect(calendarWeek(history, today), [500, 0, 0, 0, 0, 0, 0]);
+    });
+
+    test('reads each day of this week, missing days as 0', () {
+      // Thursday 15 Oct; no sync on Tuesday.
+      final history = {
+        '2026-10-11': 9000,
+        '2026-10-12': 4000,
+        '2026-10-14': 12000,
+        '2026-10-15': 300,
+      };
+
+      expect(calendarWeek(history, DateTime(2026, 10, 15, 8)), [
+        4000,
+        0,
+        12000,
+        300,
+        0,
+        0,
+        0,
+      ]);
+    });
+
+    test('runs across a month end', () {
+      // Wednesday 4 Nov 2026; the week started on Monday 2 Nov.
+      final history = {'2026-11-01': 7000, '2026-11-02': 6000};
+
+      expect(calendarWeek(history, DateTime(2026, 11, 4)), [
+        6000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+      ]);
+    });
+  });
 }
