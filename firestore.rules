@@ -1,0 +1,59 @@
+// Draft Firestore security rules for Build Up. Not deployed: paste into
+// Firebase console > Firestore Database > Rules only at the step in
+// docs/leaderboard-privacy.md that says to. Publishing replaces ALL current
+// rules, so first compare with what the console has now: any collection not
+// matched below becomes unreadable and unwritable.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Private profile: weight, height, body fat, coins, challenge progress,
+    // step history. Only its owner may read or write it.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      // users/{uid}/routes and any other subcollection.
+      match /{subcollection=**} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Public Step Race card (lib/features/social/models/leaderboard_card.dart).
+    // Any signed-in user may read it; only its owner may write it, and only
+    // with the fields the race shows.
+    match /leaderboard/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isOwner(uid) && isValidCard(request.resource.data);
+      allow delete: if isOwner(uid);
+    }
+
+    function isValidCard(card) {
+      return card.keys().hasOnly([
+          'name',
+          'avatarUrl',
+          'monthlyHighScore',
+          'monthlyHighScoreMonth',
+          'currentLeague',
+          'proAvatar',
+          'daySteps',
+        ])
+        && (!('name' in card) || (card.name is string && card.name.size() <= 100))
+        && (!('avatarUrl' in card) || (card.avatarUrl is string && card.avatarUrl.size() <= 1000))
+        && (!('monthlyHighScore' in card) || (card.monthlyHighScore is int && card.monthlyHighScore >= 0))
+        && (!('monthlyHighScoreMonth' in card) || (card.monthlyHighScoreMonth is string && card.monthlyHighScoreMonth.size() == 7))
+        && (!('currentLeague' in card) || card.currentLeague in ['bronze', 'silver', 'gold', 'diamond'])
+        && (!('proAvatar' in card) || card.proAvatar is bool)
+        // Today's steps only, keyed by day ("2026-10-18").
+        && (!('daySteps' in card) || (card.daySteps is map && card.daySteps.size() <= 1));
+    }
+  }
+}
