@@ -1,18 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/utils/activity_log.dart';
+import '../../../../core/utils/monthly_best.dart' as monthly;
 
 import '../../../shop/models/pro_avatar_item.dart' as pro_avatar;
 
 class LeaderboardUser {
   final String id;
   final String name;
-  final int totalSteps;
   final int monthlyHighScore;
   final String avatarUrl;
   final String? currentLeague; // New field
   final List<String> unlockedItems;
   final bool showsProAvatar;
+
+  /// False when [monthlyHighScore] is from an earlier month: the user hasn't
+  /// walked since, so they are left out of this month's race.
+  final bool bestIsThisMonth;
 
   /// Steps for today, read from the synced `dailyHistory` map. 0 when the
   /// user hasn't synced today.
@@ -21,13 +25,13 @@ class LeaderboardUser {
   LeaderboardUser({
     required this.id,
     required this.name,
-    required this.totalSteps,
     required this.monthlyHighScore,
     required this.avatarUrl,
     this.currentLeague,
     this.unlockedItems = const [],
     this.todaySteps = 0,
     this.showsProAvatar = false,
+    this.bestIsThisMonth = true,
   });
 
   int scoreFor(LeaderboardPeriod period) => switch (period) {
@@ -35,24 +39,42 @@ class LeaderboardUser {
     LeaderboardPeriod.today => todaySteps,
   };
 
-  factory LeaderboardUser.fromDocument(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory LeaderboardUser.fromDocument(DocumentSnapshot doc) =>
+      LeaderboardUser.fromMap(
+        doc.id,
+        doc.data() as Map<String, dynamic>,
+        now: DateTime.now(),
+      );
+
+  factory LeaderboardUser.fromMap(
+    String id,
+    Map<String, dynamic> data, {
+    required DateTime now,
+  }) {
     final items = data['unlockedItems'] as List<dynamic>?;
     final history = data['dailyHistory'] as Map<String, dynamic>?;
-    final today = history?[dayKey(DateTime.now())];
+    final today = history?[dayKey(now)];
     return LeaderboardUser(
-      id: doc.id,
+      id: id,
       name: data['name'] ?? 'Anonymous Walker',
-      totalSteps: data['totalSteps'] ?? 0,
       monthlyHighScore: data['monthlyHighScore'] ?? 0,
-      avatarUrl: data['avatarUrl'] ?? data['photoUrl'] ?? '',
+      avatarUrl: data['avatarUrl'] ?? '',
       currentLeague: data['currentLeague'], // Read from Firestore
       unlockedItems: items?.map((e) => e.toString()).toList() ?? [],
       todaySteps: today is num ? today.toInt() : 0,
       showsProAvatar: pro_avatar.showsProAvatar(data),
+      bestIsThisMonth: monthly.bestIsThisMonth(
+        month: data['monthlyHighScoreMonth'] as String?,
+        updatedAt: (data['lastUpdated'] as Timestamp?)?.toDate(),
+        now: now,
+      ),
     );
   }
 }
+
+/// [users] without those whose best is from an earlier month.
+List<LeaderboardUser> monthRace(List<LeaderboardUser> users) =>
+    users.where((u) => u.bestIsThisMonth).toList();
 
 /// Which score the Step Race ranks by.
 enum LeaderboardPeriod {
@@ -80,14 +102,12 @@ final leaderboardProvider =
           descending: true,
         ),
       };
-      return query
-          .limit(50)
-          .snapshots()
-          .map(
-            (snapshot) => snapshot.docs
-                .map((doc) => LeaderboardUser.fromDocument(doc))
-                .toList(),
-          );
+      return query.limit(50).snapshots().map((snapshot) {
+        final users = snapshot.docs
+            .map((doc) => LeaderboardUser.fromDocument(doc))
+            .toList();
+        return period == LeaderboardPeriod.month ? monthRace(users) : users;
+      });
     });
 
 /// Leaderboard positions for [users], who must already be sorted by

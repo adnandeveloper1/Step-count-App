@@ -133,19 +133,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (user != null && newName.isNotEmpty) {
         await user.updateDisplayName(newName);
 
-        double? bmi;
-        if (weight > 0 && height > 0) {
-          final heightInMeters = height / 100;
-          bmi = weight / (heightInMeters * heightInMeters);
-        }
-
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'name': newName,
           'avatarUrl': selectedAvatar,
           'weight': weight,
           'height': height,
           'bodyFat': bodyFat,
-          'bmi': bmi,
           'lastUpdated': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }

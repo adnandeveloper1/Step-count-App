@@ -254,8 +254,6 @@ class StepNotifier extends Notifier<StepState> {
     if (state.currentSteps > _lastSyncedSteps) {
       _syncCompleteProfileToFirestore(
         state.currentSteps,
-        state.calories,
-        state.distanceKm,
         state.coins,
         state.weeklySteps,
       );
@@ -602,8 +600,6 @@ class StepNotifier extends Notifier<StepState> {
 
   void _syncCompleteProfileToFirestore(
     int todaySteps,
-    double calories,
-    double distance,
     int coins,
     List<int> weekly,
   ) {
@@ -618,9 +614,6 @@ class StepNotifier extends Notifier<StepState> {
           .getDailyHistory()[yesterdayStr];
       FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'currentCoins': coins,
-        'todaySteps': todaySteps,
-        'todayCalories': calories,
-        'todayDistanceKm': distance,
         'weeklySteps': weekly,
         'currentLeague': state.currentLeague.name,
         'lastUpdated': FieldValue.serverTimestamp(),
@@ -678,20 +671,21 @@ class StepNotifier extends Notifier<StepState> {
     await initializeTracking();
   }
 
-  // After user logs in restore data from firebase
+  // After user logs in restore data from firebase. Throws when the account
+  // can't be read (e.g. offline), so the caller can try again.
 
   Future<void> restoreDataFromFirebase() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    final session = AccountSession.current;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    if (!ref.mounted || session != AccountSession.current || !doc.exists) {
+      return;
+    }
     try {
-      final session = AccountSession.current;
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (!ref.mounted || session != AccountSession.current || !doc.exists) {
-        return;
-      }
       final data = doc.data()!;
       final storage = ref.read(storageProvider);
 

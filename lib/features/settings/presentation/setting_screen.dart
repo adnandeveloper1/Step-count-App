@@ -27,8 +27,7 @@ class SettingsScreen extends ConsumerWidget {
     final profileAsync = ref.watch(userProfileProvider);
     final profile = profileAsync.value;
 
-    final displayName =
-        profile?['name'] ?? profile?['displayName'] ?? 'Build Up User';
+    final displayName = profile?['name'] ?? 'Build Up User';
     final avatar = profile?['avatarUrl'] ?? '👦';
     final isProAvatarUnlocked = showsProAvatar(profile);
 

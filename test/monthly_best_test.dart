@@ -130,6 +130,31 @@ void main() {
     });
   });
 
+  group('bestIsThisMonth', () {
+    test('a best stored for this month counts', () {
+      expect(bestIsThisMonth(month: '2026-10', now: oct18), isTrue);
+    });
+
+    test('a best stored for last month does not', () {
+      expect(bestIsThisMonth(month: '2026-09', now: oct18), isFalse);
+    });
+
+    test('older documents fall back to the last update time', () {
+      expect(
+        bestIsThisMonth(updatedAt: DateTime(2026, 10, 2), now: oct18),
+        isTrue,
+      );
+      expect(
+        bestIsThisMonth(updatedAt: DateTime(2026, 9, 29), now: oct18),
+        isFalse,
+      );
+    });
+
+    test('with neither it counts', () {
+      expect(bestIsThisMonth(now: oct18), isTrue);
+    });
+  });
+
   group('localMonthlyBest', () {
     test('a new day best this month is kept', () {
       final r = localMonthlyBest(

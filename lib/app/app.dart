@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
+import '../features/auth/presentation/screens/account_data_gate.dart';
 import '../features/home/presentation/screens/main_screen.dart';
 import '../features/auth/presentation/screens/auth_screen.dart';
 import '../features/shop/presentation/providers/theme_provider.dart';
@@ -53,8 +54,12 @@ class BuildUpApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: dynamicThemeData,
       home: authState.when(
-        data: (user) =>
-            user != null ? const MainNavigationScreen() : const AuthScreen(),
+        data: (user) => user != null
+            ? AccountDataGate(
+                uid: user.uid,
+                child: const MainNavigationScreen(),
+              )
+            : const AuthScreen(),
         loading: () =>
             const Scaffold(body: Center(child: CircularProgressIndicator())),
         error: (error, stackTrace) =>

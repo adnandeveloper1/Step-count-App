@@ -54,7 +54,6 @@ class AuthController {
 
   Future<void> signIn(String email, String password) async {
     await _auth.signInWithEmailAndPassword(email: email, password: password);
-    await _ref.read(stepNotifierProvider.notifier).restoreDataFromFirebase();
   }
 
   Future<void> signInAnonymously() async {
@@ -65,15 +64,11 @@ class AuthController {
       if (!doc.exists) {
         await _firestore.collection('users').doc(user.uid).set({
           'name': 'Guest User',
-          'displayName': 'Guest User',
-          'totalSteps': 0,
           'monthlyHighScore': 0,
           'avatarUrl': '👤',
-          'isGuest': true,
           'createdAt': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
       }
-      await _ref.read(stepNotifierProvider.notifier).restoreDataFromFirebase();
     }
   }
 
@@ -98,16 +93,11 @@ class AuthController {
         if (!doc.exists) {
           await _firestore.collection('users').doc(user.uid).set({
             'name': user.displayName ?? 'Google User',
-            'displayName': user.displayName ?? 'Google User',
-            'totalSteps': 0,
             'monthlyHighScore': 0,
             'avatarUrl': '🌟',
             'createdAt': FieldValue.serverTimestamp(),
-          });
+          }, SetOptions(merge: true));
         }
-        await _ref
-            .read(stepNotifierProvider.notifier)
-            .restoreDataFromFirebase();
       }
     } catch (e) {
       rethrow;
@@ -124,12 +114,10 @@ class AuthController {
     if (user != null) {
       await _firestore.collection('users').doc(user.uid).set({
         'name': name,
-        'displayName': name,
-        'totalSteps': 0,
         'monthlyHighScore': 0,
         'avatarUrl': '🙂',
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
       await user.updateDisplayName(name);
     }

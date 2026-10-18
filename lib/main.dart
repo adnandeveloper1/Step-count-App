@@ -15,6 +15,7 @@ import 'core/services/notification_service.dart';
 import 'core/services/step_sync_coordinator.dart';
 import 'core/services/widget_service.dart';
 import 'core/utils/calorie_calculator.dart';
+import 'core/utils/local_data_state.dart';
 import 'core/utils/step_counter_math.dart';
 import 'core/utils/step_history.dart';
 import 'features/step_tracking/presentation/providers/step_provider.dart';
@@ -83,20 +84,23 @@ void callbackDispatcher() {
     // Keeps minute-by-minute step recording on for the activity screen.
     await NativeHealthService().startStepRecording();
 
-    // 5. Silent Firebase Sync
-    if (uid != null) {
+    // 5. Silent Firebase Sync, only of data that is this account's: before
+    // the app loads the account onto a fresh install, coins and steps here
+    // start from 0 and would overwrite the real ones.
+    if (uid != null &&
+        localDataState(
+              owner: result.dataOwner,
+              uid: uid,
+              hasLocalData: result.hadLocalData,
+            ) !=
+            LocalDataState.restore) {
       final now = DateTime.now();
       final firebaseDateStr =
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      int totalWeeklySteps = result.weekly.reduce((a, b) => a + b);
 
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'currentCoins': result.coins,
-        'todaySteps': result.todaySteps,
-        'todayCalories': result.calories,
-        'todayDistanceKm': result.distanceKm,
         'weeklySteps': result.weekly,
-        'weeklyCalories': totalWeeklySteps * 0.04,
         'lastUpdated': FieldValue.serverTimestamp(),
         'dailyHistory': {
           firebaseDateStr: result.todaySteps,

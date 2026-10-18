@@ -20,7 +20,6 @@ class _FakeUser implements User {
 LeaderboardUser _user(String id, int score, {int today = 0}) => LeaderboardUser(
   id: id,
   name: 'User $id',
-  totalSteps: 0,
   monthlyHighScore: score,
   avatarUrl: '',
   todaySteps: today,

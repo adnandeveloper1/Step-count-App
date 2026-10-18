@@ -15,6 +15,10 @@ typedef BackgroundSyncResult = ({
   List<int> weekly,
   bool notifyGoal,
   List<int> appliedDriveIds,
+  // Whose data this is (see localDataState); Firestore is only synced when
+  // it is the signed-in account's.
+  String? dataOwner,
+  bool hadLocalData,
 });
 
 /// Saves [hardwareSteps], less the steps counted during [drives], to storage.
@@ -31,6 +35,7 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
     now ??= DateTime.now();
     final dateStr =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final hadLocalData = storage.getLastDate().isNotEmpty;
     final isNewDay = storage.getLastDate() != dateStr;
 
     final result = resolveTodaySteps(
@@ -127,6 +132,8 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
       weekly: weekly,
       notifyGoal: notifyGoal,
       appliedDriveIds: result.appliedDriveIds,
+      dataOwner: storage.getDataOwner(),
+      hadLocalData: hadLocalData,
     );
   } finally {
     // Flushes the writes above before another isolate may open the box.

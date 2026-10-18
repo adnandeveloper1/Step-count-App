@@ -37,10 +37,23 @@ int mergeMonthlyBest({
   required DateTime now,
 }) {
   if (remoteBest == null) return localBest;
-  final month =
-      remoteMonth ??
-      (remoteUpdatedAt == null ? null : monthKey(remoteUpdatedAt));
-  final sameMonth = month == null || month == monthKey(now);
-  if (!sameMonth) return localBest;
+  final thisMonth = bestIsThisMonth(
+    month: remoteMonth,
+    updatedAt: remoteUpdatedAt,
+    now: now,
+  );
+  if (!thisMonth) return localBest;
   return remoteBest > localBest ? remoteBest : localBest;
+}
+
+/// Whether a stored best belongs to this month: its [month] tag, else the
+/// document's last update time [updatedAt]. With neither (very old
+/// documents) it counts.
+bool bestIsThisMonth({
+  String? month,
+  DateTime? updatedAt,
+  required DateTime now,
+}) {
+  final stored = month ?? (updatedAt == null ? null : monthKey(updatedAt));
+  return stored == null || stored == monthKey(now);
 }

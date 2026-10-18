@@ -354,6 +354,14 @@ class LocalStorageService {
     _box.put(key, _box.get(key, defaultValue: 0) + 1);
   }
 
+  /// Uid of the account the saved data belongs to; null on a fresh install
+  /// and on data saved before this was stored.
+  String? getDataOwner() => _box.get('dataOwner') as String?;
+
+  void saveDataOwner(String uid) {
+    _box.put('dataOwner', uid);
+  }
+
   Future<void> clearAllUserData() async {
     await _box.clear();
   }

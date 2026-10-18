@@ -191,4 +191,19 @@ void main() {
       reason: 'logged at the end of the day before',
     );
   });
+
+  test('reports whose data it saved, for the Firestore sync', () async {
+    await seed(steps: 41, baseline: 1000);
+    await (await openBox()).put('dataOwner', 'a');
+    final result = await run(1075);
+    expect(result!.dataOwner, 'a');
+    expect(result.hadLocalData, isTrue);
+  });
+
+  test('data saved before the owner was stored has no owner', () async {
+    await seed(steps: 41, baseline: 1000);
+    final result = await run(1075);
+    expect(result!.dataOwner, isNull);
+    expect(result.hadLocalData, isTrue);
+  });
 }
