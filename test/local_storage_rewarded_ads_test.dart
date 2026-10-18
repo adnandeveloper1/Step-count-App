@@ -45,4 +45,27 @@ void main() {
     // Yesterday's goal view was dropped, not carried into the new day.
     expect(storage.rewardedAdsLeft(RewardedAdKind.goal, tomorrow), 1);
   });
+
+  test('signing out keeps the counts of today', () async {
+    for (var i = 0; i < 3; i++) {
+      storage.recordRewardedAd(RewardedAdKind.coins, today);
+    }
+    storage.recordRewardedAd(RewardedAdKind.goal, today);
+    storage.saveCoins(250);
+
+    await storage.clearAllUserData();
+
+    // Same phone, same day: signing in again gives no new ads.
+    expect(storage.rewardedAdsLeft(RewardedAdKind.coins, today), 0);
+    expect(storage.rewardedAdsLeft(RewardedAdKind.goal, today), 0);
+    // The account's data is still cleared.
+    expect(storage.getCoins(), 0);
+  });
+
+  test('a clear before any ad was watched leaves all ads', () async {
+    await storage.clearAllUserData();
+
+    expect(storage.rewardedAdsLeft(RewardedAdKind.coins, today), 3);
+    expect(storage.rewardedAdsLeft(RewardedAdKind.goal, today), 1);
+  });
 }
