@@ -125,3 +125,114 @@ String formatSteps(int steps) {
   }
   return out.toString();
 }
+
+/// One Step Race board as the screen shows it: [users] sorted by [period]'s
+/// score, highest first, and their shared [ranks].
+class StepRaceBoard {
+  final List<LeaderboardUser> users;
+  final List<int> ranks;
+  final LeaderboardPeriod period;
+
+  const StepRaceBoard._(this.users, this.ranks, this.period);
+
+  /// Sorts [users] by [period]'s score itself instead of trusting the query
+  /// order: the Today query picks its day when it subscribes, so after
+  /// midnight its order can follow yesterday while scores show today. Equal
+  /// scores keep their incoming order.
+  factory StepRaceBoard.from(
+    List<LeaderboardUser> users,
+    LeaderboardPeriod period,
+  ) {
+    final order = List<int>.generate(users.length, (i) => i)
+      ..sort((a, b) {
+        final byScore = users[b]
+            .scoreFor(period)
+            .compareTo(users[a].scoreFor(period));
+        return byScore != 0 ? byScore : a.compareTo(b);
+      });
+    final sorted = [for (final i in order) users[i]];
+    return StepRaceBoard._(sorted, leaderboardRanks(sorted, period), period);
+  }
+
+  bool get isEmpty => users.isEmpty;
+  int get length => users.length;
+}
+
+/// Where the signed-in user stands on a [StepRaceBoard].
+class StepRaceStanding {
+  /// False when nobody is signed in.
+  final bool isSignedIn;
+
+  /// Shared position (ties share it), or null when the user isn't on the
+  /// board: signed out, or outside the top 50.
+  final int? rank;
+
+  /// The user's score, or null when they aren't on the board.
+  final int? score;
+
+  /// Steps needed to get past the nearest walker with a higher score
+  /// (always at least 2: one to draw level, one to pass). Null when nobody
+  /// is ahead.
+  final int? stepsToPass;
+  final String? aheadName;
+
+  /// Share of the way to [aheadName]'s score, 0 to 1.
+  final double progress;
+
+  /// Someone else has the same score as the user.
+  final bool isTied;
+
+  const StepRaceStanding({
+    required this.isSignedIn,
+    required this.rank,
+    required this.score,
+    required this.stepsToPass,
+    required this.aheadName,
+    required this.progress,
+    required this.isTied,
+  });
+
+  bool get isRanked => rank != null;
+  bool get isLeader => isRanked && stepsToPass == null;
+
+  factory StepRaceStanding.from(StepRaceBoard board, String? myId) {
+    final users = board.users;
+    final myIndex = myId == null ? -1 : users.indexWhere((u) => u.id == myId);
+    if (myIndex < 0) {
+      return StepRaceStanding(
+        isSignedIn: myId != null,
+        rank: null,
+        score: null,
+        stepsToPass: null,
+        aheadName: null,
+        progress: 0,
+        isTied: false,
+      );
+    }
+
+    final period = board.period;
+    final score = users[myIndex].scoreFor(period);
+    final isTied = [
+      for (var i = 0; i < users.length; i++)
+        if (i != myIndex) users[i].scoreFor(period),
+    ].contains(score);
+
+    LeaderboardUser? ahead;
+    for (var i = myIndex - 1; i >= 0; i--) {
+      if (users[i].scoreFor(period) > score) {
+        ahead = users[i];
+        break;
+      }
+    }
+    final aheadScore = ahead?.scoreFor(period);
+    return StepRaceStanding(
+      isSignedIn: true,
+      rank: board.ranks[myIndex],
+      score: score,
+      stepsToPass: aheadScore == null ? null : aheadScore - score + 1,
+      aheadName: ahead?.name,
+      progress: aheadScore == null ? 1 : (score / aheadScore).clamp(0.0, 1.0),
+      isTied: isTied,
+    );
+  }
+}

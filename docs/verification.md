@@ -30,6 +30,12 @@ Stable widget keys for driving the app in integration tests and Flutter Driver.
 | `insights.olderWeek` / `insights.newerWeek` | Insights week selector | Previous / next week |
 | `insights.weekTitle` / `insights.weekRange` | Insights week selector | `THIS WEEK`, `LAST WEEK`, `N WEEKS AGO` / date range |
 | `insights.totalSteps` | Insights Total Steps card | Steps for the selected week |
+| `leaderboard-tab-month` / `leaderboard-tab-today` | Step Race tabs | Switches the board between this month's best day and today |
+| `leaderboard-reset` | Step Race, under the tabs | When the selected board resets |
+| `leaderboard-rank-card` | Step Race rank card | Your rank, score and steps to pass the walker ahead (`--` when you're not on the board) |
+| `leaderboard-row-<uid>` | Step Race list | One walker's row |
+| `leaderboard-rank-<uid>` | Step Race list | That walker's position (tied scores share it) |
+| `leaderboard-invite` | Step Race invite card | Opens the share sheet |
 
 ## Vehicle rides on a device
 
