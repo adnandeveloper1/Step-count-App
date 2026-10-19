@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/notification_provider/notification_provider.dart';
 import '../../../../core/services/account_session.dart';
 import '../../../../core/services/local_storage_service.dart';
@@ -16,6 +13,7 @@ import '../../../../core/utils/step_counter_math.dart';
 import '../../../../core/utils/step_history.dart';
 import '../../../../core/utils/step_upload.dart';
 import '../../data/account_restore.dart';
+import '../../data/step_cloud.dart';
 import '../../../social/presentation/providers/challenge_provider.dart';
 
 // list of all  ranks users can reach based on their walking.
@@ -108,8 +106,11 @@ class StepState {
   }
 
   // calculates league by average steps this week.
-  LeagueTier get currentLeague {
-    int activeDays = DateTime.now().weekday;
+  LeagueTier get currentLeague => leagueOn(DateTime.now());
+
+  /// The league on [now]'s day: the average of this week's days so far.
+  LeagueTier leagueOn(DateTime now) {
+    int activeDays = now.weekday;
 
     int totalWeeklySteps = weeklySteps
         .sublist(0, activeDays)
@@ -162,6 +163,9 @@ class StepNotifier extends Notifier<StepState> {
   int? _syncedHighScore;
   bool _highScoreSyncing = false;
 
+  StepCloud get _cloud => ref.read(stepCloudProvider);
+  DateTime _now() => ref.read(clockProvider)();
+
   //  runs on app start up , loads saved data
 
   @override
@@ -178,7 +182,7 @@ class StepNotifier extends Notifier<StepState> {
     });
 
     final storage = ref.watch(storageProvider);
-    final now = DateTime.now();
+    final now = _now();
     _syncedHighScore = null;
     _lastSent = null;
     // Steps saved on an earlier day are shown as 0 for today.
@@ -239,13 +243,8 @@ class StepNotifier extends Notifier<StepState> {
   }
 
   void _syncCoinsToFirestore(int coins) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && !AccountSession.deleting) {
-      FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'currentCoins': coins,
-        'lastUpdated': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    }
+    if (AccountSession.deleting) return;
+    _cloud.saveCoins(coins);
   }
 
   // Pushes all data to cloud right now if their is new data
@@ -255,7 +254,7 @@ class StepNotifier extends Notifier<StepState> {
   // Sends today's steps once [minNewSteps] more were taken since the last
   // send, and on the first update of each day (see needsStepUpload).
   void _syncIfNeeded({required int minNewSteps}) {
-    final day = _stepsDay ?? dateKey(DateTime.now());
+    final day = _stepsDay ?? dateKey(_now());
     if (!needsStepUpload(
       todaySteps: state.currentSteps,
       today: day,
@@ -274,10 +273,10 @@ class StepNotifier extends Notifier<StepState> {
   }
 
   Future initializeTracking() async {
-    final activityStatus = await Permission.activityRecognition.request();
+    final granted = await ref.read(activityPermissionProvider)();
     if (!ref.mounted) return;
 
-    if (!activityStatus.isGranted) {
+    if (!granted) {
       state = state.copyWith(pedestrianStatus: 'Permission Denied');
       return;
     }
@@ -310,7 +309,7 @@ class StepNotifier extends Notifier<StepState> {
     final drives = hardwareSteps > 0
         ? await nativeHealth.getDrives()
         : const <Drive>[];
-    if (needsDriveCheck(drives, DateTime.now())) {
+    if (needsDriveCheck(drives, _now())) {
       unawaited(nativeHealth.checkStillDriving());
     }
     // Signed out or reset while the sensor was read: this account's state
@@ -323,9 +322,8 @@ class StepNotifier extends Notifier<StepState> {
     }
 
     final storage = ref.read(storageProvider);
-    final now = DateTime.now();
-    final dateStr =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final now = _now();
+    final dateStr = dateKey(now);
     final isNewDay = storage.getLastDate() != dateStr;
 
     final result = resolveTodaySteps(
@@ -335,6 +333,7 @@ class StepNotifier extends Notifier<StepState> {
       isNewDay: isNewDay,
       drives: drives,
       appliedDriveIds: storage.getAppliedDriveIds(),
+      now: now,
       lastSyncAt: storage.getLastSyncAt(),
     );
     if (result == null) return;
@@ -389,7 +388,7 @@ class StepNotifier extends Notifier<StepState> {
     await _fetchFallbackData();
     if (!ref.mounted) return false;
     final storage = ref.read(storageProvider);
-    return storage.getLastDate() == dateKey(DateTime.now()) &&
+    return storage.getLastDate() == dateKey(_now()) &&
         state.goalSteps > 0 &&
         storage.getSteps() < state.goalSteps;
   }
@@ -405,7 +404,7 @@ class StepNotifier extends Notifier<StepState> {
     final storage = ref.read(storageProvider);
     // Without today's sensor read the stored count belongs to an earlier
     // day; filling it would mix the two.
-    if (storage.getLastDate() != dateKey(DateTime.now())) return false;
+    if (storage.getLastDate() != dateKey(_now())) return false;
     final fill = fillToGoal(
       todaySteps: storage.getSteps(),
       goal: state.goalSteps,
@@ -420,11 +419,7 @@ class StepNotifier extends Notifier<StepState> {
     storage.saveChallengeCreditedSteps(fill.challengeCredited);
     _processSteps(fill.todaySteps, state.pedestrianStatus, challengeSteps: 0);
     // Logged apart so the activity screen does not show them as a walk.
-    storage.logStepSync(
-      fill.todaySteps,
-      DateTime.now(),
-      CheckSource.goalReward,
-    );
+    storage.logStepSync(fill.todaySteps, _now(), CheckSource.goalReward);
     _forceCloudSync();
     return true;
   }
@@ -449,13 +444,7 @@ class StepNotifier extends Notifier<StepState> {
       calories: cals,
     );
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'height': height,
-        'weight': weight,
-      }, SetOptions(merge: true));
-    }
+    _cloud.saveBody(height: height, weight: weight);
   }
 
   //  It calculates everything
@@ -466,7 +455,7 @@ class StepNotifier extends Notifier<StepState> {
     required int challengeSteps,
   }) {
     final storage = ref.read(storageProvider);
-    final now = DateTime.now();
+    final now = _now();
 
     if (todaySteps < 0) todaySteps = 0;
     if (challengeSteps > 0) {
@@ -538,7 +527,7 @@ class StepNotifier extends Notifier<StepState> {
   //  check if  user broke  personal record of month right here.
   void _updateLeaderboardScore(int todaySteps) {
     final storage = ref.read(storageProvider);
-    final now = DateTime.now();
+    final now = _now();
     final local = localMonthlyBest(
       savedMonth: storage.getSavedMonth(),
       savedBest: storage.getMonthlyHighScore(),
@@ -558,36 +547,17 @@ class StepNotifier extends Notifier<StepState> {
   // reinstall), so the phone's copy can be lower than the real best. A failed
   // write (e.g. offline) is retried on the next step update.
   Future<void> _syncHighScoreToFirestore() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _highScoreSyncing) return;
+    if (!_cloud.isSignedIn || _highScoreSyncing) return;
     _highScoreSyncing = true;
     final session = AccountSession.current;
     final storage = ref.read(storageProvider);
-    final localBest = storage.getMonthlyHighScore();
-    final league = state.currentLeague.name;
-    final now = DateTime.now();
-    final firestore = FirebaseFirestore.instance;
-    final doc = firestore.collection('users').doc(user.uid);
+    final now = _now();
     try {
-      final best = await firestore.runTransaction((tx) async {
-        final snapshot = await tx.get(doc);
-        final data = snapshot.data();
-        if (data == null) return null;
-        final best = mergeMonthlyBest(
-          localBest: localBest,
-          remoteBest: (data['monthlyHighScore'] as num?)?.toInt(),
-          remoteMonth: data['monthlyHighScoreMonth'] as String?,
-          remoteUpdatedAt: (data['lastUpdated'] as Timestamp?)?.toDate(),
-          now: now,
-        );
-        tx.update(doc, {
-          'monthlyHighScore': best,
-          'monthlyHighScoreMonth': monthKey(now),
-          'currentLeague': league,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
-        return best;
-      });
+      final best = await _cloud.saveMonthlyBest(
+        localBest: storage.getMonthlyHighScore(),
+        league: state.leagueOn(now).name,
+        now: now,
+      );
       if (best == null || session != AccountSession.current) return;
       _syncedHighScore = best;
       // A higher remote best (from before a reinstall) becomes the local one.
@@ -611,27 +581,17 @@ class StepNotifier extends Notifier<StepState> {
     int coins,
     List<int> weekly,
   ) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && !AccountSession.deleting) {
-      final day = DateTime.parse(dateStr);
-      final yesterdayStr = dateKey(DateTime(day.year, day.month, day.day - 1));
-      final yesterdaySteps = ref
-          .read(storageProvider)
-          .getDailyHistory()[yesterdayStr];
-      FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'currentCoins': coins,
-        'weeklySteps': weekly,
-        'currentLeague': state.currentLeague.name,
-        'lastUpdated': FieldValue.serverTimestamp(),
-        'dailyHistory': {
-          dateStr: todaySteps,
-          // Steps from just before midnight can raise yesterday's total.
-          yesterdayStr: ?yesterdaySteps,
-          // Keep only the last 31 days in the cloud too.
-          for (final key in expiredDayKeys(day)) key: FieldValue.delete(),
-        },
-      }, SetOptions(merge: true));
-    }
+    if (AccountSession.deleting) return;
+    final day = DateTime.parse(dateStr);
+    final yesterday = dateKey(DateTime(day.year, day.month, day.day - 1));
+    _cloud.saveDay(
+      day: day,
+      steps: todaySteps,
+      yesterdaySteps: ref.read(storageProvider).getDailyHistory()[yesterday],
+      coins: coins,
+      weekly: weekly,
+      league: state.leagueOn(day).name,
+    );
   }
 
   // goal update
@@ -647,31 +607,26 @@ class StepNotifier extends Notifier<StepState> {
           calories: state.calories,
         );
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'stepGoal': newGoal,
-      }, SetOptions(merge: true));
-    }
+    _cloud.saveGoal(newGoal);
   }
 
   // force refresh
 
   Future<void> forceRefresh() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (!ref.mounted) return;
-      if (doc.exists) {
-        final data = doc.data()!;
-        final storage = ref.read(storageProvider);
-        int fetchedCoins = data['currentCoins'] ?? storage.getCoins();
-        storage.saveCoins(fetchedCoins);
-        state = state.copyWith(coins: fetchedCoins);
-      }
+    final session = AccountSession.current;
+    Map<String, dynamic>? data;
+    try {
+      data = await _cloud.load();
+    } catch (e) {
+      // Offline: keep the coins on the phone and still read the sensor.
+      debugPrint('Coin refresh failed: $e');
+    }
+    if (!ref.mounted) return;
+    final coins = data?['currentCoins'];
+    if (session == AccountSession.current && coins is num) {
+      final storage = ref.read(storageProvider);
+      storage.saveCoins(coins.toInt());
+      state = state.copyWith(coins: coins.toInt());
     }
     await initializeTracking();
   }
@@ -680,23 +635,15 @@ class StepNotifier extends Notifier<StepState> {
   // can't be read (e.g. offline) or saved, so the caller can try again.
 
   Future<void> restoreDataFromFirebase() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (!_cloud.isSignedIn) return;
     final session = AccountSession.current;
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    if (!ref.mounted || session != AccountSession.current || !doc.exists) {
+    final data = await _cloud.load();
+    if (!ref.mounted || session != AccountSession.current || data == null) {
       return;
     }
-    final now = DateTime.now();
-    final restored = restoreAccount(
-      ref.read(storageProvider),
-      doc.data()!,
-      now,
-    );
-    _deleteCloudDays(user.uid, restored.staleCloudDays);
+    final now = _now();
+    final restored = restoreAccount(ref.read(storageProvider), data, now);
+    _cloud.deleteHistoryDays(restored.staleCloudDays);
 
     _stepsDay = dateKey(now);
     state = state.copyWith(
@@ -717,19 +664,5 @@ class StepNotifier extends Notifier<StepState> {
       ),
     );
     await ref.read(challengeProvider.notifier).syncWithFirestore();
-  }
-
-  // Deletes cloud history days older than the 31 day window (users who
-  // skipped the per-sync cleanup).
-  void _deleteCloudDays(String uid, List<String> days) {
-    if (days.isEmpty) return;
-    FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .update({
-          for (final key in days)
-            FieldPath(['dailyHistory', key]): FieldValue.delete(),
-        })
-        .catchError((e) => debugPrint('History cleanup failed: $e'));
   }
 }
