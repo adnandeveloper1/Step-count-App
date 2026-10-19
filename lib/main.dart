@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart' as g_sign_in;
 import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
+import 'core/services/app_review_service.dart';
 import 'core/services/local_storage_service.dart';
 import 'core/services/native_health_service.dart';
 import 'core/services/notification_service.dart';
@@ -140,6 +141,7 @@ void main() async {
 
   final storage = LocalStorageService();
   await storage.init();
+  AppReviewService().recordLaunch();
 
   final int steps = storage.getSteps();
   final int goal = storage.getStepGoal();

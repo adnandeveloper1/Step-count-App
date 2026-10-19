@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/app_review_service.dart';
 import '../../step_tracking/presentation/providers/step_provider.dart';
 import '../../../core/utils/export_service.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
@@ -189,6 +190,21 @@ class SettingsScreen extends ConsumerWidget {
                             stepState.distanceKm,
                           );
 
+                        },
+                      ),
+                      const Divider(color: Colors.white24),
+                      ListTile(
+                        leading: Icon(Icons.star_rate_rounded, color: AppColors.primaryEmerald, size: screenWidth * 0.06),
+                        title: Text('Rate Us on Play Store', style: TextStyle(color: AppColors.textPrimary, fontSize: screenWidth * 0.04)),
+                        trailing: Icon(Icons.chevron_right, color: AppColors.textSecondary, size: screenWidth * 0.05),
+                        onTap: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final opened = await AppReviewService().openStoreListing();
+                          if (!opened) {
+                            messenger.showSnackBar(
+                              const SnackBar(content: Text("Couldn't open the Play Store. Please try again later.")),
+                            );
+                          }
                         },
                       ),
                       const Divider(color: Colors.white24),

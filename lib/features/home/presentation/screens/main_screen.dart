@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/gps_tracking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/services/app_review_service.dart';
 import '../../../settings/presentation/setting_screen.dart';
 import '../../../social/presentation/screens/social_screen.dart';
 import '../../../step_tracking/presentation/screens/dashboard_screen.dart';
@@ -18,6 +20,7 @@ class MainNavigationScreen extends ConsumerStatefulWidget {
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
+  Timer? _reviewTimer;
 
   final List<Widget> _screens = [
     const DashboardView(),
@@ -30,6 +33,18 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
+    // Give the user a moment with the dashboard before asking for a review.
+    _reviewTimer = Timer(const Duration(seconds: 4), () {
+      // Don't cover another screen the user opened (Store, profile...).
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+      AppReviewService().maybeRequestReview();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reviewTimer?.cancel();
+    super.dispose();
   }
 
 
