@@ -8,6 +8,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:google_sign_in/google_sign_in.dart' as g_sign_in;
 import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
+import 'core/services/app_review_service.dart';
 import 'core/services/background_step_save.dart';
 import 'core/services/local_storage_service.dart';
 import 'core/services/native_health_service.dart';
@@ -176,6 +177,7 @@ Future<void> _startApp(
   final storage = LocalStorageService();
   await storage.init();
   storageReady.complete();
+  AppReviewService().recordLaunch();
 
   final int steps = storage.getSteps();
   final int goal = storage.getStepGoal();
