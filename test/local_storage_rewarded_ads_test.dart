@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:build_up/core/ads/rewarded_ad_limits.dart';
+import 'package:build_up/core/services/app_review_service.dart';
 import 'package:build_up/core/services/local_storage_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
@@ -44,6 +45,23 @@ void main() {
     expect(storage.rewardedAdsLeft(RewardedAdKind.coins, tomorrow), 2);
     // Yesterday's goal view was dropped, not carried into the new day.
     expect(storage.rewardedAdsLeft(RewardedAdKind.goal, tomorrow), 1);
+  });
+
+  test('signing out keeps the review prompt\'s counts', () async {
+    // They belong to the phone: clearing them would restart the 5 launches
+    // and 3 days, and forget that Play was asked in the last 30 days.
+    final box = Hive.box('buildUpData');
+    await box.putAll({
+      AppReviewService.launchCountKey: 7,
+      AppReviewService.firstOpenKey: 1000,
+      AppReviewService.lastAskedKey: 2000,
+    });
+
+    await storage.clearAllUserData();
+
+    expect(box.get(AppReviewService.launchCountKey), 7);
+    expect(box.get(AppReviewService.firstOpenKey), 1000);
+    expect(box.get(AppReviewService.lastAskedKey), 2000);
   });
 
   test('signing out keeps the counts of today', () async {

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:build_up/features/insight/presentation/insights_screen.dart';
 import 'package:build_up/features/step_tracking/presentation/screens/gps_tracking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_update/in_app_update.dart';
 import '../../../../app/theme/theme_extensions.dart';
+import '../../../../core/services/app_review_service.dart';
 import '../../../settings/presentation/setting_screen.dart';
 import '../../../social/presentation/screens/social_screen.dart';
 import '../../../step_tracking/presentation/screens/dashboard_screen.dart';
@@ -19,11 +21,26 @@ class MainNavigationScreen extends ConsumerStatefulWidget {
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
+  Timer? _reviewTimer;
 
   @override
   void initState() {
     super.initState();
     _checkForUpdates();
+    // Give the user a moment with the dashboard before asking for a review.
+    // While a Play update covers the app it isn't in front, so the review
+    // service doesn't ask then.
+    _reviewTimer = Timer(const Duration(seconds: 4), () {
+      // Don't cover another screen the user opened (Store, profile...).
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+      AppReviewService().maybeRequestReview();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reviewTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkForUpdates() async {

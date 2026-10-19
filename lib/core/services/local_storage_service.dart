@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../ads/rewarded_ad_limits.dart';
+import 'app_review_service.dart';
 import '../utils/activity_log.dart';
 import '../utils/step_counter_math.dart';
 import '../utils/step_history.dart';
@@ -356,20 +357,23 @@ class LocalStorageService {
     _box.put('dataOwner', uid);
   }
 
-  /// Clears the account's data. Today's rewarded ad counts belong to the
-  /// phone, not the account, so they are kept: signing out and in again
-  /// must not give more ads.
+  /// Clears the account's data. What belongs to the phone, not the account,
+  /// is kept: today's rewarded ad counts (signing out and in again must not
+  /// give more ads) and the review prompt's counts (see AppReviewService).
   Future<void> clearAllUserData() async {
-    final adKeys = [
+    final phoneKeys = [
       'rewardedAdDate',
       for (final kind in RewardedAdKind.values) 'rewardedAds_${kind.name}',
+      AppReviewService.launchCountKey,
+      AppReviewService.firstOpenKey,
+      AppReviewService.lastAskedKey,
     ];
-    final adCounts = {
-      for (final key in adKeys)
+    final kept = {
+      for (final key in phoneKeys)
         if (_box.containsKey(key)) key: _box.get(key),
     };
     await _box.clear();
-    await _box.putAll(adCounts);
+    await _box.putAll(kept);
   }
 
   String getChallengeData() {

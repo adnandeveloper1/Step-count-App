@@ -44,6 +44,7 @@ dependencies:
   step_sensor:
     path: packages/step_sensor
   google_mobile_ads: ^9.1.0
+  in_app_review: ^2.0.12
 
 
 flutter_launcher_icons:
