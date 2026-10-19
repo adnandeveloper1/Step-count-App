@@ -386,14 +386,20 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       icon: Icons.directions_walk_rounded,
       iconColor: context.primaryColor,
       title: '${formatThousands(walk.steps)} steps',
-      subtitle: walk.timeUnknown
-          ? fromMidnight
-                ? 'Before ${_time(walk.end)} · time not recorded'
-                : 'Between ${_time(walk.start)} and ${_time(walk.end)} · '
-                      'time not recorded'
-          : fromMidnight
-          ? 'Until ${_time(walk.end)}'
-          : '${_time(walk.start)} – ${_time(walk.end)}',
+      subtitle:
+          switch ((walk.timeUnknown, fromMidnight)) {
+            (true, true) => 'Before ${_time(walk.end)}',
+            (true, false) =>
+              'Between ${_time(walk.start)} and ${_time(walk.end)}',
+            (false, true) => 'Until ${_time(walk.end)}',
+            (false, false) => '${_time(walk.start)} – ${_time(walk.end)}',
+          } +
+          switch (walk) {
+            WalkPeriod(unseen: true) =>
+              ' · not seen as walking, maybe a vehicle',
+            WalkPeriod(timeUnknown: true) => ' · time not recorded',
+            _ => '',
+          },
     );
   }
 

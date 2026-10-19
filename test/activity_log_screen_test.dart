@@ -157,6 +157,24 @@ void main() {
     expect(find.textContaining('Times come from your phone'), findsOneWidget);
   });
 
+  testWidgets('steps the recording did not see say so', (tester) async {
+    // The 9:15-9:30 steps, with recording on but no walking seen.
+    await pumpScreen(
+      tester,
+      recorded: RecordedSteps(
+        since: _today(0),
+        until: _today(23, 59),
+        minutes: [for (var m = 0; m < 5; m++) (_today(9, 5 + m), 80)],
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.text('9:15 AM – 9:30 AM · not seen as walking, maybe a vehicle'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('without recorded steps the times are estimates', (tester) async {
     await pumpScreen(tester);
     await tester.pump();

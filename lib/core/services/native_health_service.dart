@@ -78,6 +78,7 @@ class NativeHealthService {
       }) {
         return RecordedSteps(
           since: DateTime.fromMillisecondsSinceEpoch(since),
+          until: end,
           minutes: [
             for (final bucket in buckets)
               if (bucket case [final int start, final int steps])

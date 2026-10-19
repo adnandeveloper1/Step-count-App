@@ -536,8 +536,11 @@ void main() {
         (from.add(Duration(minutes: m)), perMinute),
     ];
 
-    RecordedSteps recorded(List<(DateTime, int)> minutes, {DateTime? since}) =>
-        RecordedSteps(since: since ?? at(0), minutes: minutes);
+    RecordedSteps recorded(
+      List<(DateTime, int)> minutes, {
+      DateTime? since,
+      DateTime? until,
+    }) => RecordedSteps(since: since ?? at(0), until: until, minutes: minutes);
 
     DayActivity summarize(
       List<(DateTime, int)> syncs,
@@ -861,6 +864,82 @@ void main() {
       for (final w in withRecorded.walks) {
         expect(w.end.isAfter(at(10)) && w.start.isBefore(at(10, 30)), isFalse);
       }
+    });
+
+    group('steps the recording did not see as walking', () {
+      // Today's bike ride: the phone noticed it at 2:33, but the bumps
+      // from 2:20 were counted as steps. Recording saw no walking then.
+      DayActivity bikeDay({DateTime? until}) => summarize(
+        [(at(11, 28), 113), (at(14, 51), 270)],
+        recorded(walk(at(14, 45), 2, 10), until: until ?? at(15, 56)),
+        rides: [
+          ride(
+            1,
+            RideStatus.ended,
+            start: at(14, 33),
+            end: at(14, 42),
+            steps: 358,
+          ),
+        ],
+      );
+
+      test('a long gap is marked as not seen', () {
+        final walk = bikeDay().walks.last;
+        expect(
+          (walk.start, walk.end, walk.steps),
+          (at(11, 28), at(14, 51), 157),
+        );
+        expect(walk.timeUnknown, isTrue);
+        expect(walk.unseen, isTrue);
+      });
+
+      test('a short window is marked too, keeping its times', () {
+        final day = summarize([
+          (at(14, 20), 0),
+          (at(14, 33), 157),
+        ], recorded(const [], until: at(16)));
+        final walk = day.walks.single;
+        expect(
+          (walk.start, walk.end, walk.steps),
+          (at(14, 20), at(14, 33), 157),
+        );
+        expect(walk.timeUnknown, isFalse);
+        expect(walk.unseen, isTrue);
+      });
+
+      test('steps from the last few minutes may not be saved yet', () {
+        final walk = bikeDay(until: at(14, 55)).walks.last;
+        expect(walk.timeUnknown, isTrue);
+        expect(walk.unseen, isFalse);
+      });
+
+      test('steps before recording began are not marked', () {
+        final day = summarize([
+          (at(8), 0),
+          (at(9), 300),
+        ], recorded(const [], since: at(10), until: at(16)));
+        expect(day.walks.single.unseen, isFalse);
+      });
+
+      test('steps the recording saw are never marked', () {
+        final day = summarize([
+          (at(8), 0),
+          (at(9), 300),
+        ], recorded(walk(at(8, 10), 3, 100), until: at(9, 2)));
+        expect(day.walks.single.unseen, isFalse);
+      });
+
+      test('an unseen window does not join the walk before it', () {
+        final day = summarize([
+          (at(8), 0),
+          (at(8, 10), 200),
+          (at(8, 20), 400),
+        ], recorded(const [], since: at(8, 10), until: at(16)));
+        expect(day.walks.map((w) => (w.start, w.end, w.unseen)), [
+          (at(8), at(8, 10), false),
+          (at(8, 10), at(8, 20), true),
+        ]);
+      });
     });
   });
 }
