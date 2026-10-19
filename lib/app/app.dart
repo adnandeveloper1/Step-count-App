@@ -7,6 +7,8 @@ import '../features/home/presentation/screens/main_screen.dart';
 import '../features/auth/presentation/screens/auth_screen.dart';
 import '../features/shop/presentation/providers/theme_provider.dart';
 import '../features/social/presentation/providers/leaderboard_card_sync.dart';
+import '../features/onboarding/onboarding_provider.dart';
+import '../features/onboarding/screens/onboarding_screen.dart';
 
 class BuildUpApp extends ConsumerWidget {
   const BuildUpApp({super.key});
@@ -19,6 +21,7 @@ class BuildUpApp extends ConsumerWidget {
     if (uid != null) ref.watch(leaderboardCardSyncProvider(uid));
     final themeState = ref.watch(themeProvider);
     final activeTheme = themeState.activeTheme;
+    final onboardingSeen = ref.watch(onboardingSeenProvider);
 
     final dynamicThemeData = ThemeData(
       brightness: activeTheme.brightness,
@@ -63,7 +66,9 @@ class BuildUpApp extends ConsumerWidget {
                 uid: user.uid,
                 child: const MainNavigationScreen(),
               )
-            : const AuthScreen(),
+            : onboardingSeen
+            ? const AuthScreen()
+            : const OnboardingScreen(),
         loading: () =>
             const Scaffold(body: Center(child: CircularProgressIndicator())),
         error: (error, stackTrace) =>

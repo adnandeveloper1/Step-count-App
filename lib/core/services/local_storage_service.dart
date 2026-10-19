@@ -218,6 +218,14 @@ class LocalStorageService {
     _box.put('healthSupported', supported);
   }
 
+  bool getOnboardingSeen() {
+    return _box.get('onboardingSeen', defaultValue: false);
+  }
+
+  void saveOnboardingSeen(bool value) {
+    _box.put('onboardingSeen', value);
+  }
+
   // Steps of today already added to challenges, and steps from an earlier day
   // still waiting to be added (see settleChallengeSteps).
   int getChallengeCreditedSteps() =>
@@ -359,7 +367,8 @@ class LocalStorageService {
 
   /// Clears the account's data. What belongs to the phone, not the account,
   /// is kept: today's rewarded ad counts (signing out and in again must not
-  /// give more ads) and the review prompt's counts (see AppReviewService).
+  /// give more ads), the review prompt's counts (see AppReviewService) and
+  /// whether onboarding was finished.
   Future<void> clearAllUserData() async {
     final phoneKeys = [
       'rewardedAdDate',
@@ -367,6 +376,7 @@ class LocalStorageService {
       AppReviewService.launchCountKey,
       AppReviewService.firstOpenKey,
       AppReviewService.lastAskedKey,
+      'onboardingSeen',
     ];
     final kept = {
       for (final key in phoneKeys)
