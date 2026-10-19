@@ -116,6 +116,24 @@ void main() {
     expect(auth.deletes, 1);
   });
 
+  testWidgets('a double tap opens one question and deletes once', (
+    tester,
+  ) async {
+    await pump(tester, _FakeAuthController(DeleteAccountResult.deleted));
+
+    // The second tap comes before the first dialog has drawn; its barrier
+    // takes it.
+    await tester.tap(find.text('Delete Account'));
+    await tester.tap(find.text('Delete Account'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete your account?'), findsOneWidget);
+    await tester.tap(find.byKey(DeleteAccountTile.confirmKey));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete your account?'), findsNothing);
+    expect(auth.deletes, 1);
+  });
+
   testWidgets('an email account types its password', (tester) async {
     await pump(
       tester,

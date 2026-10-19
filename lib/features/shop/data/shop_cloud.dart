@@ -39,11 +39,10 @@ class ShopCloud {
       _merge({'activeTheme': themeId});
 
   /// Adds the paid themes in [owned] to the account, for themes bought before
-  /// they were saved there, and equips [active].
-  Future<void> backUpThemes(List<String> owned, String active) => _merge({
-    'purchasedThemes': FieldValue.arrayUnion(owned),
-    'activeTheme': active,
-  });
+  /// they were saved there. Leaves the equipped theme alone: it runs on
+  /// every start, and another phone may have equipped a different one.
+  Future<void> backUpThemes(List<String> owned) =>
+      _merge({'purchasedThemes': FieldValue.arrayUnion(owned)});
 
   /// Adds [itemId] to the account's items and shows the Pro Avatar frame.
   Future<void> buyItem(String itemId) => _merge({

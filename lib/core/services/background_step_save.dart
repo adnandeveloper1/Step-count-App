@@ -8,6 +8,9 @@ import 'local_storage_service.dart';
 /// that run after it releases storage.
 typedef BackgroundSyncResult = ({
   int todaySteps,
+  // Yesterday's saved total, which steps from just before midnight can
+  // raise; null when none is saved.
+  int? yesterdaySteps,
   int goal,
   int coins,
   double distanceKm,
@@ -117,6 +120,10 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
 
     return (
       todaySteps: todaySteps,
+      yesterdaySteps:
+          storage.getDailyHistory()[dateKey(
+            DateTime(now.year, now.month, now.day - 1),
+          )],
       goal: goal,
       coins: currentCoins,
       distanceKm: distanceKm,

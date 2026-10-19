@@ -171,15 +171,18 @@ class AuthController {
       if (!await _confirmIdentity(cloud, method, askPassword)) {
         return DeleteAccountResult.cancelled;
       }
-      // Drops in-flight step and coin syncs, so they can't write the
-      // profile back while it is deleted.
+      // Drops in-flight step and coin syncs, and holds off new ones until
+      // the sign-in is gone, so nothing writes the profile back meanwhile.
       AccountSession.end();
+      AccountSession.deleting = true;
       await cloud.deleteData();
     } on DataDeletionInterrupted catch (e) {
       debugPrint('Account data deletion stopped: $e');
+      AccountSession.deleting = false;
       return DeleteAccountResult.unfinished;
     } catch (e) {
       debugPrint('Account deletion failed: $e');
+      AccountSession.deleting = false;
       return _deletionFailure(e, method);
     }
 
@@ -191,6 +194,9 @@ class AuthController {
     } catch (e) {
       debugPrint('Sign-in deletion failed: $e');
       return DeleteAccountResult.unfinished;
+    } finally {
+      // Signed out from here on success, so syncs find no account to write.
+      AccountSession.deleting = false;
     }
 
     if (method == SignInMethod.google) {

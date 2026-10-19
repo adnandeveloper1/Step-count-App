@@ -152,6 +152,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
     bodyFatController = TextEditingController();
     _prefilled = {
+      goalController: goalController.text,
       weightController: weightController.text,
       heightController: heightController.text,
       bodyFatController: '',
@@ -171,8 +172,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (!mounted || data == null) return;
 
     setState(() {
+      // Shown even when the picker doesn't offer it (new accounts start
+      // with 🙂, 🌟 or 👤).
       final savedAvatar = data!['avatarUrl'];
-      if (!_avatarPicked && avatars.contains(savedAvatar)) {
+      if (!_avatarPicked && savedAvatar is String && savedAvatar.isNotEmpty) {
         selectedAvatar = savedAvatar;
       }
       _fillIfUnchanged(weightController, data['weight']);
@@ -181,6 +184,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       isProAvatarUnlocked = showsProAvatar(data);
     });
   }
+
+  // Changed by the user or filled from the account since the screen opened.
+  bool _changed(TextEditingController controller) =>
+      controller.text.trim() != _prefilled[controller];
 
   void _fillIfUnchanged(TextEditingController controller, Object? value) {
     if (value is! num) return;
@@ -209,11 +216,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final notifier = ref.read(stepNotifierProvider.notifier);
     final stepState = ref.read(stepNotifierProvider);
 
+    // Only what differs from what the screen opened with: the phone's
+    // values can be the 70 kg / 170 cm defaults of an account that never
+    // set them, and saving them would make them the account's.
     final newName = nameController.text.trim();
-    final newGoal = int.tryParse(goalController.text.trim());
-    final weight = _parseDouble(weightController.text);
-    final height = _parseDouble(heightController.text);
-    final bodyFat = _parseDouble(bodyFatController.text);
+    final newGoal = _changed(goalController)
+        ? int.tryParse(goalController.text.trim())
+        : null;
+    final weight = _changed(weightController)
+        ? _parseDouble(weightController.text)
+        : null;
+    final height = _changed(heightController)
+        ? _parseDouble(heightController.text)
+        : null;
+    final bodyFat = _changed(bodyFatController)
+        ? _parseDouble(bodyFatController.text)
+        : null;
 
     if (weight != null || height != null) {
       notifier.updateProfile(
@@ -223,7 +241,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
     if (newGoal != null) notifier.updateGoal(newGoal);
     cloud.save({
-      'avatarUrl': selectedAvatar,
+      // Only a picked one: offline the account's avatar isn't loaded, and
+      // selectedAvatar's default would replace it.
+      if (_avatarPicked) 'avatarUrl': selectedAvatar,
       'weight': ?weight,
       'height': ?height,
       'bodyFat': ?bodyFat,

@@ -105,6 +105,9 @@ void callbackDispatcher() {
         'lastUpdated': FieldValue.serverTimestamp(),
         'dailyHistory': {
           firebaseDateStr: result.todaySteps,
+          // Steps from just before midnight can raise yesterday's total.
+          dateKey(DateTime(now.year, now.month, now.day - 1)):
+              ?result.yesterdaySteps,
           // Keep only the last 31 days in the cloud too.
           for (final key in expiredDayKeys(now)) key: FieldValue.delete(),
         },
