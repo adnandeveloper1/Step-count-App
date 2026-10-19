@@ -39,6 +39,19 @@ void main() {
       );
     });
 
+    test('a lower total is sent at once', () {
+      // Vehicle bumps or a ride took steps back out of today.
+      expect(
+        needsStepUpload(
+          todaySteps: 2860,
+          today: '2026-10-18',
+          sent: (day: '2026-10-18', steps: 3000),
+          minNewSteps: 500,
+        ),
+        isTrue,
+      );
+    });
+
     test('nothing new is not sent again', () {
       expect(
         needsStepUpload(

@@ -8,6 +8,7 @@ import 'package:build_up/core/services/local_storage_service.dart';
 import 'package:build_up/core/services/native_health_service.dart';
 import 'package:build_up/core/services/notification_service.dart';
 import 'package:build_up/core/services/widget_service.dart';
+import 'package:build_up/core/utils/activity_log.dart';
 import 'package:build_up/core/utils/step_counter_math.dart';
 import 'package:build_up/features/social/presentation/providers/challenge_provider.dart'
     show ChallengeItem, ChallengeNotifier, challengeProvider;
@@ -26,6 +27,11 @@ class _FakeSensor extends Fake implements NativeHealthService {
   final removed = <List<int>>[];
   int driveDetectionStarts = 0;
   int recordingStarts = 0;
+
+  /// Recording on since midnight with no walking seen, unless set.
+  RecordedSteps? Function(DateTime day)? recording;
+  int recordingReads = 0;
+  Completer<void>? recordingHold;
 
   @override
   Future<int> getHardwareSteps() async {
@@ -52,6 +58,16 @@ class _FakeSensor extends Fake implements NativeHealthService {
   Future<bool> startStepRecording() async {
     recordingStarts++;
     return true;
+  }
+
+  @override
+  Future<RecordedSteps?> getRecordedSteps(DateTime day) async {
+    recordingReads++;
+    await recordingHold?.future;
+    final midnight = DateTime(day.year, day.month, day.day);
+    return (recording ??
+        (_) =>
+            RecordedSteps(since: midnight, until: day, minutes: const []))(day);
   }
 }
 
@@ -377,6 +393,80 @@ void main() {
       expect(state.currentSteps, 4500);
       expect(state.drivingSteps, 3000);
       expect(sensor.removed.last, [7]);
+    });
+
+    test('takes out vehicle bumps from before a ride was noticed', () async {
+      // Synced at 10:00 (sensor 5200). The ride was noticed at 12:00 after
+      // 140 steps the recording did not see as walking, held 358, and
+      // ended at 12:09; 17 steps since.
+      await seed(steps: 4200);
+      await box.put('lastSyncReading', 5200);
+      final c = container();
+      sensor.drives = [
+        Drive(
+          id: 7,
+          enterSteps: 5340,
+          exitSteps: 5698,
+          enteredAt: wednesday.add(const Duration(hours: 2)),
+          exitedAt: wednesday.add(const Duration(hours: 2, minutes: 9)),
+        ),
+      ];
+      clock = wednesday.add(const Duration(hours: 2, minutes: 18));
+
+      final state = await read(c, 5715);
+
+      expect(state.currentSteps, 4200 + 17);
+      expect(state.drivingSteps, 358 + 140);
+      expect(box.get('currentSteps'), 4200 + 17);
+      expect(widget.steps.last, 4200 + 17);
+      final day = LocalStorageService().getActivityLog().day(wednesday);
+      expect(day.rides.single.notCounted, 358 + 140);
+    });
+
+    test('two reads at once take the bumps out once', () async {
+      await seed(steps: 4200);
+      await box.put('lastSyncReading', 5200);
+      final c = container();
+      sensor.drives = [
+        Drive(
+          id: 7,
+          enterSteps: 5340,
+          exitSteps: 5698,
+          enteredAt: wednesday.add(const Duration(hours: 2)),
+          exitedAt: wednesday.add(const Duration(hours: 2, minutes: 9)),
+        ),
+      ];
+      clock = wednesday.add(const Duration(hours: 2, minutes: 18));
+      sensor.steps = 5715;
+      sensor.recordingHold = Completer();
+      final notifier = c.read(stepNotifierProvider.notifier);
+
+      // The minute poll and a background request, both waiting on the
+      // recording.
+      final first = notifier.syncFromBackgroundRequest();
+      final second = notifier.syncFromBackgroundRequest();
+      await Future<void>.delayed(Duration.zero);
+      sensor.recordingHold!.complete();
+      await Future.wait([first, second]);
+
+      expect(c.read(stepNotifierProvider).currentSteps, 4200 + 17);
+      expect(box.get('currentSteps'), 4200 + 17);
+      expect(
+        LocalStorageService()
+            .getActivityLog()
+            .day(wednesday)
+            .rides
+            .single
+            .bumps,
+        140,
+      );
+    });
+
+    test('reads the step recording only with a stretch to check', () async {
+      await seed(steps: 4200);
+      final c = container();
+      await read(c, 1000 + 4300);
+      expect(sensor.recordingReads, 0);
     });
 
     test('adds new steps to active challenges and pays their coins', () async {

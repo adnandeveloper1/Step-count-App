@@ -1,5 +1,6 @@
 import '../utils/activity_log.dart';
 import '../utils/calorie_calculator.dart';
+import '../utils/ride_bumps.dart';
 import '../utils/step_counter_math.dart';
 import '../utils/step_history.dart';
 import 'local_storage_service.dart';
@@ -27,10 +28,15 @@ typedef BackgroundSyncResult = ({
 /// Saves [hardwareSteps], less the steps counted during [drives], to storage.
 /// Call only while holding storage (see StepSyncCoordinator.runInBackground).
 /// Returns null when the reading is not usable. [now] is for tests.
+///
+/// [readRecorded] reads the day's step recording, to find vehicle bumps
+/// counted beside a ride (see ride_bumps); it is only called when there is
+/// a stretch to check.
 Future<BackgroundSyncResult?> saveStepsInBackground(
   int hardwareSteps, {
   List<Drive> drives = const [],
   DateTime? now,
+  Future<RecordedSteps?> Function(DateTime now)? readRecorded,
 }) async {
   final storage = LocalStorageService();
   await storage.init();
@@ -41,7 +47,17 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
     final hadLocalData = storage.getLastDate().isNotEmpty;
     final isNewDay = storage.getLastDate() != dateStr;
 
-    final result = resolveTodaySteps(
+    final bumpChecks = storage.bumpChecksFor(
+      drives: drives,
+      hardwareSteps: hardwareSteps,
+      now: now,
+    );
+    final settled = now.subtract(recordingDelay);
+    final recorded = bumpChecks.any((c) => !c.to.isAfter(settled))
+        ? await readRecorded?.call(now)
+        : null;
+
+    final resolved = resolveTodaySteps(
       hardwareSteps: hardwareSteps,
       baseline: storage.getHardwareBaseline(),
       savedToday: storage.getSteps(),
@@ -51,7 +67,12 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
       now: now,
       lastSyncAt: storage.getLastSyncAt(),
     );
-    if (result == null) return null;
+    if (resolved == null) return null;
+    final bumps = storage.settleBumpChecks(bumpChecks, recorded, now: now);
+    final result = withoutBumps(
+      resolved,
+      bumps.fold(0, (sum, b) => sum + b.$2),
+    );
 
     // Steps from before midnight finish off the last saved day.
     if (isNewDay) {
@@ -74,6 +95,7 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
     if (isNewDay) storage.startNewDay(dateStr);
 
     storage.saveHardwareBaseline(result.baseline);
+    storage.saveLastSyncReading(hardwareSteps);
     storage.markDrivesApplied(result);
     final int todaySteps = result.todaySteps;
 
@@ -96,6 +118,7 @@ Future<BackgroundSyncResult?> saveStepsInBackground(
       CheckSource.background,
       rides: result.rides,
     );
+    storage.logRideBumps(bumps, now);
     storage.saveDailyHistory(
       recordDay(storage.getDailyHistory(), now, todaySteps),
     );

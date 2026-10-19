@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../ads/rewarded_ad_limits.dart';
 import 'app_review_service.dart';
 import '../utils/activity_log.dart';
+import '../utils/ride_bumps.dart';
 import '../utils/step_counter_math.dart';
 import '../utils/step_history.dart';
 
@@ -261,12 +262,16 @@ class LocalStorageService {
   /// their steps to today's driving steps. Call after any new-day reset and
   /// after saving the baseline; delete the drives natively afterwards.
   void markDrivesApplied(StepCounterResult result) {
-    if (result.appliedDriveIds.isEmpty) return;
-    _box.put(
-      'appliedDriveIds',
-      rememberAppliedDrives(getAppliedDriveIds(), result.appliedDriveIds),
-    );
-    saveDrivingStepsToday(getDrivingStepsToday() + result.drivingSteps);
+    if (result.appliedDriveIds.isNotEmpty) {
+      _box.put(
+        'appliedDriveIds',
+        rememberAppliedDrives(getAppliedDriveIds(), result.appliedDriveIds),
+      );
+    }
+    // Also bumps found beside a ride still going (see ride_bumps).
+    if (result.drivingSteps > 0) {
+      saveDrivingStepsToday(getDrivingStepsToday() + result.drivingSteps);
+    }
   }
 
   /// Steps removed today because they were counted in a vehicle.
@@ -301,6 +306,110 @@ class LocalStorageService {
     final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
     _ => null,
   };
+
+  /// The step counter at the last save; null before one is saved.
+  int? getLastSyncReading() => _box.get('lastSyncReading') as int?;
+
+  void saveLastSyncReading(int hardwareSteps) =>
+      _box.put('lastSyncReading', hardwareSteps);
+
+  /// How many [BumpCheck] keys are remembered; far more than rides in a day.
+  static const _bumpKeysKept = 200;
+
+  /// The stretches beside rides to compare with step recording at this
+  /// check (see ride_bumps): those still waiting from today, and new ones
+  /// beside [drives]. Nothing is stored until [settleBumpChecks].
+  List<BumpCheck> bumpChecksFor({
+    required List<Drive> drives,
+    required int hardwareSteps,
+    required DateTime now,
+  }) {
+    final today = dayKey(now);
+    final waiting = <BumpCheck>[
+      for (final json
+          in jsonDecode(_box.get('bumpChecks', defaultValue: '[]')) as List)
+        if (BumpCheck.fromJson(json as Map) case final check
+            when dayKey(check.to) == today)
+          check,
+    ];
+    return [
+      ...waiting,
+      ...newBumpChecks(
+        drives: drives,
+        queued: {
+          ...List<String>.from(
+            _box.get('bumpCheckKeys', defaultValue: const <String>[]),
+          ),
+          for (final check in waiting) check.key,
+        },
+        lastSyncAt: getLastSyncAt(),
+        lastReading: getLastSyncReading(),
+        hardwareSteps: hardwareSteps,
+        now: now,
+      ),
+    ];
+  }
+
+  /// Compares [checks] with [recorded] and returns the bumps found in each.
+  /// Stretches the recording may not have saved yet are kept for a later
+  /// check. None are taken out on a day the goal ad filled: that would put
+  /// the paid-for goal out of reach again.
+  List<(BumpCheck, int)> settleBumpChecks(
+    List<BumpCheck> checks,
+    RecordedSteps? recorded, {
+    required DateTime now,
+  }) {
+    final goalFilled = getActivityLog()
+        .day(now)
+        .checks
+        .any((c) => c.source == CheckSource.goalReward);
+    final found = <(BumpCheck, int)>[];
+    final waiting = <BumpCheck>[];
+    for (final check in checks) {
+      if (goalFilled) continue;
+      final bumps = recorded == null ? null : bumpsIn(check, recorded);
+      if (bumps == null) {
+        waiting.add(check);
+      } else if (bumps > 0) {
+        found.add((check, bumps));
+      }
+    }
+    final keys = [
+      ...List<String>.from(
+        _box.get('bumpCheckKeys', defaultValue: const <String>[]),
+      ),
+      for (final check in checks)
+        if (!waiting.contains(check)) check.key,
+    ];
+    _box.put(
+      'bumpCheckKeys',
+      keys.length > _bumpKeysKept
+          ? keys.sublist(keys.length - _bumpKeysKept)
+          : keys,
+    );
+    _box.put(
+      'bumpChecks',
+      jsonEncode([for (final check in waiting) check.toJson()]),
+    );
+    return found;
+  }
+
+  /// Puts the bumps [found] at [now] on their rides in the activity log,
+  /// and takes them off the checks that counted them (see
+  /// ActivityLog.addRideBumps). Call after logging the check at [now].
+  void logRideBumps(List<(BumpCheck, int)> found, DateTime now) {
+    if (found.isEmpty) return;
+    var log = getActivityLog();
+    for (final (check, steps) in found) {
+      log = log.addRideBumps(
+        rideId: check.rideId,
+        steps: steps,
+        after: check.to,
+        before: now,
+      );
+    }
+    _box.put('activityLog', log.toJson());
+  }
 
   /// On a new day, before [startNewDay]: adds the [steps] taken after the
   /// last sync, before the end of its day, to that day (see

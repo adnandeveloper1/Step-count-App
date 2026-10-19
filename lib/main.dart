@@ -54,7 +54,11 @@ void callbackDispatcher() {
     // Checks again: the app may have started during the sensor read.
     BackgroundSyncResult? synced;
     final outcome = await StepSyncCoordinator.runInBackground(() async {
-      synced = await saveStepsInBackground(hardwareSteps, drives: drives);
+      synced = await saveStepsInBackground(
+        hardwareSteps,
+        drives: drives,
+        readRecorded: NativeHealthService().getRecordedSteps,
+      );
     });
     if (outcome != BackgroundSyncOutcome.ranHere) return Future.value(true);
     final result = synced;

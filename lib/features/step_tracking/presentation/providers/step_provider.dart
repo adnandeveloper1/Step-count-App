@@ -9,6 +9,7 @@ import '../../../../core/services/widget_service.dart';
 import '../../../../core/utils/activity_log.dart';
 import '../../../../core/utils/calorie_calculator.dart';
 import '../../../../core/utils/monthly_best.dart';
+import '../../../../core/utils/ride_bumps.dart';
 import '../../../../core/utils/step_counter_math.dart';
 import '../../../../core/utils/step_history.dart';
 import '../../../../core/utils/step_upload.dart';
@@ -326,7 +327,23 @@ class StepNotifier extends Notifier<StepState> {
     final dateStr = dateKey(now);
     final isNewDay = storage.getLastDate() != dateStr;
 
-    final result = resolveTodaySteps(
+    // Stretches beside rides to compare with step recording (see
+    // ride_bumps). Read only when one may be saved by now.
+    List<BumpCheck> bumpChecksNow() => storage.bumpChecksFor(
+      drives: drives,
+      hardwareSteps: hardwareSteps,
+      now: now,
+    );
+    final settled = now.subtract(recordingDelay);
+    final recorded = bumpChecksNow().any((c) => !c.to.isAfter(settled))
+        ? await nativeHealth.getRecordedSteps(now)
+        : null;
+    if (!ref.mounted || session != AccountSession.current) return;
+    // Again after the wait: another read may have settled some meanwhile.
+    // From here on nothing waits, so no other read can come in between.
+    final bumpChecks = bumpChecksNow();
+
+    final resolved = resolveTodaySteps(
       hardwareSteps: hardwareSteps,
       baseline: storage.getHardwareBaseline(),
       savedToday: storage.getSteps(),
@@ -336,7 +353,12 @@ class StepNotifier extends Notifier<StepState> {
       now: now,
       lastSyncAt: storage.getLastSyncAt(),
     );
-    if (result == null) return;
+    if (resolved == null) return;
+    final bumps = storage.settleBumpChecks(bumpChecks, recorded, now: now);
+    final result = withoutBumps(
+      resolved,
+      bumps.fold(0, (sum, b) => sum + b.$2),
+    );
 
     // Steps from before midnight finish off the last saved day, coins
     // included.
@@ -361,6 +383,7 @@ class StepNotifier extends Notifier<StepState> {
 
     if (isNewDay) storage.startNewDay(dateStr);
     storage.saveHardwareBaseline(result.baseline);
+    storage.saveLastSyncReading(hardwareSteps);
     storage.markDrivesApplied(result);
 
     _processSteps(
@@ -374,6 +397,7 @@ class StepNotifier extends Notifier<StepState> {
       CheckSource.app,
       rides: result.rides,
     );
+    storage.logRideBumps(bumps, now);
     // The baseline now includes these drives, and their ids are stored.
     await nativeHealth.removeDrives(result.appliedDriveIds);
   }

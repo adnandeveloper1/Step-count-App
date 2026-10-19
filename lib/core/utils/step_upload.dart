@@ -6,7 +6,8 @@ typedef SentSteps = ({String day, int steps});
 /// Whether [todaySteps] on [today] (yyyy-MM-dd) should be sent: always when
 /// nothing was sent yet or the last send was on another day (it also carries
 /// yesterday's final total), otherwise once [minNewSteps] more steps were
-/// taken since [sent].
+/// taken since [sent], or at once when the total went down (a ride or
+/// vehicle bumps took steps back out).
 ///
 /// Comparing counts across days would hold today back until it passed
 /// yesterday's total.
@@ -17,5 +18,5 @@ bool needsStepUpload({
   required int minNewSteps,
 }) {
   if (sent == null || sent.day != today) return true;
-  return todaySteps - sent.steps >= minNewSteps;
+  return todaySteps < sent.steps || todaySteps - sent.steps >= minNewSteps;
 }

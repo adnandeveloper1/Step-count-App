@@ -426,7 +426,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       RideStatus.ongoing when past => (
         'Vehicle ride',
         '${start ?? '?'} – still going · '
-            '${formatThousands(ride.steps)} steps not counted',
+            '${formatThousands(ride.notCounted)} steps not counted',
       ),
       RideStatus.ongoing => (
         'In a vehicle',
@@ -440,7 +440,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       RideStatus.ended => (
         'Vehicle ride',
         '${start ?? '?'} – ${end ?? '?'} · '
-            '${formatThousands(ride.steps)} steps not counted',
+            '${formatThousands(ride.notCounted)} steps not counted',
       ),
       RideStatus.timedOut => (
         'Vehicle ride',

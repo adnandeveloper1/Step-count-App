@@ -34,6 +34,13 @@ class LoggedRide {
   /// so the ride could not hold any steps out: they all count.
   final bool measured;
 
+  /// Vehicle bumps counted just before or after the ride, which step
+  /// recording saw were not walking, taken out as well (see ride_bumps).
+  final int bumps;
+
+  /// All the steps the ride took out of the day.
+  int get notCounted => steps + bumps;
+
   const LoggedRide({
     required this.id,
     this.start,
@@ -43,6 +50,7 @@ class LoggedRide {
     this.kept = 0,
     this.keptAt,
     this.measured = true,
+    this.bumps = 0,
   });
 }
 
@@ -169,7 +177,52 @@ class ActivityLog {
       kept: givesBack ? existing.steps : existing.kept,
       keptAt: givesBack ? now : existing.keptAt,
       measured: logged.measured,
+      bumps: existing.bumps,
     );
+  }
+
+  /// Adds [steps] bumps found beside ride [rideId] (see ride_bumps). The
+  /// checks of [after]'s day from [after] until [before] counted them, so
+  /// they come off those checks' totals; the check at [before] already
+  /// saved the lower total.
+  ActivityLog addRideBumps({
+    required int rideId,
+    required int steps,
+    required DateTime after,
+    required DateTime before,
+  }) {
+    final key = dayKey(after);
+    final log = days[key];
+    if (log == null || steps <= 0) return this;
+    return ActivityLog({
+      ...days,
+      key: DayLog(
+        checks: [
+          for (final c in log.checks)
+            if (!c.at.isBefore(after) && c.at.isBefore(before))
+              StepCheck(c.at, c.steps > steps ? c.steps - steps : 0, c.source)
+            else
+              c,
+        ],
+        rides: [
+          for (final r in log.rides)
+            if (r.id == rideId)
+              LoggedRide(
+                id: r.id,
+                start: r.start,
+                end: r.end,
+                steps: r.steps,
+                status: r.status,
+                kept: r.kept,
+                keptAt: r.keptAt,
+                measured: r.measured,
+                bumps: r.bumps + steps,
+              )
+            else
+              r,
+        ],
+      ),
+    });
   }
 
   static bool _isKept(String key, DateTime now) {
@@ -195,6 +248,7 @@ class ActivityLog {
               if (r.kept != 0) 'k': r.kept,
               if (r.keptAt case final at?) 'ka': at.millisecondsSinceEpoch,
               if (!r.measured) 'm': false,
+              if (r.bumps != 0) 'b': r.bumps,
             },
         ],
       },
@@ -246,6 +300,7 @@ class ActivityLog {
                     kept: r['k'] as int? ?? 0,
                     keptAt: time(r['ka']),
                     measured: r['m'] as bool? ?? true,
+                    bumps: r['b'] as int? ?? 0,
                   ),
                 ),
             ],
@@ -318,7 +373,7 @@ class DayActivity {
   });
 
   /// Steps held out or removed for being in a vehicle.
-  int get rideSteps => rides.fold(0, (sum, r) => sum + r.steps);
+  int get rideSteps => rides.fold(0, (sum, r) => sum + r.notCounted);
 }
 
 /// Rides closer than this (a stop at the lights, a quick errand) are shown as
@@ -531,6 +586,7 @@ List<LoggedRide> _joinRides(List<LoggedRide> sorted, List<WalkPeriod> walks) {
         end: ride.end,
         steps: last.steps + ride.steps,
         status: ride.status,
+        bumps: last.bumps + ride.bumps,
       );
     } else {
       joined.add(ride);

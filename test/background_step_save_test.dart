@@ -236,4 +236,167 @@ void main() {
       expect((await openBox()).get('weeklySteps'), week.join(','));
     },
   );
+
+  group('bike bumps before a ride', () {
+    // 2026-10-19: checked at 11:28 with 113 steps (counter 1000). The bike
+    // ride started about 2:20 PM but was noticed at 2:33 PM and ended at
+    // 2:42 PM; the next check came at 2:51 PM (counter 1515).
+    DateTime at(int hour, [int minute = 0]) =>
+        DateTime(2026, 10, 19, hour, minute);
+    final ride = Drive(
+      id: 4,
+      enterSteps: 1140,
+      exitSteps: 1498,
+      enteredAt: at(14, 33),
+      exitedAt: at(14, 42),
+    );
+
+    Future<void> seedMorning({int coins = 0, int lastCoinStep = 0}) async {
+      await seed(
+        lastDate: '2026-10-19',
+        steps: 113,
+        baseline: 887,
+        goal: 10000,
+      );
+      final log = const ActivityLog().record(
+        now: at(11, 28),
+        todaySteps: 113,
+        source: CheckSource.app,
+      );
+      await (await openBox()).putAll({
+        'lastSyncMs': at(11, 28).millisecondsSinceEpoch,
+        'lastSyncReading': 1000,
+        'activityLog': log.toJson(),
+        'coins': coins,
+        'lastCoinStep': lastCoinStep,
+      });
+    }
+
+    /// Recording on all day, with no walking seen.
+    Future<RecordedSteps?> noWalking(DateTime now) async =>
+        RecordedSteps(since: at(0), until: now, minutes: const []);
+
+    Future<BackgroundSyncResult?> runAt(
+      DateTime now,
+      int hardwareSteps, {
+      List<Drive> drives = const [],
+      Future<RecordedSteps?> Function(DateTime now)? readRecorded,
+    }) async {
+      await openBox();
+      return saveStepsInBackground(
+        hardwareSteps,
+        drives: drives,
+        now: now,
+        readRecorded: readRecorded ?? noWalking,
+      );
+    }
+
+    test('takes the bumps out with the ride', () async {
+      await seedMorning();
+      final result = await runAt(at(14, 51), 1515, drives: [ride]);
+
+      // 515 counted since 11:28: 358 on the ride, 140 before it was
+      // noticed with no walking recorded, 17 after it.
+      expect(result!.todaySteps, 113 + 17);
+      final box = await openBox();
+      expect(box.get('currentSteps'), 113 + 17);
+      expect(box.get('hardwareBaseline'), 887 + 358 + 140);
+      expect(box.get('drivingStepsToday'), 358 + 140);
+      final day = ActivityLog.fromJson(box.get('activityLog')).day(at(0));
+      expect(day.rides.single.notCounted, 358 + 140);
+      expect(day.checks.map((c) => c.steps), [113, 113 + 17]);
+    });
+
+    test('later checks keep counting from the lower total', () async {
+      await seedMorning();
+      await runAt(at(14, 51), 1515, drives: [ride]);
+      final result = await runAt(at(15, 51), 1733);
+      expect(result!.todaySteps, 113 + 17 + 218);
+    });
+
+    test('waits until the recording has saved the stretch', () async {
+      await seedMorning();
+      // Checked at 2:38 PM: the minutes before 2:33 may not be saved yet.
+      final early = Drive(id: 4, enterSteps: 1140, enteredAt: at(14, 33));
+      final first = await runAt(at(14, 38), 1160, drives: [early]);
+      expect(first!.todaySteps, 113 + 140);
+
+      final later = await runAt(at(14, 51), 1515, drives: [ride]);
+      expect(later!.todaySteps, 113 + 17);
+      final box = await openBox();
+      final day = ActivityLog.fromJson(box.get('activityLog')).day(at(0));
+      // The 2:38 PM check counted the bumps; it no longer does.
+      expect(day.checks.map((c) => (c.at, c.steps)), [
+        (at(11, 28), 113),
+        (at(14, 38), 113),
+        (at(14, 51), 113 + 17),
+      ]);
+      expect(day.rides.single.notCounted, 358 + 140);
+    });
+
+    test('takes nothing out when the recording saw the walking', () async {
+      await seedMorning();
+      final result = await runAt(
+        at(14, 51),
+        1515,
+        drives: [ride],
+        readRecorded: (now) async => RecordedSteps(
+          since: at(0),
+          until: now,
+          minutes: [for (var m = 0; m < 14; m++) (at(14, 5 + m), 10)],
+        ),
+      );
+      expect(result!.todaySteps, 113 + 157);
+    });
+
+    test('takes nothing out without the recording', () async {
+      await seedMorning();
+      final result = await runAt(
+        at(14, 51),
+        1515,
+        drives: [ride],
+        readRecorded: (_) async => null,
+      );
+      expect(result!.todaySteps, 113 + 157);
+    });
+
+    test('never takes back coins', () async {
+      // 100 more steps had already earned a coin before the ride.
+      await seedMorning(coins: 7, lastCoinStep: 200);
+      await runAt(at(14, 51), 1515, drives: [ride]);
+      final box = await openBox();
+      expect(box.get('coins'), 7);
+      expect(box.get('lastCoinStep'), 200);
+    });
+
+    test('takes nothing out on a day the goal ad filled', () async {
+      await seedMorning();
+      final box = await openBox();
+      final log = ActivityLog.fromJson(
+        box.get('activityLog'),
+      ).record(now: at(12), todaySteps: 10000, source: CheckSource.goalReward);
+      await box.putAll({
+        'activityLog': log.toJson(),
+        'currentSteps': 10000,
+        'hardwareBaseline': 887 - 9887,
+        'lastSyncMs': at(12).millisecondsSinceEpoch,
+      });
+      final result = await runAt(at(14, 51), 1515, drives: [ride]);
+      expect(result!.todaySteps, 10000 + 157);
+    });
+
+    test('does not read the recording with nothing to check', () async {
+      await seedMorning();
+      var reads = 0;
+      await runAt(
+        at(12),
+        1050,
+        readRecorded: (now) async {
+          reads++;
+          return null;
+        },
+      );
+      expect(reads, 0);
+    });
+  });
 }
